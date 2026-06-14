@@ -60,23 +60,25 @@ export function DeployButton({
         <a
           href="/connect"
           title="ต้องเชื่อมบัญชี Google ก่อนถึงจะ deploy ได้"
-          className="flex items-center gap-1.5 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-950/40 px-4 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 transition hover:bg-amber-100"
+          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 transition hover:bg-amber-100 sm:px-4"
         >
-          <RocketLaunchIcon className="h-4 w-4" />
-          เชื่อม Google ก่อน Deploy
+          <RocketLaunchIcon className="h-4 w-4 shrink-0" />
+          <span className="sm:hidden">เชื่อม Google</span>
+          <span className="hidden sm:inline">เชื่อม Google ก่อน Deploy</span>
         </a>
       ) : (
         <button
           onClick={deploy}
           disabled={res.kind === "busy"}
-          className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:opacity-50"
+          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:opacity-50 sm:px-4"
         >
           {res.kind === "busy" ? (
             "กำลัง deploy…"
           ) : (
             <>
-              <RocketLaunchIcon className="h-4 w-4" />
-              Deploy เข้า Google
+              <RocketLaunchIcon className="h-4 w-4 shrink-0" />
+              <span className="sm:hidden">Deploy</span>
+              <span className="hidden sm:inline">Deploy เข้า Google</span>
             </>
           )}
         </button>

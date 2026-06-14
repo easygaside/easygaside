@@ -62,7 +62,9 @@ export function EditorPane({ projectId }: { projectId: string }) {
 
   return (
     <Monaco
-      key={activePath}
+      // `path` makes Monaco keep one model per file and switch between them — NOT a full remount
+      // (which `key=` forced, disposing the editor mid-async → noisy "Canceled" errors).
+      path={activePath}
       height="100%"
       theme="vs-dark"
       language={langOf(activePath)}

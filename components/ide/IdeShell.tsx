@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeftIcon, ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowLeftIcon,
+  ChatBubbleLeftRightIcon,
+  CodeBracketIcon,
+  ExclamationTriangleIcon,
+  EyeIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ChatPanel } from "./ChatPanel";
@@ -32,9 +39,19 @@ export function IdeShell({
 }) {
   const setInitial = useProjectStore((s) => s.setInitial);
   const [hintOpen, setHintOpen] = useState(true);
+  // mobile-only: show one pane at a time (desktop shows all three side by side)
+  const [pane, setPane] = useState<"chat" | "code" | "preview">("chat");
   useEffect(() => {
     setInitial(initialFiles);
   }, [initialFiles, setInitial]);
+
+  const hideOnMobile = (p: "chat" | "code" | "preview") => (pane === p ? "" : "max-lg:hidden");
+  const TAB = (active: boolean) =>
+    `flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] transition ${
+      active
+        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 font-semibold text-white shadow-[0_4px_12px_rgba(16,185,129,0.35)]"
+        : "font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/60"
+    }`;
 
   return (
     <main className="flex h-screen flex-col bg-[#eef2f8] text-slate-800 dark:bg-[#0b0f14] dark:text-slate-100">
@@ -47,11 +64,11 @@ export function IdeShell({
             height={28}
             className="rounded-lg"
           />
-          <b className="text-sm tracking-tight">
+          <b className="hidden text-sm tracking-tight sm:block">
             EasyGAS <span className="text-emerald-600">IDE</span>
           </b>
         </span>
-        <span className="h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700" />
+        <span className="hidden h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700 sm:block" />
         <Link
           href="/projects"
           title="กลับไปหน้าโปรเจกต์"
@@ -85,19 +102,37 @@ export function IdeShell({
       )}
 
       <div className="grid min-h-0 flex-1 gap-3 px-3 pb-3 lg:grid-cols-[320px_1.3fr_1fr]">
-        <section className={CARD}>
+        <section className={`${CARD} ${hideOnMobile("chat")}`}>
           <ChatPanel projectId={projectId} initialImages={initialImages} />
         </section>
-        <section className={CARD}>
+        <section className={`${CARD} ${hideOnMobile("code")}`}>
           <FileTree />
           <div className="min-h-0 flex-1">
             <EditorPane projectId={projectId} />
           </div>
         </section>
-        <section className={`${CARD} p-3`}>
+        <section className={`${CARD} p-3 ${hideOnMobile("preview")}`}>
           <PreviewPane />
         </section>
       </div>
+
+      {/* mobile pane switcher — floating segmented control; desktop shows all three so it's hidden */}
+      <nav className="shrink-0 px-3 pb-3 lg:hidden">
+        <div className="flex items-center gap-1 rounded-2xl border border-slate-200/70 bg-white/90 p-1 shadow-[0_4px_16px_rgba(60,70,110,0.10)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+          <button type="button" onClick={() => setPane("chat")} className={TAB(pane === "chat")}>
+            <ChatBubbleLeftRightIcon className="h-4 w-4 shrink-0" />
+            แชต
+          </button>
+          <button type="button" onClick={() => setPane("code")} className={TAB(pane === "code")}>
+            <CodeBracketIcon className="h-4 w-4 shrink-0" />
+            โค้ด
+          </button>
+          <button type="button" onClick={() => setPane("preview")} className={TAB(pane === "preview")}>
+            <EyeIcon className="h-4 w-4 shrink-0" />
+            พรีวิว
+          </button>
+        </div>
+      </nav>
     </main>
   );
 }

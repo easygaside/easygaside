@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { mapGoogleError } from "@/lib/api-helpers";
-import { deployProject } from "@/lib/deploy";
+import { getTarget } from "@/lib/deployment-targets";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,7 +23,8 @@ export async function POST(
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   try {
-    const result = await deployProject(user.id, project);
+    const target = getTarget(project.target ?? "gas");
+    const result = await target.deploy(user.id, project);
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     return mapGoogleError(e);

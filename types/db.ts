@@ -5,12 +5,16 @@
 
 export type ProjectKind = "webapp" | "bound";
 export type ProjectStatus = "draft" | "previewing" | "deployed" | "archived";
+/** Deployment runtime. Only 'gas' is implemented; web targets are designed in docs/WEB-TARGET.md. */
+export type TargetId = "gas" | "web-supabase" | "static-web";
 
 export interface EgsProject {
   id: string;
   owner_id: string;
   name: string;
   kind: ProjectKind;
+  target: TargetId;
+  spec: Record<string, unknown> | null;
   script_id: string | null;
   bound_sheet_id: string | null;
   scratch_script_id: string | null;

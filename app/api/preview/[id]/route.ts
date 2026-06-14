@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { mapGoogleError } from "@/lib/api-helpers";
-import { pushScratch } from "@/lib/deploy";
+import { getTarget } from "@/lib/deployment-targets";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,8 +23,9 @@ export async function POST(
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   try {
-    const result = await pushScratch(user.id, project);
-    return NextResponse.json({ ok: true, ...result });
+    const target = getTarget(project.target ?? "gas");
+    const { previewUrl } = await target.pushPreview(user.id, project);
+    return NextResponse.json({ ok: true, devUrl: previewUrl }); // key kept for PreviewPane
   } catch (e) {
     return mapGoogleError(e);
   }

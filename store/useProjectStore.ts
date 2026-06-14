@@ -15,9 +15,12 @@ interface ProjectState {
   files: Record<string, FileEntry>;
   order: string[];
   activePath: string | null;
+  /** the file the agent is currently writing/editing — FileTree pulses its dot; null when idle */
+  workingPath: string | null;
   setInitial: (files: { path: string; content: string }[]) => void;
   applyMutation: (m: FileMutation) => void;
   setActive: (path: string) => void;
+  setWorking: (path: string | null) => void;
   updateActiveContent: (content: string) => void;
 }
 
@@ -29,6 +32,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   files: {},
   order: [],
   activePath: null,
+  workingPath: null,
 
   setInitial: (list) =>
     set(() => {
@@ -51,14 +55,17 @@ export const useProjectStore = create<ProjectState>((set) => ({
           files,
           order,
           activePath: s.activePath === m.path ? order[0] ?? null : s.activePath,
+          workingPath: s.workingPath === m.path ? null : s.workingPath,
         };
       }
       const files = { ...s.files, [m.path]: { content: m.content ?? "", dirty: false } };
       const order = s.order.includes(m.path) ? s.order : [...s.order, m.path];
-      return { files, order, activePath: m.path }; // jump to the file being written
+      // jump to + mark as the file being written (FileTree pulses its dot)
+      return { files, order, activePath: m.path, workingPath: m.path };
     }),
 
   setActive: (path) => set({ activePath: path }),
+  setWorking: (path) => set({ workingPath: path }),
 
   updateActiveContent: (content) =>
     set((s) =>

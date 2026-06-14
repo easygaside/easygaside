@@ -61,6 +61,7 @@ export function ChatPanel({
   initialImages?: { url: string }[];
 }) {
   const applyMutation = useProjectStore((s) => s.applyMutation);
+  const setWorking = useProjectStore((s) => s.setWorking);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -162,7 +163,10 @@ export function ChatPanel({
           else if (ev.type === "lint") setStatus(ev.messages.join(" · "));
           else if (ev.type === "spec") setPendingSpec(ev.spec);
           else if (ev.type === "error") appendAssistant(`\n\n[ผิดพลาด: ${ev.message}]`);
-          else if (ev.type === "done") setStatus("");
+          else if (ev.type === "done") {
+            setStatus("");
+            setWorking(null);
+          }
         }
       }
     } catch {
@@ -170,6 +174,7 @@ export function ChatPanel({
     } finally {
       setBusy(false);
       setStatus("");
+      setWorking(null);
     }
   }
 

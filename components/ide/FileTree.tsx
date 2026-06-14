@@ -12,6 +12,7 @@ function dotColor(path: string): string {
 export function FileTree() {
   const order = useProjectStore((s) => s.order);
   const active = useProjectStore((s) => s.activePath);
+  const working = useProjectStore((s) => s.workingPath);
   const setActive = useProjectStore((s) => s.setActive);
 
   return (
@@ -29,7 +30,15 @@ export function FileTree() {
                 : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
             }`}
           >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: dotColor(p) }} />
+            <span className="relative flex h-1.5 w-1.5">
+              {p === working && (
+                <span
+                  className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                  style={{ background: dotColor(p) }}
+                />
+              )}
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: dotColor(p) }} />
+            </span>
             {p}
           </button>
         ))

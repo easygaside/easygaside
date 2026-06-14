@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 const URL_ERR: Record<string, string> = {
   signin_failed: "เข้าสู่ระบบด้วย Google ไม่สำเร็จ ลองใหม่อีกครั้ง",
@@ -39,39 +38,16 @@ function GoogleG() {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [accepted, setAccepted] = useState(false);
 
   useEffect(() => {
     const e = new URLSearchParams(window.location.search).get("error");
     if (e) setError(URL_ERR[e] ?? e);
   }, []);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    const supabase = createClient();
-    const fn =
-      mode === "signin"
-        ? supabase.auth.signInWithPassword({ email, password })
-        : supabase.auth.signUp({ email, password });
-    const { error } = await fn;
-    setBusy(false);
-    if (error) {
-      setError(error.message);
-      return;
-    }
-    router.push("/connect");
-    router.refresh();
-  }
-
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-5 px-6">
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-6">
       <div className="flex flex-col items-center gap-3 text-center">
         <Image
           src="/icon/android-icon-192x192.png"
@@ -88,55 +64,53 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <a
-        href="/api/auth/google/start"
-        className="flex items-center justify-center gap-3 rounded-lg bg-white px-4 py-2.5 font-medium text-slate-800 shadow-sm transition hover:bg-slate-100"
-      >
-        <GoogleG />
-        เข้าสู่ระบบด้วย Google
-      </a>
-
-      {error && <p className="text-sm text-red-400">{error}</p>}
-
-      <div className="flex items-center gap-3 text-xs text-slate-500">
-        <span className="h-px flex-1 bg-slate-700" />
-        หรือใช้อีเมล (สำรอง)
-        <span className="h-px flex-1 bg-slate-700" />
-      </div>
-
-      <form onSubmit={submit} className="flex flex-col gap-3">
+      <label className="flex items-start gap-2.5">
         <input
-          type="email"
-          required
-          placeholder="อีเมล"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2.5 outline-none focus:border-emerald-500"
+          type="checkbox"
+          checked={accepted}
+          onChange={(e) => setAccepted(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
         />
-        <input
-          type="password"
-          required
-          minLength={6}
-          placeholder="รหัสผ่าน (อย่างน้อย 6 ตัว)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2.5 outline-none focus:border-emerald-500"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-lg bg-emerald-500 px-4 py-2.5 font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+        <span className="text-[13px] leading-relaxed text-slate-400">
+          ฉันอ่านและยอมรับ{" "}
+          <Link href="/terms" target="_blank" className="text-emerald-400 underline">
+            เงื่อนไขการใช้งาน
+          </Link>{" "}
+          และ{" "}
+          <Link href="/privacy" target="_blank" className="text-emerald-400 underline">
+            นโยบายความเป็นส่วนตัว
+          </Link>
+        </span>
+      </label>
+
+      {accepted ? (
+        <a
+          href="/api/auth/google/start"
+          className="flex items-center justify-center gap-3 rounded-lg bg-white px-4 py-2.5 font-medium text-slate-800 shadow-sm transition hover:bg-slate-100"
         >
-          {busy ? "กำลังดำเนินการ…" : mode === "signin" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
+          <GoogleG />
+          เข้าสู่ระบบด้วย Google
+        </a>
+      ) : (
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          title="กรุณายอมรับเงื่อนไขก่อน"
+          className="flex cursor-not-allowed items-center justify-center gap-3 rounded-lg bg-white/50 px-4 py-2.5 font-medium text-slate-400 shadow-sm"
+        >
+          <GoogleG />
+          เข้าสู่ระบบด้วย Google
         </button>
-      </form>
+      )}
 
-      <button
-        onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-        className="text-sm text-slate-400 underline"
-      >
-        {mode === "signin" ? "ยังไม่มีบัญชี? สมัครสมาชิก" : "มีบัญชีแล้ว? เข้าสู่ระบบ"}
-      </button>
+      {!accepted && (
+        <p className="-mt-3 text-center text-xs text-slate-500">
+          กดยอมรับเงื่อนไขด้านบนก่อน จึงจะเข้าสู่ระบบได้
+        </p>
+      )}
+
+      {error && <p className="text-center text-sm text-red-400">{error}</p>}
     </main>
   );
 }

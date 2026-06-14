@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeftIcon, CodeBracketIcon, ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
 import { ChatPanel } from "./ChatPanel";
 import { DeployButton } from "./DeployButton";
@@ -36,10 +37,13 @@ export function IdeShell({
     <main className="flex h-screen flex-col bg-[#eef2f8] text-slate-800">
       <div className="flex items-center gap-3 px-4 py-3">
         <span className="flex items-center gap-2">
-          {/* brand — swap this box for your icon later */}
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm">
-            <CodeBracketIcon className="h-4 w-4" />
-          </span>
+          <Image
+            src="/icon/android-icon-192x192.png"
+            alt="EasyGAS IDE"
+            width={28}
+            height={28}
+            className="rounded-lg"
+          />
           <b className="text-sm tracking-tight">
             EasyGAS <span className="text-emerald-600">IDE</span>
           </b>

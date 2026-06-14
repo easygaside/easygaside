@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -71,11 +72,20 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-5 px-6">
-      <div>
-        <h1 className="text-2xl font-bold">เข้าสู่ระบบ easygas</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          เข้าสู่ระบบด้วย Google = บัญชีเดียวจบ ทั้งล็อกอินและเชื่อม Google สำหรับ deploy
-        </p>
+      <div className="flex flex-col items-center gap-3 text-center">
+        <Image
+          src="/icon/android-icon-192x192.png"
+          alt="EasyGAS IDE"
+          width={64}
+          height={64}
+          className="rounded-2xl shadow-sm"
+        />
+        <div>
+          <h1 className="text-2xl font-bold">เข้าสู่ระบบ EasyGAS IDE</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            เข้าสู่ระบบด้วย Google = บัญชีเดียวจบ ทั้งล็อกอินและเชื่อม Google สำหรับ deploy
+          </p>
+        </div>
       </div>
 
       <a

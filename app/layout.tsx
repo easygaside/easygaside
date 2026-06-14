@@ -10,9 +10,18 @@ const prompt = Prompt({
 });
 
 export const metadata: Metadata = {
-  title: "easygas — AI builder for Google Apps Script",
+  title: "EasyGAS IDE — AI builder for Google Apps Script",
   description:
     "Chat with AI to build Google Apps Script tools, preview live, and deploy to your own Google account.",
+  icons: {
+    icon: [
+      { url: "/icon/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icon/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+    ],
+    apple: [{ url: "/icon/apple-icon-180x180.png", sizes: "180x180" }],
+    shortcut: ["/icon/favicon.ico"],
+  },
 };
 
 export default function RootLayout({

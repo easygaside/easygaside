@@ -195,7 +195,7 @@ export function ChatPanel({
             <button
               onClick={() => send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ")}
               disabled={busy}
-              className="flex items-center justify-center gap-1 rounded-full border border-slate-200 px-2.5 py-1.5 text-[11.5px] font-medium text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+              className="flex items-center justify-center gap-1 truncate whitespace-nowrap rounded-full border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
             >
               อธิบายโค้ด
             </button>
@@ -204,17 +204,17 @@ export function ChatPanel({
                 send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย")
               }
               disabled={busy}
-              className="flex items-center justify-center gap-1 rounded-full border border-slate-200 px-2.5 py-1.5 text-[11.5px] font-medium text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+              className="flex items-center justify-center gap-1 truncate whitespace-nowrap rounded-full border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
             >
-              ตรวจ &amp; แก้บั๊ก
+              ตรวจบั๊ก
             </button>
           </>
         )}
         <button
           onClick={() => setWizardOpen(true)}
-          className="flex items-center justify-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1.5 text-[11.5px] font-semibold text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400"
+          className="flex items-center justify-center gap-1 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-1 text-[11px] font-semibold text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400"
         >
-          <SparklesIcon className="h-3.5 w-3.5 shrink-0" />
+          <SparklesIcon className="h-3 w-3 shrink-0" />
           ผู้ช่วย
         </button>
       </div>

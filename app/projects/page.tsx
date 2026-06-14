@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CheckCircleIcon, FolderIcon, InboxIcon, RocketLaunchIcon } from "@heroicons/react/24/outline";
 import { CreateProjectBar } from "@/components/projects/CreateProjectBar";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getConnectionStatus } from "@/lib/google-connection";
 import { getCurrentUserId, getDeployedMap, listProjects } from "@/lib/projects";
@@ -36,6 +37,7 @@ export default async function ProjectsPage() {
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <ReportButton />
               <ThemeToggle className="h-9 w-9 rounded-full border border-slate-200 bg-white/70 dark:border-slate-700/60 dark:bg-slate-900/50" />
               {conn.connected && conn.status === "active" ? (
                 <Link

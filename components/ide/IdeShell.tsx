@@ -12,6 +12,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ChatPanel } from "./ChatPanel";
 import { DeployButton } from "./DeployButton";
@@ -78,6 +79,7 @@ export function IdeShell({
         </Link>
         <b className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{projectName}</b>
         <span className="flex-1" />
+        <ReportButton projectId={projectId} />
         <ThemeToggle />
         <DeployButton projectId={projectId} googleConnected={googleConnected} />
       </div>

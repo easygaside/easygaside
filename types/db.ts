@@ -67,6 +67,19 @@ export interface EgsDeployment {
   updated_at: string;
 }
 
+export type ReportKind = "bug" | "idea" | "other";
+
+export interface EgsReport {
+  id: string;
+  user_id: string | null;
+  project_id: string | null;
+  kind: ReportKind;
+  message: string;
+  url: string | null;
+  status: string;
+  created_at: string;
+}
+
 export type ConnectionStatus = "active" | "needs_reauth" | "revoked";
 
 export interface GoogleConnection {

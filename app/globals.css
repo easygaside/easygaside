@@ -11,7 +11,7 @@ body {
   overflow-x: hidden;
   background: var(--background);
   color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, "Noto Sans Thai", -apple-system, sans-serif;
+  font-family: var(--font-prompt), ui-sans-serif, system-ui, "Noto Sans Thai", -apple-system, sans-serif;
 }
 
 a {

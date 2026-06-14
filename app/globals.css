@@ -14,7 +14,9 @@ body {
   font-family: var(--font-prompt), ui-sans-serif, system-ui, "Noto Sans Thai", -apple-system, sans-serif;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }

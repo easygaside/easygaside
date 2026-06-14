@@ -1,9 +1,27 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { CodeBracketIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+
+// Monaco logs a benign "Canceled" error whenever it aborts an in-flight async op (hover/suggestion/
+// layout) on blur or re-layout. It doesn't affect anything, but Next's dev overlay surfaces it as a
+// scary error. Drop ONLY that exact shape from console.error, once.
+let canceledSilenced = false;
+function silenceMonacoCanceled() {
+  if (canceledSilenced || typeof window === "undefined") return;
+  canceledSilenced = true;
+  const orig = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    const isCanceled = args.some((a) => {
+      if (typeof a === "string") return a === "Canceled" || a.startsWith("Canceled:");
+      const e = a as { name?: string; message?: string } | null;
+      return !!e && (e.name === "Canceled" || e.message === "Canceled");
+    });
+    if (!isCanceled) orig(...args);
+  };
+}
 
 const Monaco = dynamic(
   () => import("@monaco-editor/react").then((m) => m.default),
@@ -27,6 +45,8 @@ export function EditorPane({ projectId }: { projectId: string }) {
   const files = useProjectStore((s) => s.files);
   const update = useProjectStore((s) => s.updateActiveContent);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(silenceMonacoCanceled, []);
 
   function onChange(v: string | undefined) {
     const content = v ?? "";

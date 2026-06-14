@@ -15,9 +15,9 @@ export function FileTree() {
   const setActive = useProjectStore((s) => s.setActive);
 
   return (
-    <div className="flex flex-none items-center gap-1 overflow-x-auto border-b border-slate-200/70 px-3 py-2">
+    <div className="flex flex-none items-center gap-1 overflow-x-auto border-b border-slate-200/70 dark:border-slate-700/60 px-3 py-2">
       {order.length === 0 ? (
-        <span className="px-1 text-xs text-slate-400">ยังไม่มีไฟล์</span>
+        <span className="px-1 text-xs text-slate-400 dark:text-slate-500">ยังไม่มีไฟล์</span>
       ) : (
         order.map((p) => (
           <button
@@ -25,8 +25,8 @@ export function FileTree() {
             onClick={() => setActive(p)}
             className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 font-mono text-xs transition ${
               active === p
-                ? "bg-slate-100 font-medium text-slate-800"
-                : "text-slate-400 hover:text-slate-600"
+                ? "bg-slate-100 dark:bg-slate-800 font-medium text-slate-800 dark:text-slate-100"
+                : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
             }`}
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: dotColor(p) }} />

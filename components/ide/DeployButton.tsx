@@ -60,7 +60,7 @@ export function DeployButton({
         <a
           href="/connect"
           title="ต้องเชื่อมบัญชี Google ก่อนถึงจะ deploy ได้"
-          className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+          className="flex items-center gap-1.5 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-950/40 px-4 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 transition hover:bg-amber-100"
         >
           <RocketLaunchIcon className="h-4 w-4" />
           เชื่อม Google ก่อน Deploy
@@ -84,7 +84,7 @@ export function DeployButton({
 
       {res.kind !== "idle" && res.kind !== "busy" && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
             {res.kind === "ok" && (
               <div className="flex flex-col gap-3">
                 <CheckCircleIcon className="mx-auto h-10 w-10 text-emerald-500" />
@@ -94,21 +94,21 @@ export function DeployButton({
                     href={res.execUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="break-all rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                    className="break-all rounded-xl bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2 text-center text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100"
                   >
                     เปิดแอปของคุณ <ArrowTopRightOnSquareIcon className="inline h-3 w-3 align-text-bottom" />
                     <br />
                     {res.execUrl}
                   </a>
                 )}
-                <p className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+                <p className="rounded-lg bg-slate-50 dark:bg-slate-800 px-3 py-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                   ครั้งแรกที่เปิด Google จะขอให้คุณ (เจ้าของ) อนุญาตสิทธิ์ของสคริปต์ เช่น Sheets/Gmail —
                   กด <b>Review permissions → Advanced → Allow</b> ครั้งเดียว แล้วใช้ได้เลย ·
                   แอปนี้อยู่บนบัญชี Google ของคุณ (ตั้งให้รัน &ldquo;ในนามเจ้าของ&rdquo; — คนอื่นเปิดไม่ต้องขอสิทธิ์ซ้ำ)
                 </p>
                 {res.needsTriggerSetup && (
-                  <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
-                    <ClockIcon className="inline h-4 w-4 align-text-bottom text-amber-600" /> ระบบนี้มีการแจ้งเตือน/ตั้งเวลา — เปิดสคริปต์แล้วรันฟังก์ชัน{" "}
+                  <div className="rounded-xl bg-amber-50 dark:bg-amber-950/40 p-3 text-xs text-amber-700 dark:text-amber-300">
+                    <ClockIcon className="inline h-4 w-4 align-text-bottom text-amber-600 dark:text-amber-400" /> ระบบนี้มีการแจ้งเตือน/ตั้งเวลา — เปิดสคริปต์แล้วรันฟังก์ชัน{" "}
                     <code>installTriggers()</code> ครั้งเดียวเพื่อเปิดใช้
                     <a
                       href={res.scriptEditorUrl}
@@ -122,7 +122,7 @@ export function DeployButton({
                 )}
                 <button
                   onClick={() => setRes({ kind: "idle" })}
-                  className="mt-1 rounded-xl border border-slate-200 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                  className="mt-1 rounded-xl border border-slate-200 dark:border-slate-700/60 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
                 >
                   ปิด
                 </button>
@@ -131,13 +131,13 @@ export function DeployButton({
 
             {res.kind === "enable_api" && (
               <div className="flex flex-col gap-3">
-                <h3 className="font-bold text-amber-700">ต้องเปิด Apps Script API ก่อน</h3>
-                <p className="text-sm text-slate-600">{res.message}</p>
+                <h3 className="font-bold text-amber-700 dark:text-amber-300">ต้องเปิด Apps Script API ก่อน</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{res.message}</p>
                 <a
                   href={res.enableUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-xl border border-amber-400 py-2 text-center text-sm text-amber-700 hover:bg-amber-50"
+                  className="rounded-xl border border-amber-400 dark:border-amber-700/50 py-2 text-center text-sm text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40"
                 >
                   เปิดหน้า usersettings <ArrowTopRightOnSquareIcon className="inline h-3 w-3 align-text-bottom" />
                 </a>
@@ -147,7 +147,7 @@ export function DeployButton({
                 >
                   เปิดแล้ว — ลองอีกครั้ง
                 </button>
-                <button onClick={() => setRes({ kind: "idle" })} className="text-sm text-slate-400 underline">
+                <button onClick={() => setRes({ kind: "idle" })} className="text-sm text-slate-400 dark:text-slate-500 underline">
                   ปิด
                 </button>
               </div>
@@ -155,11 +155,11 @@ export function DeployButton({
 
             {res.kind === "error" && (
               <div className="flex flex-col gap-3">
-                <h3 className="font-bold text-red-600">Deploy ไม่สำเร็จ</h3>
-                <p className="text-sm text-slate-600">{res.message}</p>
+                <h3 className="font-bold text-red-600 dark:text-red-400">Deploy ไม่สำเร็จ</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{res.message}</p>
                 <button
                   onClick={() => setRes({ kind: "idle" })}
-                  className="rounded-xl border border-slate-200 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 dark:border-slate-700/60 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
                 >
                   ปิด
                 </button>

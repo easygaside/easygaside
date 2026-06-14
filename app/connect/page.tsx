@@ -29,20 +29,20 @@ export default async function ConnectPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6">
       <h1 className="text-2xl font-bold">เชื่อมต่อบัญชี Google</h1>
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-slate-600 dark:text-slate-400">
         easygas จะขอสิทธิ์ Apps Script (สร้าง/แก้/deploy โปรเจกต์) + Drive (เฉพาะไฟล์ที่แอปสร้าง)
         เพื่อ push โค้ดเข้าบัญชีของคุณเอง
       </p>
 
       {error && (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
           {ERROR_MESSAGES[error] ?? `เกิดข้อผิดพลาด: ${error}`}
         </div>
       )}
 
-      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-200/90">
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-700 dark:text-amber-200/90">
         <p className="font-semibold">หมายเหตุระหว่างพัฒนา (unverified app)</p>
-        <p className="mt-1 text-amber-200/70">
+        <p className="mt-1 text-amber-600 dark:text-amber-200/70">
           ตอนนี้แอปยังไม่ผ่าน Google verification — จะเห็นจอเตือน &ldquo;Google hasn&rsquo;t
           verified this app&rdquo; ให้กด <strong>Advanced → Go to easygas (unsafe)</strong> เพื่อทดสอบ
         </p>
@@ -50,7 +50,7 @@ export default async function ConnectPage({
 
       {connected && status === "active" ? (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+          <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
             <CheckCircleIcon className="h-4 w-4" />
             เชื่อมต่อแล้ว
           </div>

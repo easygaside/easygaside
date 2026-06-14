@@ -176,7 +176,7 @@ export function ChatPanel({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 px-4 pt-3 text-sm font-semibold">
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-100 text-violet-600">
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">
           <ChatBubbleLeftRightIcon className="h-4 w-4" />
         </span>
         AI Assistant
@@ -185,7 +185,7 @@ export function ChatPanel({
         <button
           onClick={() => send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ")}
           disabled={busy}
-          className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50"
+          className="rounded-full border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 text-[11px] text-slate-500 dark:text-slate-400 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-50"
         >
           อธิบายโค้ด
         </button>
@@ -194,7 +194,7 @@ export function ChatPanel({
             send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย")
           }
           disabled={busy}
-          className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50"
+          className="rounded-full border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 text-[11px] text-slate-500 dark:text-slate-400 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-50"
         >
           ตรวจ &amp; แก้บั๊ก
         </button>
@@ -202,8 +202,8 @@ export function ChatPanel({
 
       <div ref={bodyRef} className="flex-1 space-y-3 overflow-auto px-3 pb-2">
         {initialImages && initialImages.length > 0 && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
-            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-800/50 p-2.5">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
               <PhotoIcon className="h-3.5 w-3.5" />
               รูปอ้างอิงที่เคยแนบ ({initialImages.length})
             </div>
@@ -214,7 +214,7 @@ export function ChatPanel({
                   <img
                     src={img.url}
                     alt="รูปอ้างอิงเก่า"
-                    className="h-14 w-14 rounded-lg border border-slate-200 object-cover transition hover:opacity-80"
+                    className="h-14 w-14 rounded-lg border border-slate-200 dark:border-slate-700/60 object-cover transition hover:opacity-80"
                   />
                 </a>
               ))}
@@ -223,7 +223,7 @@ export function ChatPanel({
         )}
         {messages.length === 0 && (
           <div className="px-1 pt-6">
-            <p className="text-center text-[13px] text-slate-400">
+            <p className="text-center text-[13px] text-slate-400 dark:text-slate-500">
               พิมพ์บอกสิ่งที่อยากได้ หรือเริ่มจากตัวอย่าง
             </p>
             <div className="mt-3 flex flex-col gap-2">
@@ -232,7 +232,7 @@ export function ChatPanel({
                   key={s}
                   onClick={() => setInput(s)}
                   disabled={busy}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-[12px] text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50/50 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 px-3 py-2.5 text-left text-[12px] text-slate-600 dark:text-slate-300 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 disabled:opacity-50"
                 >
                   <SparklesIcon className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                   {s}
@@ -241,7 +241,7 @@ export function ChatPanel({
             </div>
             <button
               onClick={() => setWizardOpen(true)}
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50/50 px-3 py-2.5 text-[12px] font-medium text-emerald-700 transition hover:bg-emerald-50"
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/30 px-3 py-2.5 text-[12px] font-medium text-emerald-700 dark:text-emerald-300 transition hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
             >
               <SparklesIcon className="h-3.5 w-3.5" />
               ใช้ตัวช่วยแบบเลือก (ไกด์ทีละขั้น)
@@ -250,7 +250,7 @@ export function ChatPanel({
         )}
         {messages.map((m, i) => (
           <div key={i} className="flex flex-col gap-1">
-            <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
               {m.role === "user" ? (
                 "คุณ"
               ) : (
@@ -263,8 +263,8 @@ export function ChatPanel({
             <div
               className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
                 m.role === "user"
-                  ? "self-start bg-slate-100 text-slate-700"
-                  : "bg-emerald-50 text-slate-700"
+                  ? "self-start bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                  : "bg-emerald-50 dark:bg-emerald-950/40 text-slate-700 dark:text-slate-200"
               }`}
             >
               {m.images && m.images.length > 0 && (
@@ -275,7 +275,7 @@ export function ChatPanel({
                       key={j}
                       src={src}
                       alt="รูปแนบ"
-                      className="h-16 w-16 rounded-lg border border-slate-200 object-cover"
+                      className="h-16 w-16 rounded-lg border border-slate-200 dark:border-slate-700/60 object-cover"
                     />
                   ))}
                 </div>
@@ -288,28 +288,28 @@ export function ChatPanel({
         ))}
 
         {pendingSpec && (
-          <div className="rounded-2xl border border-emerald-200 bg-white p-3.5 shadow-sm">
-            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-emerald-700">
+          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-white dark:bg-slate-900 p-3.5 shadow-sm">
+            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-emerald-700 dark:text-emerald-300">
               <SparklesIcon className="h-4 w-4" />
               สรุปสิ่งที่จะสร้าง
             </div>
-            <p className="mt-1.5 text-[13px] font-semibold text-slate-800">{pendingSpec.title}</p>
-            {pendingSpec.summary && <p className="text-[12px] text-slate-500">{pendingSpec.summary}</p>}
+            <p className="mt-1.5 text-[13px] font-semibold text-slate-800 dark:text-slate-100">{pendingSpec.title}</p>
+            {pendingSpec.summary && <p className="text-[12px] text-slate-500 dark:text-slate-400">{pendingSpec.summary}</p>}
             {pendingSpec.features.length > 0 && (
-              <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[12px] text-slate-600">
+              <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[12px] text-slate-600 dark:text-slate-300">
                 {pendingSpec.features.map((f, i) => (
                   <li key={i}>{f}</li>
                 ))}
               </ul>
             )}
             {pendingSpec.dataModel && pendingSpec.dataModel.length > 0 && (
-              <p className="mt-2 text-[11px] text-slate-500">ข้อมูล: {pendingSpec.dataModel.join(" · ")}</p>
+              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">ข้อมูล: {pendingSpec.dataModel.join(" · ")}</p>
             )}
             {pendingSpec.storage && (
-              <p className="text-[11px] text-slate-500">เก็บที่: {pendingSpec.storage}</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">เก็บที่: {pendingSpec.storage}</p>
             )}
             {pendingSpec.outputs && pendingSpec.outputs.length > 0 && (
-              <p className="text-[11px] text-slate-500">ผลลัพธ์: {pendingSpec.outputs.join(" · ")}</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">ผลลัพธ์: {pendingSpec.outputs.join(" · ")}</p>
             )}
             <button
               onClick={() => send("ยืนยัน สร้างเลยตาม spec ที่สรุปไว้")}
@@ -319,15 +319,15 @@ export function ChatPanel({
               <SparklesIcon className="h-4 w-4" />
               สร้างเลย
             </button>
-            <p className="mt-1.5 text-center text-[11px] text-slate-400">หรือพิมพ์บอกสิ่งที่อยากแก้</p>
+            <p className="mt-1.5 text-center text-[11px] text-slate-400 dark:text-slate-500">หรือพิมพ์บอกสิ่งที่อยากแก้</p>
           </div>
         )}
       </div>
 
-      <div className="border-t border-slate-200/70 p-3">
+      <div className="border-t border-slate-200/70 dark:border-slate-700/60 p-3">
         {/* live status — what the AI is doing right now */}
         {busy && (
-          <div className="mb-2 flex items-center gap-2 px-1 text-xs font-medium text-emerald-600">
+          <div className="mb-2 flex items-center gap-2 px-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
             {status || "AI กำลังคิด…"}
           </div>
@@ -342,7 +342,7 @@ export function ChatPanel({
                 <img
                   src={img.dataUrl}
                   alt="รูปแนบ"
-                  className="h-14 w-14 rounded-lg border border-slate-200 object-cover"
+                  className="h-14 w-14 rounded-lg border border-slate-200 dark:border-slate-700/60 object-cover"
                 />
                 <button
                   onClick={() => setImages((cur) => cur.filter((_, j) => j !== i))}
@@ -354,14 +354,14 @@ export function ChatPanel({
               </div>
             ))}
             {attaching && (
-              <div className="grid h-14 w-14 place-items-center rounded-lg border border-dashed border-slate-300 text-slate-400">
+              <div className="grid h-14 w-14 place-items-center rounded-lg border border-dashed border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
               </div>
             )}
           </div>
         )}
 
-        <div className="flex items-end gap-2 rounded-2xl bg-slate-50 px-2.5 py-2">
+        <div className="flex items-end gap-2 rounded-2xl bg-slate-50 dark:bg-slate-800 px-2.5 py-2">
           <input
             ref={fileRef}
             type="file"
@@ -375,7 +375,7 @@ export function ChatPanel({
             disabled={busy || images.length >= MAX_IMAGES}
             title={images.length >= MAX_IMAGES ? `แนบได้สูงสุด ${MAX_IMAGES} รูป` : "แนบรูปอ้างอิง"}
             aria-label="แนบรูป"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-200 hover:text-slate-600 disabled:opacity-40"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-slate-400 dark:text-slate-500 transition hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-40"
           >
             <PhotoIcon className="h-5 w-5" />
           </button>
@@ -391,7 +391,7 @@ export function ChatPanel({
             placeholder="บอกสิ่งที่อยากให้ AI สร้างหรือแก้… แนบรูปอ้างอิงได้&#10;Enter = ส่ง · Shift+Enter = ขึ้นบรรทัดใหม่"
             disabled={busy}
             rows={3}
-            className="min-h-[72px] flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none placeholder:text-slate-400 disabled:opacity-60"
+            className="min-h-[72px] flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 disabled:opacity-60"
           />
           <button
             onClick={() => send()}

@@ -90,20 +90,20 @@ export function PreviewPane() {
     <div className="flex h-full flex-col">
       <div className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold">
         <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-100 text-emerald-600">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
             <EyeIcon className="h-4 w-4" />
           </span>
-          พรีวิว <span className="text-[11px] font-normal text-slate-400">(จำลอง)</span>
+          พรีวิว <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">(จำลอง)</span>
         </div>
         {srcdoc && (
-          <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 p-0.5">
+          <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5">
             <button
               onClick={() => setView("desktop")}
               title="จอปกติ"
               aria-label="มุมมองจอปกติ"
               aria-pressed={view === "desktop"}
               className={`grid h-6 w-7 place-items-center rounded-md transition ${
-                view === "desktop" ? "bg-white text-emerald-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                view === "desktop" ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
               }`}
             >
               <ComputerDesktopIcon className="h-4 w-4" />
@@ -114,7 +114,7 @@ export function PreviewPane() {
               aria-label="มุมมองมือถือ"
               aria-pressed={view === "mobile"}
               className={`grid h-6 w-7 place-items-center rounded-md transition ${
-                view === "mobile" ? "bg-white text-emerald-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                view === "mobile" ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
               }`}
             >
               <DevicePhoneMobileIcon className="h-4 w-4" />
@@ -125,8 +125,8 @@ export function PreviewPane() {
 
       {srcdoc ? (
         <div
-          className={`min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 ${
-            view === "mobile" ? "grid place-items-start justify-center bg-slate-100 p-3" : "bg-white"
+          className={`min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700/60 ${
+            view === "mobile" ? "grid place-items-start justify-center bg-slate-100 dark:bg-slate-800 p-3" : "bg-white dark:bg-slate-900"
           }`}
         >
           {/* SECURITY: never add allow-same-origin / allow-popups-to-escape-sandbox —
@@ -137,19 +137,19 @@ export function PreviewPane() {
             style={view === "mobile" ? { width: MOBILE_WIDTH, maxWidth: "100%" } : undefined}
             className={`bg-white ${
               view === "mobile"
-                ? "h-full min-h-[560px] rounded-[1.25rem] border border-slate-300 shadow-lg"
+                ? "h-full min-h-[560px] rounded-[1.25rem] border border-slate-300 dark:border-slate-700 shadow-lg"
                 : "h-full w-full"
             }`}
             srcDoc={srcdoc}
           />
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 place-items-center rounded-xl border border-dashed border-slate-200 px-6 text-center text-xs text-slate-400">
+        <div className="grid min-h-0 flex-1 place-items-center rounded-xl border border-dashed border-slate-200 dark:border-slate-700/60 px-6 text-center text-xs text-slate-400 dark:text-slate-500">
           พรีวิวจะขึ้นเมื่อ AI สร้าง Index.html
         </div>
       )}
 
-      <p className="mt-1 px-1 text-[10px] leading-relaxed text-slate-400">
+      <p className="mt-1 px-1 text-[10px] leading-relaxed text-slate-400 dark:text-slate-500">
         หน้าตา/CSS แสดงเหมือนจริง · แต่ปุ่ม/ฟอร์มที่เรียก server (google.script.run) และข้อมูลจากชีทยังจำลอง —
         กด &ldquo;Deploy เข้า Google&rdquo; แล้วเปิดลิงก์ /exec เพื่อใช้จริง
       </p>

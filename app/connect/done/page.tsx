@@ -41,7 +41,7 @@ export default function ConnectDonePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6">
       <h1 className="text-2xl font-bold">ทดสอบ deploy (Phase 0 spike)</h1>
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-slate-600 dark:text-slate-400">
         กดปุ่มเพื่อสร้างโปรเจกต์ Apps Script + push + deploy เป็น web app บนบัญชี Google ของคุณ
         ผ่าน REST API ทั้งหมด (ไม่ใช้ clasp)
       </p>
@@ -63,7 +63,7 @@ export default function ConnectDonePage() {
 
       {result.kind === "ok" && (
         <div className="flex flex-col gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4">
-          <p className="flex items-center gap-1.5 font-semibold text-emerald-300">
+          <p className="flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-300">
             <CheckCircleIcon className="h-4 w-4" />
             สำเร็จ! Chain ทำงานครบ
           </p>
@@ -71,35 +71,35 @@ export default function ConnectDonePage() {
             href={result.execUrl}
             target="_blank"
             rel="noreferrer"
-            className="break-all text-sm text-emerald-200 underline"
+            className="break-all text-sm text-emerald-700 dark:text-emerald-200 underline"
           >
             เปิดแอปของคุณ → {result.execUrl}
           </a>
-          <p className="text-xs text-slate-400">scriptId: {result.scriptId}</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">scriptId: {result.scriptId}</p>
         </div>
       )}
 
       {result.kind === "enable_api" && (
         <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
-          <p className="font-semibold text-amber-300">ต้องเปิด Apps Script API ก่อน</p>
-          <p className="text-sm text-amber-200/80">{result.message}</p>
+          <p className="font-semibold text-amber-700 dark:text-amber-300">ต้องเปิด Apps Script API ก่อน</p>
+          <p className="text-sm text-amber-600 dark:text-amber-200/80">{result.message}</p>
           <a
             href={result.enableUrl}
             target="_blank"
             rel="noreferrer"
-            className="flex w-fit items-center gap-1 rounded-lg border border-amber-400 px-4 py-2 text-sm text-amber-200 hover:bg-amber-500/10"
+            className="flex w-fit items-center gap-1 rounded-lg border border-amber-400 px-4 py-2 text-sm text-amber-700 dark:text-amber-200 hover:bg-amber-500/10"
           >
             เปิดหน้า usersettings
             <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
           </a>
-          <button onClick={deploy} className="w-fit text-sm text-amber-200 underline">
+          <button onClick={deploy} className="w-fit text-sm text-amber-700 dark:text-amber-200 underline">
             เปิดแล้ว — ลองอีกครั้ง
           </button>
         </div>
       )}
 
       {result.kind === "error" && (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-300">
           {result.message}
         </div>
       )}

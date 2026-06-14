@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const URL_ERR: Record<string, string> = {
   signin_failed: "เข้าสู่ระบบด้วย Google ไม่สำเร็จ ลองใหม่อีกครั้ง",
@@ -47,7 +48,8 @@ export default function LoginPage() {
   }, []);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-6">
+    <main className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-6">
+      <ThemeToggle className="absolute right-4 top-4" />
       <div className="flex flex-col items-center gap-3 text-center">
         <Image
           src="/icon/android-icon-192x192.png"
@@ -58,7 +60,7 @@ export default function LoginPage() {
         />
         <div>
           <h1 className="text-2xl font-bold">เข้าสู่ระบบ EasyGAS IDE</h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             ใช้บัญชี Google เดียว — เข้าสู่ระบบ แล้วติดตั้งงานขึ้น Google ของคุณได้เลย
           </p>
         </div>
@@ -71,7 +73,7 @@ export default function LoginPage() {
           onChange={(e) => setAccepted(e.target.checked)}
           className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
         />
-        <span className="text-[13px] leading-relaxed text-slate-400">
+        <span className="text-[13px] leading-relaxed text-slate-600 dark:text-slate-400">
           ฉันอ่านและยอมรับ{" "}
           <Link href="/terms" target="_blank" className="text-emerald-400 underline">
             เงื่อนไขการใช้งาน
@@ -97,7 +99,7 @@ export default function LoginPage() {
           disabled
           aria-disabled="true"
           title="กรุณายอมรับเงื่อนไขก่อน"
-          className="flex cursor-not-allowed items-center justify-center gap-3 rounded-lg bg-white/50 px-4 py-2.5 font-medium text-slate-400 shadow-sm"
+          className="flex cursor-not-allowed items-center justify-center gap-3 rounded-lg bg-slate-200 px-4 py-2.5 font-medium text-slate-400 shadow-sm dark:bg-slate-800 dark:text-slate-500"
         >
           <GoogleG />
           เข้าสู่ระบบด้วย Google

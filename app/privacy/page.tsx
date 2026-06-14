@@ -6,9 +6,9 @@ export const metadata = { title: "นโยบายความเป็นส�
  */
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16 text-slate-300">
+    <main className="mx-auto max-w-2xl px-6 py-16 text-slate-700 dark:text-slate-300">
       <h1 className="mb-6 text-3xl font-bold">นโยบายความเป็นส่วนตัว</h1>
-      <p className="mb-4 text-sm text-amber-300/80">
+      <p className="mb-4 text-sm text-amber-600 dark:text-amber-300/80">
         (ฉบับร่าง — ต้องเขียนให้ครบก่อนยื่น Google OAuth verification)
       </p>
       <div className="space-y-4 text-sm leading-relaxed">

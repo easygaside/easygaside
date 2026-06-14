@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeftIcon, ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ChatPanel } from "./ChatPanel";
 import { DeployButton } from "./DeployButton";
 import { EditorPane } from "./EditorPane";
@@ -12,7 +13,7 @@ import { FileTree } from "./FileTree";
 import { PreviewPane } from "./PreviewPane";
 
 const CARD =
-  "flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_8px_24px_rgba(60,70,110,0.06)]";
+  "flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_8px_24px_rgba(60,70,110,0.06)] dark:border-slate-800 dark:bg-slate-900";
 
 export function IdeShell({
   projectId,
@@ -36,8 +37,8 @@ export function IdeShell({
   }, [initialFiles, setInitial]);
 
   return (
-    <main className="flex h-screen flex-col bg-[#eef2f8] text-slate-800">
-      <div className="flex items-center gap-2.5 border-b border-slate-200/70 bg-white/70 px-4 py-2.5 backdrop-blur">
+    <main className="flex h-screen flex-col bg-[#eef2f8] text-slate-800 dark:bg-[#0b0f14] dark:text-slate-100">
+      <div className="flex items-center gap-2.5 border-b border-slate-200/70 bg-white/70 px-4 py-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
         <span className="flex shrink-0 items-center gap-2">
           <Image
             src="/icon/android-icon-192x192.png"
@@ -50,21 +51,22 @@ export function IdeShell({
             EasyGAS <span className="text-emerald-600">IDE</span>
           </b>
         </span>
-        <span className="h-5 w-px shrink-0 bg-slate-200" />
+        <span className="h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700" />
         <Link
           href="/projects"
           title="กลับไปหน้าโปรเจกต์"
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
         >
           <ArrowLeftIcon className="h-4 w-4" />
         </Link>
-        <b className="truncate text-sm font-semibold text-slate-700">{projectName}</b>
+        <b className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{projectName}</b>
         <span className="flex-1" />
+        <ThemeToggle />
         <DeployButton projectId={projectId} googleConnected={googleConnected} />
       </div>
 
       {webHint && webHint.length > 0 && hintOpen && (
-        <div className="mx-3 mb-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800">
+        <div className="mx-3 mb-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200">
           <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
             งานนี้ดูเหมือนต้องใช้ฟีเจอร์ที่ Google Apps Script ทำไม่ได้:{" "}

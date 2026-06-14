@@ -28,40 +28,40 @@ export function ProjectCard({ project, deployUrl }: { project: EgsProject; deplo
   }
 
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-white/70 bg-white p-5 shadow-[0_8px_24px_rgba(60,70,110,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(60,70,110,0.13)]">
+    <div className="group relative overflow-hidden rounded-2xl border border-white/70 dark:border-slate-700/60 bg-white dark:bg-slate-900 p-5 shadow-[0_8px_24px_rgba(60,70,110,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(60,70,110,0.13)]">
       {/* accent = deploy status */}
-      <span className={`absolute inset-x-0 top-0 h-1 ${deployed ? "bg-emerald-400" : "bg-slate-300"}`} />
+      <span className={`absolute inset-x-0 top-0 h-1 ${deployed ? "bg-emerald-400" : "bg-slate-300 dark:bg-slate-700"}`} />
 
       <div className="flex items-start gap-3">
         <span
           className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-            isBound ? "bg-blue-50 text-blue-500" : "bg-emerald-50 text-emerald-500"
+            isBound ? "bg-blue-50 dark:bg-blue-950/40 text-blue-500 dark:text-blue-400" : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 dark:text-emerald-400"
           }`}
         >
           {isBound ? <TableCellsIcon className="h-5 w-5" /> : <GlobeAltIcon className="h-5 w-5" />}
         </span>
         <div className="min-w-0 flex-1 pr-7">
-          <h3 className="line-clamp-2 font-semibold leading-snug text-slate-800 group-hover:text-emerald-600">
+          <h3 className="line-clamp-2 font-semibold leading-snug text-slate-800 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
             {project.name}
           </h3>
-          <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+          <span className="mt-1 inline-block rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
             {KIND_LABEL[project.kind] ?? project.kind}
           </span>
         </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 dark:text-slate-500">
           แก้ไข{" "}
           {new Date(project.updated_at).toLocaleDateString("th-TH", { day: "numeric", month: "short" })}
         </p>
         {deployed ? (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircleIcon className="h-3 w-3" />
             deploy แล้ว
           </span>
         ) : (
-          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+          <span className="shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
             ยังไม่ deploy
           </span>
         )}
@@ -78,7 +78,7 @@ export function ProjectCard({ project, deployUrl }: { project: EgsProject; deplo
           setConfirm(true);
         }}
         aria-label="ลบโปรเจกต์"
-        className="absolute right-2.5 top-2.5 z-10 grid h-7 w-7 place-items-center rounded-lg text-slate-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+        className="absolute right-2.5 top-2.5 z-10 grid h-7 w-7 place-items-center rounded-lg text-slate-300 dark:text-slate-600 opacity-0 transition hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-500 group-hover:opacity-100"
       >
         <TrashIcon className="h-4 w-4" />
       </button>
@@ -91,26 +91,26 @@ export function ProjectCard({ project, deployUrl }: { project: EgsProject; deplo
             onClick={() => !busy && setConfirm(false)}
           >
             <div
-              className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+              className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-center">
-                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-red-50 text-red-500">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-500">
                   <TrashIcon className="h-6 w-6" />
                 </span>
               </div>
-              <h3 className="mt-3 text-center font-bold text-slate-800">ลบโปรเจกต์?</h3>
-              <p className="mt-1 line-clamp-2 text-center text-sm text-slate-500">
+              <h3 className="mt-3 text-center font-bold text-slate-800 dark:text-slate-100">ลบโปรเจกต์?</h3>
+              <p className="mt-1 line-clamp-2 text-center text-sm text-slate-500 dark:text-slate-400">
                 &ldquo;{project.name}&rdquo;
               </p>
-              <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-[12px] leading-relaxed text-amber-700">
+              <p className="mt-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-center text-[12px] leading-relaxed text-amber-700 dark:text-amber-300">
                 ลบเฉพาะใน EasyGAS เท่านั้น — ไฟล์/สคริปต์ใน Google Drive ของคุณ <b>ไม่ถูกลบ</b>
               </p>
               <div className="mt-4 flex gap-2">
                 <button
                   onClick={() => setConfirm(false)}
                   disabled={busy}
-                  className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700/60 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800/60 disabled:opacity-50"
                 >
                   ยกเลิก
                 </button>

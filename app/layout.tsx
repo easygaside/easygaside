@@ -24,11 +24,18 @@ export const metadata: Metadata = {
   },
 };
 
+// Set the theme class before first paint to avoid a flash. Defaults to light; dark only when the
+// user explicitly chose it (stored in localStorage by ThemeToggle).
+const NO_FLASH_THEME = `(function(){try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="th" className={prompt.variable}>
+    <html lang="th" className={prompt.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME }} />
+      </head>
       <body>{children}</body>
     </html>
   );

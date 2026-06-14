@@ -10,7 +10,7 @@ const Monaco = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="grid h-full place-items-center text-sm text-slate-400">กำลังโหลด editor…</div>
+      <div className="grid h-full place-items-center text-sm text-slate-400 dark:text-slate-500">กำลังโหลด editor…</div>
     ),
   },
 );
@@ -51,8 +51,8 @@ export function EditorPane({ projectId }: { projectId: string }) {
           <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_10px_30px_rgba(16,185,129,0.3)]">
             <CodeBracketIcon className="h-7 w-7" />
           </span>
-          <h3 className="text-sm font-semibold text-slate-700">โค้ดจะขึ้นที่นี่</h3>
-          <p className="mt-1 text-xs leading-relaxed text-slate-400">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">โค้ดจะขึ้นที่นี่</h3>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
             พิมพ์บอก AI ทางซ้ายว่าอยากได้ระบบอะไร — โค้ด Google Apps Script จะถูกสร้างและแสดงที่นี่ พร้อมพรีวิวสดทางขวา
           </p>
         </div>

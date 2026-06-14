@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
+/* class-based dark mode (Tailwind v4): `dark:` applies when <html> (or an ancestor) has .dark */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  --background: #eef2f8;
+  --foreground: #1f2937;
+}
+
+.dark {
   --background: #0b0f14;
   --foreground: #e6edf3;
 }

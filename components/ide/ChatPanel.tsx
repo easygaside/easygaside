@@ -25,6 +25,13 @@ const TOOL_LABEL: Record<string, string> = {
   read_project: "กำลังอ่านโปรเจกต์",
 };
 
+const SUGGESTIONS = [
+  "ฟอร์มจองคิว บันทึกลง Sheet ส่งอีเมลยืนยัน",
+  "ระบบเช็คสต๊อกสินค้า ตัด/เพิ่มสต๊อก",
+  "ส่งอีเมลอัตโนมัติจากรายชื่อใน Google Sheet",
+  "แดชบอร์ดสรุปยอดขายรายวัน",
+];
+
 export function ChatPanel({ projectId }: { projectId: string }) {
   const applyMutation = useProjectStore((s) => s.applyMutation);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -108,9 +115,23 @@ export function ChatPanel({ projectId }: { projectId: string }) {
 
       <div ref={bodyRef} className="flex-1 space-y-3 overflow-auto px-3 pb-2">
         {messages.length === 0 && (
-          <div className="px-1 pt-8 text-center text-sm text-slate-400">
-            พิมพ์บอกสิ่งที่อยากได้ เช่น<br />
-            <span className="text-slate-500">&ldquo;ระบบจองคิว บันทึกลง Sheet ส่งอีเมลยืนยัน&rdquo;</span>
+          <div className="px-1 pt-6">
+            <p className="text-center text-[13px] text-slate-400">
+              พิมพ์บอกสิ่งที่อยากได้ หรือเริ่มจากตัวอย่าง
+            </p>
+            <div className="mt-3 flex flex-col gap-2">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setInput(s)}
+                  disabled={busy}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-[12px] text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50/50 disabled:opacity-50"
+                >
+                  <SparklesIcon className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {messages.map((m, i) => (

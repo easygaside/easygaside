@@ -23,7 +23,13 @@ const ERR_MSG: Record<string, string> = {
   UNKNOWN: "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง",
 };
 
-export function DeployButton({ projectId }: { projectId: string }) {
+export function DeployButton({
+  projectId,
+  googleConnected = true,
+}: {
+  projectId: string;
+  googleConnected?: boolean;
+}) {
   const [res, setRes] = useState<Result>({ kind: "idle" });
 
   async function deploy() {
@@ -50,20 +56,31 @@ export function DeployButton({ projectId }: { projectId: string }) {
 
   return (
     <>
-      <button
-        onClick={deploy}
-        disabled={res.kind === "busy"}
-        className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:opacity-50"
-      >
-        {res.kind === "busy" ? (
-          "กำลัง deploy…"
-        ) : (
-          <>
-            <RocketLaunchIcon className="h-4 w-4" />
-            Deploy เข้า Google
-          </>
-        )}
-      </button>
+      {!googleConnected ? (
+        <a
+          href="/connect"
+          title="ต้องเชื่อมบัญชี Google ก่อนถึงจะ deploy ได้"
+          className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+        >
+          <RocketLaunchIcon className="h-4 w-4" />
+          เชื่อม Google ก่อน Deploy
+        </a>
+      ) : (
+        <button
+          onClick={deploy}
+          disabled={res.kind === "busy"}
+          className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:opacity-50"
+        >
+          {res.kind === "busy" ? (
+            "กำลัง deploy…"
+          ) : (
+            <>
+              <RocketLaunchIcon className="h-4 w-4" />
+              Deploy เข้า Google
+            </>
+          )}
+        </button>
+      )}
 
       {res.kind !== "idle" && res.kind !== "busy" && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm">

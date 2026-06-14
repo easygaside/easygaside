@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRef } from "react";
+import { CodeBracketIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
 
 const Monaco = dynamic(
@@ -45,8 +46,16 @@ export function EditorPane({ projectId }: { projectId: string }) {
 
   if (!activePath) {
     return (
-      <div className="grid h-full place-items-center px-6 text-center text-sm text-slate-400">
-        ยังไม่มีไฟล์ — พิมพ์บอก AI ทางซ้ายให้สร้างระบบ
+      <div className="grid h-full place-items-center px-8 text-center">
+        <div className="max-w-xs">
+          <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_10px_30px_rgba(16,185,129,0.3)]">
+            <CodeBracketIcon className="h-7 w-7" />
+          </span>
+          <h3 className="text-sm font-semibold text-slate-700">โค้ดจะขึ้นที่นี่</h3>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">
+            พิมพ์บอก AI ทางซ้ายว่าอยากได้ระบบอะไร — โค้ด Google Apps Script จะถูกสร้างและแสดงที่นี่ พร้อมพรีวิวสดทางขวา
+          </p>
+        </div>
       </div>
     );
   }

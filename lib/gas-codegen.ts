@@ -44,19 +44,34 @@ Based on the project instruction, generate ALL complete source files for a Googl
 - Web app: implement doGet(e) in Code.gs; set .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
 - Client↔server: google.script.run.withSuccessHandler().withFailureHandler() (NEVER fetch a server route)
 - HTTP requests: UrlFetchApp.fetch() (never fetch/axios)
-- ALWAYS SpreadsheetApp.getActiveSpreadsheet() / DocumentApp.getActiveDocument() — NEVER openById/openByUrl with hardcoded IDs
+- Data storage depends on the project kind (see the addendum below). NEVER hardcode a spreadsheet/doc ID via openById/openByUrl on an arbitrary file.
 - PropertiesService.getScriptProperties() for config/secrets; LockService for concurrent writes
 - Dates: Utilities.formatDate(date, 'Asia/Bangkok', fmt) — NEVER toISOString()/moment/dayjs
 - Phone/leading-zero columns in Sheets: setNumberFormat('@') before write + getDisplayValue() on read (Sheets eats the leading 0)
 - Filter/transform data server-side before returning; use indexed objects for O(1) lookups (never raw 2D arrays)
-- try/catch on both server and client side`;
+- try/catch on both server and client side
+
+## Clarify before generating (only when needed)
+- If the project stores data but the storage is unclear, ask ONE short question first, then WAIT for the reply: does it need ONE data sheet or several? a NEW auto-created Sheet (default) or an existing one? Keep it to a single concise question; if the request is already clear, skip and generate immediately.`;
 
 const BOUND_ADDENDUM = `
 
 ## This is a CONTAINER-BOUND script (bound to a Google Sheet)
-- Add an onOpen(e) that builds a custom menu with SpreadsheetApp.getUi() (no doGet web app unless asked)
-- Use SpreadsheetApp.getActiveSpreadsheet() / getActiveSheet() as the data source
+- The active spreadsheet IS the data store — use SpreadsheetApp.getActiveSpreadsheet() / getActiveSheet()
+- Ensure the needed tabs + header columns exist on first use (create them if missing; setNumberFormat('@') on phone/idcard columns)
+- Add an onOpen(e) custom menu with SpreadsheetApp.getUi() when a Sheet UI helps
 - For time/auth-driven automation, generate an installTriggers() setup function the user runs once`;
+
+const WEBAPP_ADDENDUM = `
+
+## This is a STANDALONE web app (NOT bound to a Sheet)
+- There is NO active spreadsheet — SpreadsheetApp.getActiveSpreadsheet() returns null. NEVER call it here.
+- If the app stores data in a Sheet, MANAGE YOUR OWN spreadsheet so it is auto-provisioned (the user must NOT create the Sheet by hand):
+  - getDataSpreadsheet_(): read a cached id from PropertiesService.getScriptProperties() (key e.g. 'DATA_SS_ID'); SpreadsheetApp.openById(id); if missing or it throws, SpreadsheetApp.create('<AppName> Data'), save the new id, return it.
+  - setupSheet_(ss, tabName, headers): get-or-insert the tab; if row 1 is empty, write the header columns ONCE; setNumberFormat('@') on phone/idcard columns before writing.
+  - Run setup on first use (top of doGet or each data function) so the spreadsheet + tabs + header columns are created automatically on the first request.
+  - Expose the spreadsheet URL to the owner (a link in an admin view or returned from a function) so they can find their data.
+- Use LockService around appendRow for concurrent writes.`;
 
 export interface CodegenOptions {
   kind?: ProjectKind;
@@ -64,7 +79,9 @@ export interface CodegenOptions {
 
 /** The system prompt (static rulebook + kind variation) — cache this. */
 export function buildCodegenSystemPrompt(options: CodegenOptions = {}): string {
-  return options.kind === "bound" ? GAS_RULEBOOK + BOUND_ADDENDUM : GAS_RULEBOOK;
+  return options.kind === "bound"
+    ? GAS_RULEBOOK + BOUND_ADDENDUM
+    : GAS_RULEBOOK + WEBAPP_ADDENDUM;
 }
 
 /** The per-request user prompt (the actual project intent). */
@@ -155,6 +172,15 @@ export function validateGasFiles(
       if (rule.re.test(f.content)) {
         errors.push({ file: f.name, rule: rule.rule, message: rule.message(f.name), severity: "error" });
       }
+    }
+    // standalone web apps have NO active spreadsheet — getActiveSpreadsheet() returns null
+    if (opts.isWebApp !== false && /\bgetActiveSpreadsheet\s*\(/.test(f.content)) {
+      errors.push({
+        file: f.name,
+        rule: "no-active-spreadsheet",
+        message: `${f.name}: เว็บแอป standalone ไม่มี active spreadsheet — ใช้ getDataSpreadsheet_() (สร้าง/เปิดเองผ่าน PropertiesService) แทน getActiveSpreadsheet()`,
+        severity: "error",
+      });
     }
   }
 

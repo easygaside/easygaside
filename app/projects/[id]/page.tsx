@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { IdeShell } from "@/components/ide/IdeShell";
 import { getFiles } from "@/lib/files";
+import { getConnectionStatus } from "@/lib/google-connection";
 import { getCurrentUserId, getProject } from "@/lib/projects";
 
 export default async function ProjectBuilderPage({
@@ -16,7 +17,7 @@ export default async function ProjectBuilderPage({
   if (!project) notFound();
 
   // ownership verified above → safe to read files via service-role
-  const files = await getFiles(id);
+  const [files, conn] = await Promise.all([getFiles(id), getConnectionStatus(userId)]);
 
   // honest hint when the project asked for a capability GAS can't serve yet (web target)
   const spec = (project.spec ?? {}) as { webOnlyReasons?: unknown };
@@ -31,6 +32,7 @@ export default async function ProjectBuilderPage({
       projectName={project.name}
       initialFiles={files.map((f) => ({ path: f.path, content: f.content }))}
       webHint={webHint}
+      googleConnected={conn.connected && conn.status === "active"}
     />
   );
 }

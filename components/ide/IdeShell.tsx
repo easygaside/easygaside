@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, CodeBracketIcon, ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
 import { ChatPanel } from "./ChatPanel";
 import { DeployButton } from "./DeployButton";
@@ -18,11 +18,13 @@ export function IdeShell({
   projectName,
   initialFiles,
   webHint,
+  googleConnected = true,
 }: {
   projectId: string;
   projectName: string;
   initialFiles: { path: string; content: string }[];
   webHint?: string[];
+  googleConnected?: boolean;
 }) {
   const setInitial = useProjectStore((s) => s.setInitial);
   const [hintOpen, setHintOpen] = useState(true);
@@ -33,6 +35,16 @@ export function IdeShell({
   return (
     <main className="flex h-screen flex-col bg-[#eef2f8] text-slate-800">
       <div className="flex items-center gap-3 px-4 py-3">
+        <span className="flex items-center gap-2">
+          {/* brand — swap this box for your icon later */}
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm">
+            <CodeBracketIcon className="h-4 w-4" />
+          </span>
+          <b className="text-sm tracking-tight">
+            EasyGAS <span className="text-emerald-600">IDE</span>
+          </b>
+        </span>
+        <span className="text-slate-300">·</span>
         <Link
           href="/projects"
           className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"
@@ -41,9 +53,9 @@ export function IdeShell({
           โปรเจกต์
         </Link>
         <span className="text-slate-300">/</span>
-        <b className="text-sm">{projectName}</b>
+        <b className="truncate text-sm">{projectName}</b>
         <span className="flex-1" />
-        <DeployButton projectId={projectId} />
+        <DeployButton projectId={projectId} googleConnected={googleConnected} />
       </div>
 
       {webHint && webHint.length > 0 && hintOpen && (

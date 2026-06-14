@@ -24,10 +24,34 @@ async function buildApiFiles(projectId: string): Promise<GasFile[]> {
   const files = await getFiles(projectId);
   if (files.length === 0) throw new Error("no_files");
   const apiFiles = toApiFiles(files.map((f) => ({ path: f.path, content: f.content })));
-  if (!files.some((f) => f.path.toLowerCase() === "appsscript.json")) {
-    apiFiles.push({ name: "appsscript", type: "JSON", source: buildWebAppManifest() });
+  return ensureWebAppDeployConfig(apiFiles);
+}
+
+/**
+ * Guarantee the deployed app runs as the OWNER with public access — regardless of what the AI
+ * put in appsscript.json. Forces webapp.executeAs = USER_DEPLOYING (so end users don't re-auth)
+ * and defaults access to ANYONE_ANONYMOUS. Adds the manifest if it's missing.
+ */
+function ensureWebAppDeployConfig(apiFiles: GasFile[]): GasFile[] {
+  const idx = apiFiles.findIndex(
+    (f) => f.type === "JSON" && f.name.toLowerCase() === "appsscript",
+  );
+  if (idx === -1) {
+    return [...apiFiles, { name: "appsscript", type: "JSON", source: buildWebAppManifest() }];
   }
-  return apiFiles;
+  try {
+    const m = JSON.parse(apiFiles[idx].source) as Record<string, unknown>;
+    const webapp = (m.webapp as Record<string, unknown> | undefined) ?? {};
+    const merged = {
+      ...m,
+      webapp: { access: "ANYONE_ANONYMOUS", ...webapp, executeAs: "USER_DEPLOYING" },
+    };
+    const next = [...apiFiles];
+    next[idx] = { ...apiFiles[idx], source: JSON.stringify(merged, null, 2) };
+    return next;
+  } catch {
+    return apiFiles; // malformed manifest — leave as-is (lint/critic flags it)
+  }
 }
 
 export interface DeployResult {

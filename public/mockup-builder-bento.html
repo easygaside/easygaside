@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>easygas — Builder · Bento minimal pastel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"Sarabun",system-ui,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;transition:background .25s}
+
+  /* ───── soft pastel tokens ───── */
+  body{
+    --bg:linear-gradient(160deg,#f3f4fb 0%,#eef3f6 100%);
+    --tx:#36405a;--mut:#8a93a8;--faint:#aab3c5;
+    --acc:#2fc79a;--acc-ink:#06382a;--acc2:#a78bfa;
+    --c-chat:#f1f0fc;   /* lavender */
+    --c-edit:#fdfdff;   /* near-white for code */
+    --c-prev:#ecf7f1;   /* mint */
+    --tint-chat:#7c6df0;--tint-edit:#5b9bd8;--tint-prev:#34c89a;
+    --line:rgba(60,70,110,.08);
+    --soft:0 1px 2px rgba(60,70,110,.04), 0 8px 24px rgba(60,70,110,.06), 0 24px 48px rgba(60,70,110,.05);
+    --rb:18px;--ri:14px;
+    --cbg:#fbfcff;--ctx:#3a4255;--c-kw:#d6608a;--c-str:#3a9d6a;--c-com:#aeb6c6;--c-fn:#6a78d6;--c-glob:#c98a3e;--c-num:#3f7fd6;
+    --pad:18px;
+    background:var(--bg);color:var(--tx);
+  }
+  body.dark{
+    --bg:linear-gradient(160deg,#13151d 0%,#15181f 100%);
+    --tx:#e7eaf2;--mut:#929bb0;--faint:#646e84;
+    --acc:#34d3a4;--acc-ink:#04130c;--acc2:#b6a4ff;
+    --c-chat:#1a1b27;--c-edit:#15171f;--c-prev:#15201c;
+    --line:rgba(255,255,255,.06);
+    --soft:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    --cbg:#12141c;--ctx:#cdd6e6;--c-kw:#ff8fb0;--c-str:#9ed99f;--c-com:#5a6377;--c-fn:#8aa0f5;--c-glob:#e6bd7c;--c-num:#7fb0f5;
+  }
+
+  button{font-family:inherit;cursor:pointer}
+
+  /* control bar */
+  .ctl{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px;padding:11px 18px}
+  .ctl .brand{font-family:"Prompt";font-weight:700;display:flex;align-items:center;gap:8px;font-size:16px;color:var(--tx)}
+  .ctl .brand i{width:10px;height:10px;border-radius:4px;background:var(--acc);box-shadow:0 0 14px var(--acc)}
+  .ctl .sp{flex:1}
+  .softbtn{font-family:"Prompt";font-size:12.5px;font-weight:500;border:1px solid var(--line);background:color-mix(in srgb,var(--tx) 4%,transparent);
+    color:var(--mut);padding:8px 15px;border-radius:999px;backdrop-filter:blur(6px)}
+  .softbtn:hover{color:var(--tx)}
+
+  /* shell */
+  #app{height:calc(100vh - 53px);display:flex;flex-direction:column;padding:0 18px 18px}
+
+  .topbar{flex:none;display:flex;align-items:center;gap:14px;padding:6px 6px 16px}
+  .topbar .proj{font-family:"Prompt";font-size:14px;color:var(--mut)}
+  .topbar .proj b{color:var(--tx);font-weight:600}
+  .verified{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--acc);
+    background:color-mix(in srgb,var(--acc) 13%,transparent);padding:7px 14px;border-radius:999px}
+  .topbar .sp{flex:1}
+  .credits{font-family:"Prompt";font-size:12.5px;color:var(--mut)}
+  .deploy{font-family:"Prompt";font-weight:600;font-size:13.5px;padding:11px 20px;border:none;border-radius:14px;color:var(--acc-ink);
+    background:linear-gradient(180deg,color-mix(in srgb,var(--acc) 92%,#fff),var(--acc));box-shadow:0 8px 22px color-mix(in srgb,var(--acc) 40%,transparent)}
+
+  .ide{flex:1;display:grid;grid-template-columns:308px 1.35fr 1fr;gap:16px;min-height:0}
+  .pane{display:flex;flex-direction:column;min-width:0;min-height:0;border-radius:var(--rb);box-shadow:var(--soft);overflow:hidden;border:1px solid var(--line)}
+  .pane.chat{background:var(--c-chat)} .pane.editor{background:var(--c-edit)} .pane.preview{background:var(--c-prev)}
+  .pane-h{flex:none;display:flex;align-items:center;gap:9px;padding:16px 18px 12px;font-family:"Prompt";font-size:13px;font-weight:600;color:var(--tx)}
+  .pane-h .ico{width:26px;height:26px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff}
+  .chat .ico{background:var(--tint-chat)} .editor .ico{background:var(--tint-edit)} .preview .ico{background:var(--tint-prev)}
+  .pane-h .sp{flex:1}
+
+  /* chat */
+  .chat-body{flex:1;overflow:auto;padding:6px 16px 14px;display:flex;flex-direction:column;gap:13px}
+  .msg{display:flex;flex-direction:column;gap:5px}
+  .msg .who{font-size:11px;color:var(--faint);font-weight:600;display:flex;align-items:center;gap:5px}
+  .bubble{padding:11px 14px;font-size:13px;line-height:1.55;border-radius:16px}
+  .msg.user .bubble{background:color-mix(in srgb,#fff 70%,transparent);color:var(--tx);align-self:flex-start;box-shadow:0 2px 8px rgba(60,70,110,.05)}
+  body.dark .msg.user .bubble{background:color-mix(in srgb,#fff 7%,transparent)}
+  .msg.ai .bubble{background:color-mix(in srgb,var(--acc) 12%,#fff);color:var(--tx);box-shadow:0 2px 10px color-mix(in srgb,var(--acc) 12%,transparent)}
+  body.dark .msg.ai .bubble{background:color-mix(in srgb,var(--acc) 14%,transparent)}
+  .msg.ai .who .av{color:var(--acc)}
+  .fchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .fchip{font-family:"JetBrains Mono";font-size:10.5px;background:color-mix(in srgb,var(--acc) 14%,#fff);color:color-mix(in srgb,var(--acc) 80%,#000);padding:3px 9px;border-radius:8px}
+  body.dark .fchip{background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc)}
+  .diffcard{margin-top:9px;border-radius:12px;overflow:hidden;font-family:"JetBrains Mono";font-size:10.5px;background:color-mix(in srgb,var(--tx) 4%,transparent)}
+  .diffcard .dh{padding:7px 11px;color:var(--mut)}
+  .diffcard .dl{padding:2px 11px}.diffcard .add{background:color-mix(in srgb,var(--acc) 16%,transparent);color:color-mix(in srgb,var(--acc) 75%,#000)}
+  body.dark .diffcard .add{color:#9ed99f}.diffcard .ctx{color:var(--faint)}
+  .handoff{margin-top:4px;align-self:flex-start;font-family:"Prompt";font-size:12px;font-weight:500;color:color-mix(in srgb,var(--acc2) 75%,#000);
+    background:color-mix(in srgb,var(--acc2) 14%,#fff);border:none;padding:9px 14px;border-radius:13px}
+  body.dark .handoff{color:var(--acc2);background:color-mix(in srgb,var(--acc2) 14%,transparent)}
+  .chat-foot{flex:none;padding:10px 16px 16px}
+  .sugg{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:11px}
+  .sg{font-family:"Prompt";font-size:11.5px;color:var(--mut);background:color-mix(in srgb,#fff 60%,transparent);padding:6px 12px;border-radius:999px;box-shadow:0 1px 4px rgba(60,70,110,.05)}
+  body.dark .sg{background:color-mix(in srgb,#fff 6%,transparent)}
+  .composer{display:flex;align-items:center;gap:9px;background:color-mix(in srgb,#fff 75%,transparent);border-radius:15px;padding:9px 11px;box-shadow:0 2px 10px rgba(60,70,110,.06)}
+  body.dark .composer{background:color-mix(in srgb,#fff 6%,transparent)}
+  .composer input{flex:1;background:transparent;border:none;outline:none;color:var(--tx);font-size:13px;font-family:inherit}
+  .composer input::placeholder{color:var(--faint)}
+  .send{width:32px;height:32px;border-radius:11px;background:var(--acc);color:var(--acc-ink);border:none;font-weight:700;flex:none}
+
+  /* editor */
+  .tabs{flex:none;display:flex;align-items:center;gap:5px;padding:0 16px 10px;overflow-x:auto}
+  .tab{display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:11px;color:var(--faint);font-size:12px;font-family:"JetBrains Mono";white-space:nowrap}
+  .tab .d{width:7px;height:7px;border-radius:50%}.tab.gs .d{background:#e0b06a}.tab.html .d{background:#7aa2f7}.tab.json .d{background:#b69cf0}
+  .tab.active{color:var(--tx);background:color-mix(in srgb,var(--tx) 6%,transparent);font-weight:500}
+  .code-wrap{flex:1;overflow:auto;display:flex;font-family:"JetBrains Mono";font-size:12.5px;line-height:1.75;background:var(--cbg);margin:0 14px;border-radius:14px}
+  .gutter{flex:none;text-align:right;color:var(--faint);padding:14px 10px 14px 16px;user-select:none}
+  .gutter div{height:21.875px}
+  .code{flex:1;padding:14px 16px 14px 4px;white-space:pre;tab-size:2;color:var(--ctx)}
+  .code .ln{display:block;min-height:21.875px;border-radius:5px}
+  .code .line-add{background:color-mix(in srgb,var(--acc) 11%,transparent);box-shadow:inset 3px 0 0 var(--acc)}
+  .t-kw{color:var(--c-kw)}.t-str{color:var(--c-str)}.t-com{color:var(--c-com);font-style:italic}
+  .t-fn{color:var(--c-fn)}.t-glob{color:var(--c-glob)}.t-num{color:var(--c-num)}
+  .ed-foot{flex:none;display:flex;align-items:center;gap:13px;padding:12px 18px;font-size:11px;font-family:"JetBrains Mono";color:var(--faint)}
+  .ed-foot .ok{color:var(--acc)}
+
+  /* preview */
+  .pv-h .tier{display:flex;gap:4px;background:color-mix(in srgb,var(--tx) 5%,transparent);border-radius:11px;padding:3px}
+  .pv-h .tier button{font-family:"Prompt";font-size:11px;border:none;background:transparent;color:var(--mut);padding:5px 11px;border-radius:8px}
+  .pv-h .tier button.on{background:color-mix(in srgb,var(--acc) 16%,#fff);color:color-mix(in srgb,var(--acc) 80%,#000);font-weight:600}
+  body.dark .pv-h .tier button.on{background:color-mix(in srgb,var(--acc) 18%,transparent);color:var(--acc)}
+  .pv-body{flex:1;overflow:auto;padding:6px 16px 16px;display:flex;flex-direction:column;gap:13px}
+  .browser{flex:none;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 12px 30px rgba(40,50,80,.16)}
+  .urlbar{height:30px;background:#f1f3f7;display:flex;align-items:center;gap:7px;padding:0 11px}
+  .urlbar i{width:8px;height:8px;border-radius:50%;display:block}.urlbar i:nth-child(1){background:#ff6b6b}.urlbar i:nth-child(2){background:#ffd166}.urlbar i:nth-child(3){background:#51cf85}
+  .urlbar .ad{flex:1;background:#fff;border-radius:7px;font-size:10px;color:#8a93a8;padding:4px 9px;font-family:"JetBrains Mono";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:4px}
+  .site{padding:20px;background:linear-gradient(180deg,#fbfcfe,#f1f5f9)}
+  .bk{max-width:240px;margin:0 auto;background:#fff;border-radius:16px;padding:18px;box-shadow:0 4px 16px rgba(2,6,23,.06)}
+  .bk h4{margin:0 0 3px;font-size:15px;color:#2a3342;font-family:"Prompt"}.bk .s{font-size:11px;color:#8a93a8;margin-bottom:13px}
+  .bk label{display:block;font-size:10px;color:#8a93a8;margin-bottom:4px;font-weight:600}
+  .bk input,.bk select{width:100%;border:1px solid #eceef3;background:#f8fafc;border-radius:10px;padding:8px 10px;font-size:12px;margin-bottom:10px;color:#2a3342;font-family:"Sarabun"}
+  .bk .go{width:100%;border:none;border-radius:11px;padding:11px;font-weight:700;font-size:13px;background:#2fc79a;color:#fff;font-family:"Prompt"}
+  .bk .cancel{width:100%;border:none;background:#fef0f0;color:#e8607a;border-radius:11px;padding:9px;margin-top:8px;font-size:12px;font-family:"Prompt"}
+  .console{flex:none;border-radius:14px;overflow:hidden;font-family:"JetBrains Mono";font-size:11px;background:color-mix(in srgb,var(--tx) 4%,transparent)}
+  .console .ch{display:flex;align-items:center;gap:8px;padding:9px 13px;color:var(--mut);font-weight:600}
+  .console .cl{padding:3px 13px;line-height:1.75;color:var(--ctx)}
+  .console .cl.ok{color:color-mix(in srgb,var(--acc) 78%,#000)}body.dark .console .cl.ok{color:#9ed99f}
+  .console .cl.warn{color:#cf9445}.console .cl.dim{color:var(--faint)}
+
+  @media(max-width:920px){
+    #app{height:auto;padding:0 12px 12px}
+    .ide{grid-template-columns:1fr;gap:12px}
+    .pane{min-height:320px}
+  }
+</style>
+</head>
+<body>
+  <div class="ctl">
+    <span class="brand"><i></i>easygas</span>
+    <span class="softbtn" style="color:var(--acc);font-weight:600">Bento · minimal pastel</span>
+    <span class="sp"></span>
+    <button class="softbtn" id="mode">🌙 Dark</button>
+  </div>
+
+  <div id="app">
+    <div class="topbar">
+      <span class="proj">โปรเจกต์ · <b>ระบบจองคิวร้านตัดผม</b></span>
+      <span class="verified">✓ ทดสอบรันจริงผ่าน</span>
+      <span class="sp"></span>
+      <span class="credits">เหลือ 7 โปรเจกต์</span>
+      <button class="deploy">🚀 Deploy เข้า Google</button>
+    </div>
+
+    <div class="ide">
+      <!-- CHAT -->
+      <section class="pane chat">
+        <div class="pane-h"><span class="ico">💬</span> แชตกับ AI</div>
+        <div class="chat-body">
+          <div class="msg user"><div class="who">คุณ</div><div class="bubble">อยากได้ระบบจองคิวร้านตัดผม บันทึกลง Google Sheet ส่งอีเมลยืนยัน</div></div>
+          <div class="msg ai"><div class="who"><span class="av">✦</span> easygas AI</div>
+            <div class="bubble">สร้างให้แล้วครับ ✦ ทดสอบรันจริงผ่าน
+              <div class="fchips"><span class="fchip">appsscript.json</span><span class="fchip">Code.gs</span><span class="fchip">Index.html</span><span class="fchip">CSS.html</span></div>
+            </div>
+          </div>
+          <div class="msg user"><div class="who">คุณ</div><div class="bubble">เพิ่มปุ่มยกเลิกนัด</div></div>
+          <div class="msg ai"><div class="who"><span class="av">✦</span> easygas AI</div>
+            <div class="bubble">เพิ่ม cancelBooking() ให้แล้ว — รันจริงผ่าน
+              <div class="diffcard">
+                <div class="dh">Code.gs · แก้ไข</div>
+                <div class="dl ctx">&nbsp;&nbsp;return { ok: true };</div>
+                <div class="dl add">+ function cancelBooking(phone) {</div>
+                <div class="dl add">+&nbsp;&nbsp;const sh = SpreadsheetApp...</div>
+                <div class="dl add">+ }</div>
+              </div>
+            </div>
+          </div>
+          <button class="handoff">🙋 ระบบซับซ้อน? ให้ทีมช่วยทำให้ →</button>
+        </div>
+        <div class="chat-foot">
+          <div class="sugg"><span class="sg">＋ เพิ่มฟิลด์</span><span class="sg">เปลี่ยนสี</span><span class="sg">ส่ง LINE แทนเมล</span></div>
+          <div class="composer"><input placeholder="พิมพ์บอก AI…" /><button class="send">↑</button></div>
+        </div>
+      </section>
+
+      <!-- EDITOR -->
+      <section class="pane editor">
+        <div class="pane-h"><span class="ico">📝</span> เอดิเตอร์<span class="sp"></span>
+          <span style="font-family:'JetBrains Mono';font-size:11px;color:var(--faint)">Code.gs</span></div>
+        <div class="tabs">
+          <div class="tab json"><span class="d"></span>appsscript.json</div>
+          <div class="tab gs active"><span class="d"></span>Code.gs</div>
+          <div class="tab html"><span class="d"></span>Index.html</div>
+          <div class="tab html"><span class="d"></span>CSS.html</div>
+        </div>
+        <div class="code-wrap"><div class="gutter" id="gutter"></div><div class="code" id="code"></div></div>
+        <div class="ed-foot"><span>พร้อม deploy</span><span style="flex:1"></span><span class="ok">✓ validateGasFiles</span><span>GAS · V8</span></div>
+      </section>
+
+      <!-- PREVIEW -->
+      <section class="pane preview">
+        <div class="pane-h pv-h"><span class="ico">👁</span> พรีวิว<span class="sp"></span>
+          <div class="tier"><button class="on">⚡ จำลอง</button><button>☁ รันจริง</button></div>
+        </div>
+        <div class="pv-body">
+          <div class="browser">
+            <div class="urlbar"><i></i><i></i><i></i><span class="ad">script.google.com/macros/s/AKfy…/dev</span></div>
+            <div class="site">
+              <div class="bk"><h4>✂️ จองคิวร้านตัดผม</h4><div class="s">เลือกเวลาที่สะดวก ส่งอีเมลยืนยัน</div>
+                <label>ชื่อ</label><input value="คุณสมชาย"/>
+                <label>เบอร์โทร</label><input value="0812345678"/>
+                <label>บริการ</label><select><option>ตัดผมชาย</option></select>
+                <button class="go">จองคิว</button>
+                <button class="cancel">ยกเลิกนัดของฉัน</button>
+              </div>
+            </div>
+          </div>
+          <div class="console">
+            <div class="ch">🖥 Console — ทดสอบรันจริง</div>
+            <div class="cl dim">&gt; push scratch → /dev → run</div>
+            <div class="cl ok">✓ doGet() → 200 OK</div>
+            <div class="cl ok">✓ saveBooking({…}) → {ok:true}</div>
+            <div class="cl warn">⚠ console.warn: คอลัมน์ "เบอร์โทร" → setNumberFormat('@') กัน 0 หาย</div>
+            <div class="cl ok">✓ Cloud Logging: ไม่มี error</div>
+            <div class="cl ok">✓ ทดสอบรันจริงผ่าน — พร้อม deploy</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+<script>
+  var KW=new Set(["function","const","let","var","return","if","else","for","new","true","false","null"]);
+  var GLOB=new Set(["SpreadsheetApp","HtmlService","MailApp","Utilities","Session","ContentService","PropertiesService","Logger","DriveApp"]);
+  function esc(c){return c==="<"?"&lt;":c===">"?"&gt;":c==="&"?"&amp;":c}
+  function hl(line){var o="",i=0,n=line.length;while(i<n){var c=line[i];
+    if(c==="/"&&line[i+1]==="/"){o+='<span class="t-com">'+line.slice(i).split("").map(esc).join("")+'</span>';break}
+    if(c==="'"||c==='"'){var q=c,j=i+1;while(j<n&&line[j]!==q){if(line[j]==="\\")j++;j++}o+='<span class="t-str">'+line.slice(i,j+1).split("").map(esc).join("")+'</span>';i=j+1;continue}
+    if(/[A-Za-z_$]/.test(c)){var k=i;while(k<n&&/[A-Za-z0-9_$]/.test(line[k]))k++;var w=line.slice(i,k),a=line.slice(k).trimStart(),cls="";
+      if(KW.has(w))cls="t-kw";else if(GLOB.has(w))cls="t-glob";else if(a[0]==="(")cls="t-fn";
+      o+=cls?'<span class="'+cls+'">'+w+'</span>':w;i=k;continue}
+    if(/[0-9]/.test(c)){var m=i;while(m<n&&/[0-9.]/.test(line[m]))m++;o+='<span class="t-num">'+line.slice(i,m)+'</span>';i=m;continue}
+    o+=esc(c);i++}return o}
+  var CODE=
+"function doGet() {\n"+
+"  const t = HtmlService.createTemplateFromFile('Index');\n"+
+"  return t.evaluate()\n"+
+"    .setTitle('จองคิวร้านตัดผม')\n"+
+"    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);\n"+
+"}\n"+
+"\n"+
+"function saveBooking(data) {\n"+
+"  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('คิว');\n"+
+"  const when = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm');\n"+
+"  sh.appendRow([when, data.name, \"'\" + data.phone, data.service]);\n"+
+"  MailApp.sendEmail(data.email, 'ยืนยันการจอง', 'จองคิวเรียบร้อยแล้ว');\n"+
+"  return { ok: true };\n"+
+"}\n"+
+"\n"+
+"// ✦ เพิ่มโดย AI: ยกเลิกนัด\n"+
+"function cancelBooking(phone) {\n"+
+"  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('คิว');\n"+
+"  const rows = sh.getDataRange().getDisplayValues();\n"+
+"  for (let i = rows.length - 1; i > 0; i--) {\n"+
+"    if (rows[i][2] === phone) sh.deleteRow(i + 1);\n"+
+"  }\n"+
+"  return { ok: true };\n"+
+"}";
+  (function(){
+    var lines=CODE.split("\n"),addFrom=lines.findIndex(function(l){return l.indexOf("เพิ่มโดย AI")>-1});
+    var code=document.getElementById("code"),gut=document.getElementById("gutter");
+    lines.forEach(function(l,idx){
+      var ln=document.createElement("span");ln.className="ln"+(addFrom>-1&&idx>=addFrom?" line-add":"");
+      ln.innerHTML=hl(l)||"&nbsp;";code.appendChild(ln);
+      var g=document.createElement("div");g.textContent=idx+1;gut.appendChild(g);
+    });
+  })();
+  var mode=document.getElementById('mode');
+  mode.addEventListener('click',function(){var d=document.body.classList.toggle('dark');mode.textContent=d?'☀️ Light':'🌙 Dark'});
+</script>
+</body>
+</html>

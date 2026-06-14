@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>easygas — Builder (Linear / Bento)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"Sarabun",system-ui,sans-serif;font-size:14px;background:#06080c;color:#fff;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+
+  /* ───── control bar ───── */
+  .ctl{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:9px 14px;
+    background:rgba(8,11,16,.94);backdrop-filter:blur(10px);border-bottom:1px solid #1a2230}
+  .ctl .brand{font-family:"Space Grotesk";font-weight:700;display:flex;align-items:center;gap:8px;color:#fff;font-size:15px}
+  .ctl .brand i{width:9px;height:9px;border-radius:3px;background:#34d399;box-shadow:0 0 12px #34d399}
+  .ctl .sp{flex:1}
+  .pill{font-family:"Inter";font-size:12.5px;font-weight:600;border:1px solid #283142;background:#0d121b;color:#9fb0c3;padding:6px 13px;border-radius:999px;transition:.15s}
+  .pill:hover{color:#fff;border-color:#3a4658}.pill.on{background:#34d399;border-color:#34d399;color:#04130c}
+
+  /* ═══════════ APP SHELL ═══════════ */
+  #app{height:calc(100vh - 51px);display:flex;flex-direction:column;transition:background .2s;color:var(--tx)}
+
+  /* top app bar */
+  .topbar{flex:none;display:flex;align-items:center;gap:14px;height:52px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--bar)}
+  .topbar .proj{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mut)}
+  .topbar .proj b{color:var(--tx);font-weight:600}
+  .verified{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--acc);
+    background:color-mix(in srgb,var(--acc) 12%,transparent);border:1px solid color-mix(in srgb,var(--acc) 32%,transparent);padding:5px 11px;border-radius:999px}
+  .topbar .sp{flex:1}
+  .deploy{font-weight:600;font-size:13.5px;padding:9px 18px;border:none;color:#04130c;background:linear-gradient(180deg,var(--acc),#10b981);box-shadow:0 6px 18px rgba(16,185,129,.3)}
+  .iconbtn{border:1px solid var(--line);background:transparent;color:var(--mut);border-radius:8px;padding:7px 11px;font-size:13px}
+
+  /* 3-pane */
+  .ide{flex:1;display:grid;grid-template-columns:300px 1.35fr 1fr;min-height:0}
+  .pane{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surf)}
+  .pane-h{flex:none;display:flex;align-items:center;gap:8px;height:38px;padding:0 14px;font-size:12px;font-weight:600;color:var(--mut);border-bottom:1px solid var(--line)}
+
+  /* chat */
+  .chat-body{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+  .msg{display:flex;flex-direction:column;gap:5px}
+  .msg .who{font-size:11px;color:var(--faint);font-weight:600;display:flex;align-items:center;gap:5px}
+  .bubble{padding:9px 12px;font-size:13px;line-height:1.55}
+  .msg.user .bubble{background:var(--ubub);color:var(--tx);align-self:flex-start;border-radius:var(--rb)}
+  .msg.ai .bubble{background:color-mix(in srgb,var(--acc) 10%,transparent);border:1px solid color-mix(in srgb,var(--acc) 22%,transparent);border-radius:var(--rb)}
+  .msg.ai .who .av{color:var(--acc)}
+  .fchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+  .fchip{font-family:"JetBrains Mono";font-size:10.5px;background:var(--code-bg);border:1px solid var(--line);color:var(--acc);padding:2px 7px;border-radius:6px}
+  .diffcard{margin-top:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-family:"JetBrains Mono";font-size:10.5px}
+  .diffcard .dh{padding:6px 10px;background:var(--code-bg);color:var(--mut);border-bottom:1px solid var(--line)}
+  .diffcard .dl{padding:2px 10px}.diffcard .add{background:rgba(52,211,153,.12);color:#3fbf86}.diffcard .ctx{color:var(--faint)}
+  .handoff{margin-top:6px;align-self:flex-start;font-size:12px;font-weight:600;color:var(--acc2);background:color-mix(in srgb,var(--acc2) 10%,transparent);
+    border:1px dashed color-mix(in srgb,var(--acc2) 40%,transparent);padding:7px 12px;border-radius:var(--rb)}
+  .chat-foot{flex:none;border-top:1px solid var(--line);padding:11px}
+  .sugg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px}
+  .sg{font-size:11.5px;border:1px solid var(--line);background:var(--code-bg);color:var(--mut);padding:5px 10px;border-radius:999px}
+  .composer{display:flex;align-items:center;gap:8px;background:var(--code-bg);border:1px solid var(--line);border-radius:var(--ri);padding:7px 10px}
+  .composer input{flex:1;background:transparent;border:none;outline:none;color:var(--tx);font-size:13px;font-family:inherit}
+  .composer input::placeholder{color:var(--faint)}
+  .send{width:30px;height:30px;border-radius:8px;background:var(--acc);color:#04130c;border:none;font-weight:700}
+
+  /* editor */
+  .tabs{flex:none;display:flex;align-items:center;height:38px;border-bottom:1px solid var(--line);overflow-x:auto;background:var(--bar)}
+  .tab{display:flex;align-items:center;gap:7px;padding:0 14px;height:100%;border-right:1px solid var(--line);color:var(--faint);font-size:12px;font-family:"JetBrains Mono";white-space:nowrap}
+  .tab .d{width:7px;height:7px;border-radius:50%}.tab.gs .d{background:#e0af68}.tab.html .d{background:#7aa2f7}.tab.json .d{background:#c084fc}
+  .tab.active{color:var(--tx);background:var(--code-bg);box-shadow:inset 0 -2px 0 var(--acc)}
+  .code-wrap{flex:1;overflow:auto;display:flex;font-family:"JetBrains Mono";font-size:12.5px;line-height:1.7;background:var(--code-bg)}
+  .gutter{flex:none;text-align:right;color:var(--faint);padding:12px 10px 12px 14px;user-select:none}
+  .gutter div{height:21.25px}
+  .code{flex:1;padding:12px 16px 12px 4px;white-space:pre;tab-size:2;color:var(--code-tx)}
+  .code .ln{display:block;min-height:21.25px}
+  .code .line-add{background:rgba(52,211,153,.1);box-shadow:inset 3px 0 0 var(--acc)}
+  .t-kw{color:var(--c-kw)}.t-str{color:var(--c-str)}.t-com{color:var(--c-com);font-style:italic}
+  .t-fn{color:var(--c-fn)}.t-glob{color:var(--c-glob)}.t-num{color:var(--c-num)}
+  .ed-foot{flex:none;height:30px;display:flex;align-items:center;gap:12px;padding:0 14px;font-size:11px;font-family:"JetBrains Mono";color:var(--faint);border-top:1px solid var(--line);background:var(--bar)}
+  .ed-foot .ok{color:var(--acc)}
+
+  /* preview */
+  .pv-h{justify-content:space-between}
+  .tier{display:flex;gap:3px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:3px}
+  .tier button{font-size:11px;border:none;background:transparent;color:var(--mut);padding:4px 9px;border-radius:6px;font-family:inherit}
+  .tier button.on{background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--acc);font-weight:600}
+  .pv-body{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+  .browser{flex:none;border:1px solid var(--line);border-radius:var(--ri);overflow:hidden;background:#fff;box-shadow:0 14px 36px rgba(0,0,0,.28)}
+  .urlbar{height:30px;background:#e9edf2;display:flex;align-items:center;gap:7px;padding:0 10px;border-bottom:1px solid #d4dae2}
+  .urlbar i{width:8px;height:8px;border-radius:50%;display:block}.urlbar i:nth-child(1){background:#ff5f57}.urlbar i:nth-child(2){background:#febc2e}.urlbar i:nth-child(3){background:#28c840}
+  .urlbar .ad{flex:1;background:#fff;border-radius:5px;font-size:10px;color:#6b7280;padding:3px 8px;font-family:"JetBrains Mono";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:4px}
+  .site{padding:18px;background:linear-gradient(180deg,#f8fafc,#eef2f7)}
+  .bk{max-width:260px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px;box-shadow:0 6px 18px rgba(2,6,23,.07)}
+  .bk h4{margin:0 0 3px;font-size:15px;color:#111827}.bk .s{font-size:11px;color:#6b7280;margin-bottom:12px}
+  .bk label{display:block;font-size:10px;color:#6b7280;margin-bottom:3px;font-weight:600}
+  .bk input,.bk select{width:100%;border:1px solid #d1d5db;border-radius:7px;padding:7px 9px;font-size:12px;margin-bottom:9px;color:#111827;background:#fff;font-family:"Sarabun"}
+  .bk .go{width:100%;border:none;border-radius:8px;padding:10px;font-weight:700;font-size:13px;background:#10b981;color:#fff;font-family:"Sarabun"}
+  .bk .cancel{width:100%;border:1px solid #fecaca;background:#fff;color:#ef4444;border-radius:8px;padding:8px;margin-top:7px;font-size:12px;font-family:"Sarabun"}
+  /* console panel */
+  .console{flex:none;border:1px solid var(--line);border-radius:var(--ri);overflow:hidden;font-family:"JetBrains Mono";font-size:11px;background:var(--code-bg)}
+  .console .ch{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid var(--line);color:var(--mut);font-weight:600}
+  .console .cl{padding:3px 11px;line-height:1.7;color:var(--code-tx)}
+  .console .cl.ok{color:#3fbf86}.console .cl.warn{color:#e0af68}.console .cl.dim{color:var(--faint)}
+
+  /* ════════ LINEAR skin ════════ */
+  #app[data-skin=linear]{--surf:#0e141f;--bar:#0c1119;--line:#1b2433;--tx:#e8eef6;--mut:#8493a7;--faint:#586577;
+    --acc:#34d399;--acc2:#60a5fa;--ubub:#16202d;--code-bg:#0b101a;--code-tx:#c7d2e0;--rb:11px;--ri:10px;
+    --c-kw:#ff7b9c;--c-str:#9ece6a;--c-com:#5a6675;--c-fn:#7aa2f7;--c-glob:#e0af68;--c-num:#ff9e64;
+    background:radial-gradient(800px 360px at 88% -10%,rgba(52,211,153,.07),transparent 60%),#070a10}
+  body.light #app[data-skin=linear]{--surf:#ffffff;--bar:#f7f9fc;--line:#e6ebf2;--tx:#0d1623;--mut:#5a6b80;--faint:#9aa7b8;
+    --ubub:#eef2f7;--code-bg:#fbfcfe;--code-tx:#1f2937;--c-kw:#cf222e;--c-str:#0a7b3e;--c-com:#8a919a;--c-fn:#6639ba;--c-glob:#b5530a;--c-num:#0550ae;
+    background:radial-gradient(800px 360px at 88% -10%,rgba(52,211,153,.08),transparent 60%),#f3f6fb}
+
+  /* ════════ BENTO skin (rounded cards + gaps) ════════ */
+  #app[data-skin=bento]{--surf:#ffffff;--bar:#fbfcfe;--line:#eaeef4;--tx:#16202e;--mut:#5d6b7e;--faint:#9aa7b6;
+    --acc:#10b981;--acc2:#8b5cf6;--ubub:#f1f5f9;--code-bg:#f6f9fc;--code-tx:#1f2a37;--rb:16px;--ri:14px;
+    --c-kw:#c2185b;--c-str:#0a7b3e;--c-com:#94a3b5;--c-fn:#6639ba;--c-glob:#b5530a;--c-num:#0550ae;
+    background:#eef2f8}
+  body:not(.light) #app[data-skin=bento]{--surf:#141c28;--bar:#111824;--line:#243043;--tx:#eef3f9;--mut:#94a3b5;--faint:#5e6c7e;
+    --ubub:#1d2735;--code-bg:#0e1622;--code-tx:#cdd8e6;--c-kw:#ff7b9c;--c-str:#9ece6a;--c-com:#5e6c7e;--c-fn:#7aa2f7;--c-glob:#e0af68;--c-num:#ff9e64;
+    background:#0a0f17}
+  #app[data-skin=bento] .ide{gap:14px;padding:14px}
+  #app[data-skin=bento] .pane{border-radius:20px;border:1px solid var(--line);box-shadow:0 8px 22px rgba(20,30,50,.07);overflow:hidden}
+  #app[data-skin=bento] .topbar{border-bottom:none;background:transparent;padding:14px 18px 0}
+  #app[data-skin=bento] .pane-h{font-weight:700}
+  #app[data-skin=bento] .tab.active{box-shadow:inset 0 -3px 0 var(--acc)}
+  #app[data-skin=bento] .verified{padding:6px 13px}
+  /* linear seams */
+  #app[data-skin=linear] .pane + .pane{border-left:1px solid var(--line)}
+
+  /* responsive */
+  @media(max-width:920px){
+    .ide{grid-template-columns:1fr;grid-auto-rows:minmax(260px,auto);overflow:auto}
+    #app{height:auto}#app[data-skin=bento] .ide{gap:12px}
+    .pane{min-height:300px}
+  }
+</style>
+</head>
+<body class="">
+  <div class="ctl">
+    <span class="brand"><i></i>easygas</span>
+    <button class="pill on" data-skin="linear">① Linear</button>
+    <button class="pill" data-skin="bento">② Bento</button>
+    <span class="sp"></span>
+    <button class="pill" id="mode">☀️ Light</button>
+  </div>
+
+  <div id="app" data-skin="linear">
+    <!-- top app bar -->
+    <div class="topbar">
+      <span class="proj">โปรเจกต์: <b>ระบบจองคิวร้านตัดผม</b> ▾</span>
+      <span class="verified">✓ ทดสอบรันจริงผ่าน</span>
+      <span class="sp"></span>
+      <span class="proj" style="font-size:12px">เหลือ 7 โปรเจกต์</span>
+      <button class="iconbtn">↩ ประวัติ</button>
+      <button class="deploy">🚀 Deploy เข้า Google</button>
+    </div>
+
+    <div class="ide">
+      <!-- CHAT -->
+      <section class="pane">
+        <div class="pane-h">💬 แชตกับ AI</div>
+        <div class="chat-body">
+          <div class="msg user"><div class="who">คุณ</div><div class="bubble">อยากได้ระบบจองคิวร้านตัดผม บันทึกลง Google Sheet ส่งอีเมลยืนยัน</div></div>
+          <div class="msg ai"><div class="who"><span class="av">✦</span> easygas AI</div>
+            <div class="bubble">สร้างให้แล้วครับ ✦ ทดสอบรันจริงผ่าน
+              <div class="fchips"><span class="fchip">appsscript.json</span><span class="fchip">Code.gs</span><span class="fchip">Index.html</span><span class="fchip">CSS.html</span></div>
+            </div>
+          </div>
+          <div class="msg user"><div class="who">คุณ</div><div class="bubble">เพิ่มปุ่มยกเลิกนัด</div></div>
+          <div class="msg ai"><div class="who"><span class="av">✦</span> easygas AI</div>
+            <div class="bubble">เพิ่ม <code>cancelBooking()</code> ให้แล้ว — รันจริงผ่าน
+              <div class="diffcard">
+                <div class="dh">Code.gs · แก้ไข</div>
+                <div class="dl ctx">&nbsp;&nbsp;return { ok: true };</div>
+                <div class="dl add">+ function cancelBooking(phone) {</div>
+                <div class="dl add">+&nbsp;&nbsp;const sh = SpreadsheetApp...</div>
+                <div class="dl add">+ }</div>
+              </div>
+            </div>
+          </div>
+          <button class="handoff">🙋 ระบบซับซ้อน? ให้ทีมช่วยทำให้ →</button>
+        </div>
+        <div class="chat-foot">
+          <div class="sugg"><span class="sg">＋ เพิ่มฟิลด์</span><span class="sg">เปลี่ยนสี</span><span class="sg">ส่ง LINE แทนเมล</span></div>
+          <div class="composer"><input placeholder="พิมพ์บอก AI…" /><button class="send">↑</button></div>
+        </div>
+      </section>
+
+      <!-- EDITOR -->
+      <section class="pane">
+        <div class="tabs">
+          <div class="tab json"><span class="d"></span>appsscript.json</div>
+          <div class="tab gs active"><span class="d"></span>Code.gs</div>
+          <div class="tab html"><span class="d"></span>Index.html</div>
+          <div class="tab html"><span class="d"></span>CSS.html</div>
+        </div>
+        <div class="code-wrap"><div class="gutter" id="gutter"></div><div class="code" id="code"></div></div>
+        <div class="ed-foot"><span>พร้อม deploy</span><span style="flex:1"></span><span class="ok">✓ validateGasFiles</span><span>GAS · V8</span><span>UTF-8</span></div>
+      </section>
+
+      <!-- PREVIEW -->
+      <section class="pane">
+        <div class="pane-h pv-h"><span>👁 พรีวิว</span>
+          <div class="tier"><button class="on">⚡ จำลอง</button><button>☁ รันจริง</button></div>
+        </div>
+        <div class="pv-body">
+          <div class="browser">
+            <div class="urlbar"><i></i><i></i><i></i><span class="ad">script.google.com/macros/s/AKfy…/dev</span></div>
+            <div class="site">
+              <div class="bk"><h4>✂️ จองคิวร้านตัดผม</h4><div class="s">เลือกเวลาที่สะดวก ส่งอีเมลยืนยัน</div>
+                <label>ชื่อ</label><input value="คุณสมชาย"/>
+                <label>เบอร์โทร</label><input value="0812345678"/>
+                <label>บริการ</label><select><option>ตัดผมชาย</option></select>
+                <button class="go">จองคิว</button>
+                <button class="cancel">ยกเลิกนัดของฉัน</button>
+              </div>
+            </div>
+          </div>
+          <div class="console">
+            <div class="ch">🖥 Console — ทดสอบรันจริง</div>
+            <div class="cl dim">&gt; push scratch → /dev → run</div>
+            <div class="cl ok">✓ doGet() → 200 OK</div>
+            <div class="cl ok">✓ saveBooking({…}) → {ok:true}</div>
+            <div class="cl warn">⚠ console.warn: คอลัมน์ "เบอร์โทร" → setNumberFormat('@') กัน 0 หาย</div>
+            <div class="cl ok">✓ Cloud Logging: ไม่มี error</div>
+            <div class="cl ok">✓ ทดสอบรันจริงผ่าน — พร้อม deploy</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+<script>
+  // syntax highlighter (safe scanner)
+  var KW=new Set(["function","const","let","var","return","if","else","for","new","true","false","null"]);
+  var GLOB=new Set(["SpreadsheetApp","HtmlService","MailApp","Utilities","Session","ContentService","PropertiesService","Logger","DriveApp"]);
+  function esc(c){return c==="<"?"&lt;":c===">"?"&gt;":c==="&"?"&amp;":c}
+  function hl(line){var o="",i=0,n=line.length;while(i<n){var c=line[i];
+    if(c==="/"&&line[i+1]==="/"){o+='<span class="t-com">'+line.slice(i).split("").map(esc).join("")+'</span>';break}
+    if(c==="'"||c==='"'){var q=c,j=i+1;while(j<n&&line[j]!==q){if(line[j]==="\\")j++;j++}o+='<span class="t-str">'+line.slice(i,j+1).split("").map(esc).join("")+'</span>';i=j+1;continue}
+    if(/[A-Za-z_$]/.test(c)){var k=i;while(k<n&&/[A-Za-z0-9_$]/.test(line[k]))k++;var w=line.slice(i,k),a=line.slice(k).trimStart(),cls="";
+      if(KW.has(w))cls="t-kw";else if(GLOB.has(w))cls="t-glob";else if(a[0]==="(")cls="t-fn";else if(line[i-1]===".")cls="";
+      o+=cls?'<span class="'+cls+'">'+w+'</span>':w;i=k;continue}
+    if(/[0-9]/.test(c)){var m=i;while(m<n&&/[0-9.]/.test(line[m]))m++;o+='<span class="t-num">'+line.slice(i,m)+'</span>';i=m;continue}
+    o+=esc(c);i++}return o}
+
+  var CODE=
+"function doGet() {\n"+
+"  const t = HtmlService.createTemplateFromFile('Index');\n"+
+"  return t.evaluate()\n"+
+"    .setTitle('จองคิวร้านตัดผม')\n"+
+"    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);\n"+
+"}\n"+
+"\n"+
+"function saveBooking(data) {\n"+
+"  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('คิว');\n"+
+"  const when = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm');\n"+
+"  sh.appendRow([when, data.name, \"'\" + data.phone, data.service]);\n"+
+"  MailApp.sendEmail(data.email, 'ยืนยันการจอง', 'จองคิวเรียบร้อยแล้ว');\n"+
+"  return { ok: true };\n"+
+"}\n"+
+"\n"+
+"// ✦ เพิ่มโดย AI: ยกเลิกนัด\n"+
+"function cancelBooking(phone) {\n"+
+"  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('คิว');\n"+
+"  const rows = sh.getDataRange().getDisplayValues();\n"+
+"  for (let i = rows.length - 1; i > 0; i--) {\n"+
+"    if (rows[i][2] === phone) sh.deleteRow(i + 1);\n"+
+"  }\n"+
+"  return { ok: true };\n"+
+"}";
+
+  (function(){
+    var lines=CODE.split("\n"),addFrom=lines.findIndex(function(l){return l.indexOf("เพิ่มโดย AI")>-1});
+    var code=document.getElementById("code"),gut=document.getElementById("gutter");
+    lines.forEach(function(l,idx){
+      var ln=document.createElement("span");ln.className="ln"+(addFrom>-1&&idx>=addFrom?" line-add":"");
+      ln.innerHTML=hl(l)||"&nbsp;";code.appendChild(ln);
+      var g=document.createElement("div");g.textContent=idx+1;gut.appendChild(g);
+    });
+  })();
+
+  document.querySelectorAll('.pill[data-skin]').forEach(function(p){p.addEventListener('click',function(){
+    document.querySelectorAll('.pill[data-skin]').forEach(function(x){x.classList.remove('on')});p.classList.add('on');
+    document.getElementById('app').dataset.skin=p.dataset.skin;
+  })});
+  var mode=document.getElementById('mode');
+  mode.addEventListener('click',function(){var light=document.body.classList.toggle('light');mode.textContent=light?'🌙 Dark':'☀️ Light'});
+</script>
+</body>
+</html>

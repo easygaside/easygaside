@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>easygas — 4 style directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"Sarabun",system-ui,sans-serif;background:#06080c;color:#fff;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%}
+
+  /* ───────── control bar ───────── */
+  .controls{position:sticky;top:0;z-index:100;display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+    padding:10px 16px;background:rgba(8,11,16,.92);backdrop-filter:blur(12px);border-bottom:1px solid #1a2230}
+  .controls .brand{font-family:"Space Grotesk";font-weight:700;display:flex;align-items:center;gap:8px;color:#fff}
+  .controls .brand i{width:10px;height:10px;border-radius:3px;background:#34d399;box-shadow:0 0 12px #34d399;display:block}
+  .controls .sp{flex:1}
+  .pill{font-family:"Inter";font-size:12.5px;font-weight:600;border:1px solid #283142;background:#0d121b;color:#9fb0c3;
+    padding:7px 13px;border-radius:999px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .pill:hover{border-color:#3a4658;color:#fff}
+  .pill.on{background:#34d399;border-color:#34d399;color:#04130c}
+  .toggle{font-family:"Inter";font-size:12.5px;font-weight:600;border:1px solid #283142;background:#0d121b;color:#cfe;
+    padding:7px 13px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:6px}
+  .hint{font-family:"Inter";font-size:11px;color:#5e6c7e}
+  @media(max-width:640px){.hint{display:none}}
+
+  .stage{min-height:calc(100vh - 53px)}
+  .world{display:none}
+  .world.show{display:block}
+  .center{max-width:1140px;margin:0 auto;padding:0 24px}
+
+  /* shared mini builder peek (re-skinned per world via vars) */
+  .peek{display:grid;grid-template-columns:.9fr 1.3fr 1fr;gap:2px;border-radius:14px;overflow:hidden}
+  .peek > div{padding:14px;min-height:150px}
+  .peek .mono{font-family:"JetBrains Mono";font-size:11px;line-height:1.7}
+  @media(max-width:760px){.peek{grid-template-columns:1fr}.world .hero-grid{grid-template-columns:1fr!important}}
+
+  /* ════════════ 1 · LINEAR (dark luxury) ════════════ */
+  .world--linear{--bg:#070a10;--surf:#0e141f;--line:#1b2433;--tx:#e8eef6;--mut:#8493a7;--acc:#34d399;--acc2:#60a5fa;--font:"Inter"}
+  body.light .world--linear{--bg:#fbfcfe;--surf:#fff;--line:#e6ebf2;--tx:#0d1623;--mut:#5a6b80;}
+  .world--linear{background:
+      radial-gradient(900px 420px at 82% -8%,rgba(52,211,153,.10),transparent 60%),
+      radial-gradient(700px 380px at 0% 110%,rgba(96,165,250,.08),transparent 55%),var(--bg);
+    color:var(--tx);font-family:var(--font)}
+  .world--linear .hero{padding:84px 0 56px}
+  .world--linear .badge{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--acc);
+    border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent);
+    padding:6px 13px;border-radius:999px}
+  .world--linear h1{font-family:"Space Grotesk";font-size:clamp(2.4rem,1.2rem+4.2vw,4.4rem);line-height:1.04;letter-spacing:-.03em;
+    margin:22px 0 18px;font-weight:700}
+  .world--linear h1 .g{background:linear-gradient(100deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .world--linear .sub{font-size:clamp(1rem,.9rem+.5vw,1.22rem);color:var(--mut);max-width:620px;line-height:1.6}
+  .world--linear .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+  .world--linear .btn{font-weight:600;font-size:15px;padding:13px 24px;border-radius:11px;cursor:pointer;border:1px solid transparent;transition:.15s}
+  .world--linear .btn.p{background:linear-gradient(180deg,var(--acc),#10b981);color:#04130c;box-shadow:0 8px 28px rgba(16,185,129,.34)}
+  .world--linear .btn.p:hover{transform:translateY(-1px)}
+  .world--linear .btn.s{background:transparent;border-color:var(--line);color:var(--tx)}
+  .world--linear .trust{margin-top:20px;font-size:13px;color:var(--mut)}
+  .world--linear .peek{margin:48px 0 0;border:1px solid var(--line);box-shadow:0 30px 80px rgba(0,0,0,.5)}
+  .world--linear .peek{background:var(--line)}
+  .world--linear .peek > div{background:var(--surf)}
+  .world--linear .peek .h{font-size:11px;color:var(--mut);margin-bottom:10px;font-weight:600}
+  .world--linear .kw{color:#ff7b9c}.world--linear .st{color:#9ece6a}.world--linear .gl{color:#e0af68}
+  .world--linear .chip{display:inline-block;font-size:10px;background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--acc);
+    border:1px solid color-mix(in srgb,var(--acc) 30%,transparent);padding:2px 7px;border-radius:6px;margin:2px}
+  .world--linear .pvcard{background:color-mix(in srgb,var(--tx) 4%,transparent);border:1px solid var(--line);border-radius:10px;padding:12px;font-family:var(--font)}
+  .world--linear .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;padding:64px 0}
+  .world--linear .stp{border:1px solid var(--line);border-radius:14px;padding:22px;background:color-mix(in srgb,var(--surf) 60%,transparent)}
+  .world--linear .stp .n{font-family:"Space Grotesk";font-size:13px;color:var(--acc);font-weight:700}
+  .world--linear .stp h3{font-size:18px;margin:10px 0 7px}
+  .world--linear .stp p{color:var(--mut);font-size:14px;line-height:1.6}
+  @media(max-width:760px){.world--linear .steps{grid-template-columns:1fr}}
+
+  /* ════════════ 2 · BENTO (friendly) ════════════ */
+  .world--bento{--bg:#f4f6fb;--card:#fff;--tx:#16202e;--mut:#5d6b7e;--acc:#10b981;--p1:#fde68a;--p2:#bfdbfe;--p3:#fbcfe8;--p4:#bbf7d0;--font:"Prompt"}
+  body.light .world--bento{}
+  body:not(.light) .world--bento{--bg:#0c111a;--card:#141c28;--tx:#eef3f9;--mut:#94a3b5;--p1:#3b3416;--p2:#16304a;--p3:#3a1f33;--p4:#123528}
+  .world--bento{background:var(--bg);color:var(--tx);font-family:var(--font);padding:40px 0 70px}
+  .world--bento .grid{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:minmax(120px,auto);gap:16px}
+  .world--bento .b{background:var(--card);border-radius:22px;padding:24px;box-shadow:0 8px 24px rgba(20,30,50,.06);border:1px solid color-mix(in srgb,var(--tx) 8%,transparent)}
+  .world--bento .hero{grid-column:span 4;grid-row:span 2;display:flex;flex-direction:column;justify-content:center;
+    background:linear-gradient(135deg,var(--card),color-mix(in srgb,var(--acc) 8%,var(--card)))}
+  .world--bento .badge{align-self:flex-start;background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--acc);font-weight:600;
+    font-size:13px;padding:7px 15px;border-radius:999px;margin-bottom:18px}
+  .world--bento h1{font-size:clamp(2.1rem,1.2rem+3.6vw,3.7rem);line-height:1.1;font-weight:700;letter-spacing:-.02em}
+  .world--bento h1 em{font-style:normal;color:var(--acc)}
+  .world--bento .sub{color:var(--mut);font-size:clamp(1rem,.95rem+.4vw,1.18rem);margin:16px 0 26px;max-width:560px;line-height:1.6}
+  .world--bento .btn{font-family:var(--font);font-weight:600;font-size:15px;padding:13px 26px;border-radius:14px;cursor:pointer;border:none}
+  .world--bento .btn.p{background:var(--acc);color:#fff;box-shadow:0 10px 24px rgba(16,185,129,.3)}
+  .world--bento .btn.s{background:transparent;border:2px solid color-mix(in srgb,var(--tx) 14%,transparent);color:var(--tx);margin-left:10px}
+  .world--bento .b .ic{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:14px}
+  .world--bento .b h3{font-size:17px;margin-bottom:6px}.world--bento .b p{color:var(--mut);font-size:13.5px;line-height:1.55}
+  .world--bento .b.c1{background:linear-gradient(160deg,color-mix(in srgb,var(--p1) 70%,var(--card)),var(--card))}
+  .world--bento .b.c2{background:linear-gradient(160deg,color-mix(in srgb,var(--p2) 70%,var(--card)),var(--card))}
+  .world--bento .b.c3{background:linear-gradient(160deg,color-mix(in srgb,var(--p4) 70%,var(--card)),var(--card))}
+  .world--bento .b.span2{grid-column:span 2}.world--bento .b.span4{grid-column:span 4}
+  .world--bento .stat{font-size:30px;font-weight:700;font-family:"Space Grotesk"}
+  .world--bento .verified{display:inline-flex;align-items:center;gap:6px;background:color-mix(in srgb,var(--acc) 16%,transparent);
+    color:var(--acc);font-weight:600;font-size:12px;padding:4px 10px;border-radius:999px}
+  @media(max-width:900px){.world--bento .grid{grid-template-columns:repeat(2,1fr)}.world--bento .hero,.world--bento .b.span4{grid-column:span 2}}
+  @media(max-width:560px){.world--bento .grid{grid-template-columns:1fr}.world--bento .hero,.world--bento .b.span2,.world--bento .b.span4{grid-column:span 1}}
+
+  /* ════════════ 3 · NEO-BRUTALISM ════════════ */
+  .world--brutal{--bg:#f5f3e8;--ink:#0a0a0a;--card:#fff;--acc:#c6ff00;--acc2:#ff5a5f;--acc3:#4d7cff;--font:"Archivo"}
+  body:not(.light) .world--brutal{--bg:#141414;--ink:#f5f3e8;--card:#1f1f1f}
+  .world--brutal{background:var(--bg);color:var(--ink);font-family:var(--font);padding:44px 0 70px}
+  .world--brutal .bd{border:3px solid var(--ink);box-shadow:7px 7px 0 var(--ink)}
+  .world--brutal .badge{display:inline-block;background:var(--acc);color:#0a0a0a;border:3px solid #0a0a0a;font-weight:700;
+    font-size:13px;padding:7px 14px;transform:rotate(-1.5deg);font-family:"JetBrains Mono"}
+  .world--brutal h1{font-size:clamp(2.4rem,1.1rem+5vw,5rem);line-height:.96;font-weight:900;letter-spacing:-.02em;text-transform:uppercase;margin:22px 0 16px}
+  .world--brutal h1 mark{background:var(--acc);padding:0 6px;color:#0a0a0a}
+  .world--brutal .sub{font-family:"Sarabun";font-size:clamp(1rem,.95rem+.5vw,1.25rem);max-width:600px;font-weight:500;line-height:1.55}
+  .world--brutal .cta{display:flex;flex-wrap:wrap;gap:16px;margin-top:30px}
+  .world--brutal .btn{font-family:"Archivo";font-weight:700;font-size:16px;padding:14px 28px;cursor:pointer;border:3px solid var(--ink);
+    text-transform:uppercase;transition:.1s}
+  .world--brutal .btn.p{background:var(--acc);color:#0a0a0a;box-shadow:6px 6px 0 var(--ink)}
+  .world--brutal .btn.p:active{transform:translate(6px,6px);box-shadow:none}
+  .world--brutal .btn.s{background:var(--card);color:var(--ink);box-shadow:6px 6px 0 var(--ink)}
+  .world--brutal .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:56px}
+  .world--brutal .stp{background:var(--card);padding:24px;position:relative}
+  .world--brutal .stp.k1{background:var(--acc)}.world--brutal .stp.k2{background:var(--acc3);color:#fff}.world--brutal .stp.k3{background:var(--acc2);color:#fff}
+  .world--brutal .stp .n{font-family:"JetBrains Mono";font-weight:700;font-size:38px;line-height:1}
+  .world--brutal .stp h3{font-size:20px;text-transform:uppercase;margin:8px 0 6px;font-weight:900}
+  .world--brutal .stp p{font-family:"Sarabun";font-size:14px;font-weight:500;line-height:1.5}
+  .world--brutal .stp.k1{color:#0a0a0a}
+  @media(max-width:760px){.world--brutal .steps{grid-template-columns:1fr}.world--brutal .bd{box-shadow:4px 4px 0 var(--ink)}}
+
+  /* ════════════ 4 · SWISS (minimal premium) ════════════ */
+  .world--swiss{--bg:#fff;--ink:#0a0a0a;--mut:#666;--line:#000;--acc:#ff3b00;--font:"Inter"}
+  body:not(.light) .world--swiss{--bg:#0a0a0a;--ink:#fff;--mut:#9a9a9a;--line:#fff}
+  .world--swiss{background:var(--bg);color:var(--ink);font-family:var(--font)}
+  .world--swiss .top{border-bottom:1px solid var(--line);padding:14px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+  .world--swiss .hero{padding:70px 0 50px;border-bottom:1px solid var(--line)}
+  .world--swiss .idx{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+  .world--swiss h1{font-size:clamp(2.6rem,1rem+6vw,6.2rem);line-height:.95;font-weight:800;letter-spacing:-.035em;margin:18px 0;max-width:14ch}
+  .world--swiss h1 u{text-decoration:none;color:var(--acc)}
+  .world--swiss .row{display:grid;grid-template-columns:1.4fr 1fr;gap:40px;align-items:end}
+  .world--swiss .sub{font-size:clamp(1rem,.9rem+.5vw,1.3rem);line-height:1.5;color:var(--ink);max-width:46ch}
+  .world--swiss .cta{display:flex;gap:14px;margin-top:26px;flex-wrap:wrap}
+  .world--swiss .btn{font-weight:600;font-size:14px;padding:14px 26px;cursor:pointer;border:1px solid var(--line);letter-spacing:.02em;transition:.15s}
+  .world--swiss .btn.p{background:var(--ink);color:var(--bg)}
+  .world--swiss .btn.p:hover{background:var(--acc);border-color:var(--acc);color:#fff}
+  .world--swiss .btn.s{background:transparent;color:var(--ink)}
+  .world--swiss .steps{display:grid;grid-template-columns:repeat(3,1fr)}
+  .world--swiss .stp{padding:38px 28px 38px 0;border-right:1px solid var(--line)}
+  .world--swiss .stp:last-child{border-right:none}
+  .world--swiss .stp .n{font-size:13px;letter-spacing:.1em;color:var(--acc);font-weight:600}
+  .world--swiss .stp h3{font-size:21px;margin:14px 0 8px;letter-spacing:-.01em}
+  .world--swiss .stp p{color:var(--mut);font-size:14px;line-height:1.55}
+  .world--swiss .big{font-size:clamp(3rem,1rem+8vw,8rem);font-weight:800;letter-spacing:-.04em;line-height:.9;padding:50px 0;border-top:1px solid var(--line)}
+  .world--swiss .big span{color:var(--acc)}
+  @media(max-width:760px){.world--swiss .row{grid-template-columns:1fr;gap:20px}.world--swiss .steps{grid-template-columns:1fr}.world--swiss .stp{border-right:none;border-bottom:1px solid var(--line);padding-right:0}}
+</style>
+</head>
+<body class="light">
+  <div class="controls">
+    <span class="brand"><i></i>easygas</span>
+    <button class="pill on" data-w="linear">① Linear</button>
+    <button class="pill" data-w="bento">② Bento</button>
+    <button class="pill" data-w="brutal">③ Brutalism</button>
+    <button class="pill" data-w="swiss">④ Swiss</button>
+    <span class="sp"></span>
+    <span class="hint">ย่อ/ขยายหน้าต่างเพื่อดู responsive →</span>
+    <button class="toggle" id="mode">🌙 Dark</button>
+  </div>
+
+  <div class="stage">
+
+    <!-- ① LINEAR -->
+    <section class="world world--linear show" data-world="linear">
+      <div class="center">
+        <div class="hero">
+          <span class="badge">✓ ทดสอบรันจริงก่อนส่งมอบ</span>
+          <h1>บอก AI สร้างเครื่องมือ<br><span class="g">Google ของคุณ</span> ใช้งานได้จริง</h1>
+          <p class="sub">คุยกับ AI สร้างระบบบน Google Apps Script — พรีวิวสด แล้วกดปุ่ม deploy เข้าบัญชี Google ของคุณเอง เรารันจริงให้เห็นก่อนว่าใช้ได้</p>
+          <div class="cta">
+            <button class="btn p">เริ่มสร้างฟรี →</button>
+            <button class="btn s">ดูตัวอย่าง</button>
+          </div>
+          <p class="trust">ฟรี 3 โปรเจกต์/เดือน · ไม่มีค่าโฮสต์ · แอปเป็นของคุณ 100%</p>
+        </div>
+        <div class="peek">
+          <div><div class="h">💬 แชต</div>
+            <div style="font-size:12.5px;color:var(--mut);line-height:1.7">คุณ: อยากได้ระบบจองคิว<br><br><span style="color:var(--acc)">✦ AI:</span> สร้างให้แล้ว 4 ไฟล์
+            <div style="margin-top:8px"><span class="chip">Code.gs</span><span class="chip">Index.html</span></div></div>
+          </div>
+          <div><div class="h">📝 Code.gs</div>
+            <div class="mono"><span class="kw">function</span> <span class="gl">doGet</span>() {<br>&nbsp;&nbsp;<span class="kw">return</span> <span class="gl">HtmlService</span><br>&nbsp;&nbsp;&nbsp;&nbsp;.createTemplate(<span class="st">'Index'</span>);<br>}<br><span style="color:var(--acc)">// ✓ ผ่าน lint + รันจริง</span></div>
+          </div>
+          <div><div class="h">👁 พรีวิว</div>
+            <div class="pvcard"><b style="font-size:13px">จองคิวร้านตัดผม</b>
+              <div style="margin-top:8px;font-size:11px;color:var(--mut)">ชื่อ · เบอร์ · วันที่</div>
+              <div style="margin-top:8px;background:var(--acc);color:#04130c;text-align:center;padding:7px;border-radius:7px;font-size:12px;font-weight:700">จองคิว</div>
+            </div>
+            <div style="margin-top:8px;font-size:10px;color:var(--acc)">⚡ Tier1 จำลอง</div>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="stp"><div class="n">01</div><h3>บอกสิ่งที่อยากได้</h3><p>พิมพ์เป็นภาษาคน หรือเลือกจากตัวอย่าง — ไม่ต้องเขียนโค้ดเป็น</p></div>
+          <div class="stp"><div class="n">02</div><h3>AI เขียน + พรีวิว + แก้</h3><p>เห็นโค้ดวิ่งขึ้น พรีวิวสด คุยแก้ต่อได้ ระบบรันจริงแล้วซ่อมเองจนผ่าน</p></div>
+          <div class="stp"><div class="n">03</div><h3>Deploy เข้า Google คุณ</h3><p>กดปุ่มเดียว ได้เว็บแอปจริงในบัญชี Google ของคุณ ไม่มีค่าโฮสต์</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ② BENTO -->
+    <section class="world world--bento" data-world="bento">
+      <div class="center">
+        <div class="grid">
+          <div class="b hero">
+            <span class="badge">🟢 ทดสอบรันจริงก่อนส่งมอบ</span>
+            <h1>สร้างเครื่องมือ <em>Google</em><br>ด้วยการ "บอก" AI</h1>
+            <p class="sub">ระบบจองคิว ฟอร์ม แจ้งเตือน LINE ออกใบเสร็จ — บอก AI แล้วได้แอปจริงบน Google ของคุณ ไม่ต้องเขียนโค้ด</p>
+            <div><button class="btn p">เริ่มสร้างฟรี</button><button class="btn s">ดูตัวอย่าง</button></div>
+          </div>
+          <div class="b c1"><div class="ic" style="background:#f59e0b22">⚡</div><h3>พรีวิวสด</h3><p>เห็นผลทันทีทุกการแก้</p></div>
+          <div class="b c2"><div class="ic" style="background:#3b82f622">🚀</div><h3>Deploy คลิกเดียว</h3><p>เข้าบัญชี Google คุณเอง</p></div>
+          <div class="b span2"><div class="verified">✓ รันผ่านจริง</div><div class="stat" style="margin-top:10px">96%</div><p>โปรเจกต์ที่รันได้ตั้งแต่ครั้งแรก ไม่ต้องแก้</p></div>
+          <div class="b c3"><div class="ic" style="background:#10b98122">📊</div><h3>เชื่อม Sheets</h3><p>ใช้ข้อมูลเดิมของคุณได้เลย</p></div>
+          <div class="b"><div class="ic" style="background:#ec489922">💬</div><h3>คุยเป็นไทย</h3><p>สั่งงานภาษาคน</p></div>
+          <div class="b span4" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px">
+            <div><h3 style="font-size:19px">ไม่มีค่าโฮสต์ · แอปเป็นของคุณ 100%</h3><p>เพราะมันรันบน Google ของคุณ ไม่ใช่เซิร์ฟเวอร์เรา</p></div>
+            <button class="btn p">ลองเลย →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ BRUTALISM -->
+    <section class="world world--brutal" data-world="brutal">
+      <div class="center">
+        <span class="badge">✓ ทดสอบรันจริงก่อนส่งมอบ</span>
+        <h1>บอก AI.<br>ได้แอป <mark>Google</mark><br>ที่ใช้ได้จริง.</h1>
+        <p class="sub">สร้างระบบบน Google Apps Script ด้วยการคุยกับ AI — พรีวิวสด deploy เข้าบัญชีคุณเอง ฟรี ไม่มีค่าโฮสต์</p>
+        <div class="cta">
+          <button class="btn p">เริ่มสร้างฟรี</button>
+          <button class="btn s">ดูตัวอย่าง ↗</button>
+        </div>
+        <div class="steps">
+          <div class="stp bd k1"><div class="n">01</div><h3>บอก</h3><p>พิมพ์ว่าอยากได้ระบบอะไร เป็นภาษาคน</p></div>
+          <div class="stp bd k2"><div class="n">02</div><h3>พรีวิว+แก้</h3><p>AI เขียน รันจริง ซ่อมเองจนเขียว</p></div>
+          <div class="stp bd k3"><div class="n">03</div><h3>Deploy</h3><p>กดปุ่ม เข้าบัญชี Google คุณเอง</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ④ SWISS -->
+    <section class="world world--swiss" data-world="swiss">
+      <div class="center">
+        <div class="top"><span>easygas™</span><span>AI builder / Google Apps Script</span><span>2026</span></div>
+        <div class="hero">
+          <div class="idx">[ 01 — บอก AI สร้างระบบ ]</div>
+          <h1>เครื่องมือ Google<br>ที่ <u>ใช้งานได้จริง</u></h1>
+          <div class="row">
+            <p class="sub">คุยกับ AI สร้างระบบบน Google Apps Script — เรารันจริงให้เห็นก่อนว่าใช้ได้ แล้ว deploy เข้าบัญชี Google ของคุณเอง</p>
+            <div class="cta">
+              <button class="btn p">เริ่มสร้างฟรี</button>
+              <button class="btn s">ตัวอย่าง</button>
+            </div>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="stp"><div class="n">01 / บอก</div><h3>พิมพ์เป็นภาษาคน</h3><p>อธิบายระบบที่อยากได้ หรือเลือกจากตัวอย่าง</p></div>
+          <div class="stp"><div class="n">02 / สร้าง</div><h3>AI เขียน รันจริง ซ่อมเอง</h3><p>พรีวิวสด ตรวจรันจริงจนผ่าน ก่อนส่งให้คุณ</p></div>
+          <div class="stp"><div class="n">03 / ส่งมอบ</div><h3>Deploy เข้าบัญชีคุณ</h3><p>เว็บแอปจริงบน Google ของคุณ ไม่มีค่าโฮสต์</p></div>
+        </div>
+        <div class="big">รันผ่านจริง <span>96%</span><br>ตั้งแต่ครั้งแรก</div>
+      </div>
+    </section>
+
+  </div>
+
+<script>
+  var pills=document.querySelectorAll('.pill[data-w]');
+  var worlds=document.querySelectorAll('.world');
+  pills.forEach(function(p){p.addEventListener('click',function(){
+    pills.forEach(function(x){x.classList.remove('on')});p.classList.add('on');
+    worlds.forEach(function(w){w.classList.toggle('show', w.dataset.world===p.dataset.w)});
+    window.scrollTo(0,0);
+  })});
+  var mode=document.getElementById('mode');
+  mode.addEventListener('click',function(){
+    var light=document.body.classList.toggle('light');
+    mode.textContent = light ? '🌙 Dark' : '☀️ Light';
+  });
+</script>
+</body>
+</html>

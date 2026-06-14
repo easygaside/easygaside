@@ -53,7 +53,13 @@ const SUGGESTIONS = [
   "แดชบอร์ดสรุปยอดขายรายวัน",
 ];
 
-export function ChatPanel({ projectId }: { projectId: string }) {
+export function ChatPanel({
+  projectId,
+  initialImages,
+}: {
+  projectId: string;
+  initialImages?: { url: string }[];
+}) {
   const applyMutation = useProjectStore((s) => s.applyMutation);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -195,6 +201,26 @@ export function ChatPanel({ projectId }: { projectId: string }) {
       </div>
 
       <div ref={bodyRef} className="flex-1 space-y-3 overflow-auto px-3 pb-2">
+        {initialImages && initialImages.length > 0 && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+              <PhotoIcon className="h-3.5 w-3.5" />
+              รูปอ้างอิงที่เคยแนบ ({initialImages.length})
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {initialImages.map((img, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <a key={i} href={img.url} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={img.url}
+                    alt="รูปอ้างอิงเก่า"
+                    className="h-14 w-14 rounded-lg border border-slate-200 object-cover transition hover:opacity-80"
+                  />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
         {messages.length === 0 && (
           <div className="px-1 pt-6">
             <p className="text-center text-[13px] text-slate-400">

@@ -80,6 +80,45 @@ export async function storeChatImages(projectId: string, images: AttachedImage[]
   }
 }
 
+export interface StoredChatImage {
+  path: string;
+  url: string; // short-lived signed URL (bucket is private)
+  createdAt: string;
+}
+
+/**
+ * List a project's previously-attached chat images as signed URLs, so the chat can re-show them
+ * when the project is reopened. URLs are short-lived; the page re-fetches them on each load.
+ */
+export async function listProjectChatImages(projectId: string): Promise<StoredChatImage[]> {
+  const svc = createServiceClient();
+  const { data, error } = await svc
+    .from("egs_chat_images")
+    .select("storage_path, created_at")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true });
+  if (error) {
+    console.error("[chat-images] list failed:", error.message);
+    return [];
+  }
+  const rows = (data ?? []) as { storage_path: string; created_at: string }[];
+  if (rows.length === 0) return [];
+
+  const { data: signed, error: sErr } = await svc.storage
+    .from(CHAT_IMAGES_BUCKET)
+    .createSignedUrls(
+      rows.map((r) => r.storage_path),
+      3600,
+    );
+  if (sErr) {
+    console.error("[chat-images] sign failed:", sErr.message);
+    return [];
+  }
+  return rows
+    .map((r, i) => ({ path: r.storage_path, url: signed?.[i]?.signedUrl ?? "", createdAt: r.created_at }))
+    .filter((x) => x.url);
+}
+
 /**
  * Remove every stored chat image for a project from the bucket. Call BEFORE deleting the project
  * row (the egs_chat_images rows cascade away with it, taking the path list with them).

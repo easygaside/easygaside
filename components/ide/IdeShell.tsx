@@ -18,12 +18,14 @@ export function IdeShell({
   projectId,
   projectName,
   initialFiles,
+  initialImages,
   webHint,
   googleConnected = true,
 }: {
   projectId: string;
   projectName: string;
   initialFiles: { path: string; content: string }[];
+  initialImages?: { url: string }[];
   webHint?: string[];
   googleConnected?: boolean;
 }) {
@@ -82,7 +84,7 @@ export function IdeShell({
 
       <div className="grid min-h-0 flex-1 gap-3 px-3 pb-3 lg:grid-cols-[320px_1.3fr_1fr]">
         <section className={CARD}>
-          <ChatPanel projectId={projectId} />
+          <ChatPanel projectId={projectId} initialImages={initialImages} />
         </section>
         <section className={CARD}>
           <FileTree />

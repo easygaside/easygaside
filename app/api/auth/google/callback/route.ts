@@ -8,8 +8,11 @@ export const runtime = "nodejs";
 
 /**
  * GET /api/auth/google/callback?code=...&state=...
- * Verifies state, exchanges the code, encrypts + stores the refresh token, then
- * redirects to /connect/done.
+ *
+ * Verifies state, exchanges the code, then:
+ *  - if NOT logged in → signs the user in from the Google id_token (Google login),
+ *  - if already logged in → keeps that identity (connecting Google to an existing account),
+ * then encrypts + stores the refresh token and lands on /projects. One Google consent does both.
  */
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -18,8 +21,7 @@ export async function GET(request: NextRequest) {
   const oauthError = url.searchParams.get("error");
 
   const origin = url.origin;
-  const fail = (reason: string) =>
-    NextResponse.redirect(new URL(`/connect?error=${reason}`, origin));
+  const fail = (reason: string) => NextResponse.redirect(new URL(`/login?error=${reason}`, origin));
 
   if (oauthError) return fail(oauthError);
   if (!code || !state) return fail("missing_code_or_state");
@@ -30,32 +32,39 @@ export async function GET(request: NextRequest) {
   cookieStore.delete("eg_oauth_state");
   if (!expected || expected !== state) return fail("bad_state");
 
-  // Must still be logged in.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.redirect(new URL("/login", origin));
-
   let tokens;
   try {
     tokens = await exchangeCode(code);
   } catch {
     return fail("exchange_failed");
   }
+  if (!tokens.refresh_token) return fail("no_refresh_token"); // guarded by prompt=consent
+  if (!tokens.id_token) return fail("no_id_token");
 
-  if (!tokens.refresh_token) {
-    // Should not happen with prompt=consent, but guard anyway.
-    return fail("no_refresh_token");
+  const supabase = await createClient();
+
+  // Already logged in (email/pw user connecting Google) → keep that identity.
+  // Otherwise sign in via the Google id_token (Supabase verifies it against the configured
+  // Google provider; nonce checks are disabled because this is a server-side code flow).
+  let userId: string;
+  const {
+    data: { user: existing },
+  } = await supabase.auth.getUser();
+  if (existing) {
+    userId = existing.id;
+  } else {
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: "google",
+      token: tokens.id_token,
+    });
+    if (error || !data.user) return fail("signin_failed");
+    userId = data.user.id;
   }
 
-  const { sub } = tokens.id_token
-    ? decodeIdToken(tokens.id_token)
-    : { sub: "" };
-
+  const { sub } = decodeIdToken(tokens.id_token);
   try {
     await storeConnection({
-      userId: user.id,
+      userId,
       googleSub: sub,
       scope: tokens.scope,
       refreshToken: tokens.refresh_token,
@@ -64,5 +73,5 @@ export async function GET(request: NextRequest) {
     return fail("store_failed");
   }
 
-  return NextResponse.redirect(new URL("/connect/done", origin));
+  return NextResponse.redirect(new URL("/projects", origin));
 }

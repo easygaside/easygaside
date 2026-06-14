@@ -2,26 +2,17 @@ import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { buildAuthUrl } from "@/lib/google-oauth";
-import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 /**
  * GET /api/auth/google/start
- * Starts the custom Google OAuth grant. Requires the user to be logged into easygas first.
+ *
+ * Entry point for BOTH "Sign in with Google" (no prior session) and connecting Google to an
+ * existing email/password session. No login required up front — the callback signs the user in
+ * via the returned id_token when there's no session yet, then stores the encrypted refresh token.
  */
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.redirect(
-      new URL("/login", process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "http://localhost:3000"),
-    );
-  }
-
   const state = randomBytes(32).toString("hex");
   const cookieStore = await cookies();
   cookieStore.set("eg_oauth_state", state, {

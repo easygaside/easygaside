@@ -46,13 +46,20 @@ export async function createProject(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("not_authenticated");
 
-  const { data, error } = await supabase
-    .from("egs_projects")
-    .insert({ owner_id: user.id, name: name.trim() || "โปรเจกต์ใหม่", kind, spec })
-    .select("id")
-    .single();
-  if (error) throw new Error(`createProject: ${error.message}`);
-  return (data as { id: string }).id;
+  // (owner_id, name) is unique — auto-uniquify ("ชื่อ", "ชื่อ (2)", "ชื่อ (3)"…) so a duplicate
+  // name never crashes the create. 23505 = Postgres unique-violation.
+  const base = name.trim() || "โปรเจกต์ใหม่";
+  for (let n = 1; n <= 50; n++) {
+    const candidate = n === 1 ? base : `${base} (${n})`;
+    const { data, error } = await supabase
+      .from("egs_projects")
+      .insert({ owner_id: user.id, name: candidate, kind, spec })
+      .select("id")
+      .single();
+    if (!error) return (data as { id: string }).id;
+    if (error.code !== "23505") throw new Error(`createProject: ${error.message}`);
+  }
+  throw new Error("createProject: ตั้งชื่อไม่สำเร็จ มีโปรเจกต์ชื่อนี้ซ้ำมากเกินไป");
 }
 
 /**

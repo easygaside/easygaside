@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowTopRightOnSquareIcon,
-  BoltIcon,
   CloudIcon,
   CommandLineIcon,
   EyeIcon,
@@ -11,10 +10,11 @@ import {
 import { useProjectStore, type FileEntry } from "@/store/useProjectStore";
 
 /**
- * Tier-1: inline GAS includes + render Index.html in a sandboxed srcdoc iframe with a console
- * shim (captures console.* + window.onerror, posts to parent) and a no-op google.script.run.
- * Tier-2: push to a scratch script and surface the live /dev URL as a click-to-open button
- * (NOT window.open — that gets popup-blocked when fired after an await).
+ * Preview = the Tier-1 SIMULATED render only (inline srcdoc iframe + console). The real GAS
+ * web app (/dev) can't be embedded inline — Google blocks framing script.googleusercontent.com
+ * and it needs the owner's login — so "run live" is an explicit action that pushes to a scratch
+ * script and surfaces a click-to-open link (NOT a fake preview tab, NOT window.open which is
+ * popup-blocked after an await).
  */
 const INCLUDE_RE = /<\?!?=?\s*include\(\s*['"]([^'"]+)['"]\s*\)\s*\?>/g;
 
@@ -52,10 +52,9 @@ function buildSrcdoc(files: Record<string, FileEntry>): string | null {
 export function PreviewPane({ projectId }: { projectId: string }) {
   const files = useProjectStore((s) => s.files);
   const srcdoc = useMemo(() => buildSrcdoc(files), [files]);
-  const [tier, setTier] = useState<"sim" | "live">("sim");
   const [logs, setLogs] = useState<ConsoleLine[]>([]);
   const [liveBusy, setLiveBusy] = useState(false);
-  const [liveMsg, setLiveMsg] = useState("");
+  const [liveErr, setLiveErr] = useState("");
   const [liveUrl, setLiveUrl] = useState("");
 
   useEffect(() => {
@@ -74,23 +73,21 @@ export function PreviewPane({ projectId }: { projectId: string }) {
 
   async function runLive() {
     setLiveBusy(true);
-    setLiveMsg("");
+    setLiveErr("");
     setLiveUrl("");
     try {
       const r = await fetch(`/api/preview/${projectId}`, { method: "POST" });
       const data = await r.json();
       if (r.ok && data.devUrl) {
-        // Do NOT window.open here — fired after await, Chrome blocks it as a popup.
-        // Surface a click-to-open button instead (user gesture = not blocked).
+        // click-to-open link (window.open after await is popup-blocked)
         setLiveUrl(data.devUrl);
-        setLiveMsg("push สำเร็จ — กดปุ่มด้านล่างเปิดแอปจริง");
       } else if (data.error === "USER_SETTINGS_DISABLED") {
-        setLiveMsg("ต้องเปิด Apps Script API ที่ usersettings ก่อน");
+        setLiveErr("ต้องเปิด Apps Script API ที่ usersettings ก่อน");
       } else {
-        setLiveMsg("รันจริงไม่สำเร็จ: " + (data.error ?? " unknown"));
+        setLiveErr("รันจริงไม่สำเร็จ: " + (data.error ?? "unknown"));
       }
     } catch {
-      setLiveMsg("เชื่อมต่อล้มเหลว");
+      setLiveErr("เชื่อมต่อล้มเหลว");
     } finally {
       setLiveBusy(false);
     }
@@ -98,118 +95,87 @@ export function PreviewPane({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-sm font-semibold">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-100 text-emerald-600">
             <EyeIcon className="h-4 w-4" />
           </span>
-          พรีวิว
+          พรีวิว <span className="text-[11px] font-normal text-slate-400">(จำลอง)</span>
         </span>
-        <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5 text-[11px]">
-          <button
-            onClick={() => setTier("sim")}
-            className={`rounded-md px-2.5 py-1 ${tier === "sim" ? "bg-white font-semibold text-emerald-600 shadow-sm" : "text-slate-500"}`}
-          >
-            <span className="flex items-center gap-1">
-              <BoltIcon className="h-3.5 w-3.5" />
-              จำลอง
-            </span>
-          </button>
-          <button
-            onClick={() => setTier("live")}
-            className={`rounded-md px-2.5 py-1 ${tier === "live" ? "bg-white font-semibold text-emerald-600 shadow-sm" : "text-slate-500"}`}
-          >
-            <span className="flex items-center gap-1">
-              <CloudIcon className="h-3.5 w-3.5" />
-              รันจริง
-            </span>
-          </button>
-        </div>
+        <button
+          onClick={runLive}
+          disabled={liveBusy}
+          title="push โค้ดขึ้น Google แล้วเปิดแอปจริงในแท็บใหม่"
+          className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[12px] font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+        >
+          <CloudIcon className="h-3.5 w-3.5" />
+          {liveBusy ? "กำลัง push…" : "รันจริงบน Google"}
+        </button>
       </div>
 
-      {tier === "sim" ? (
-        <>
-          {srcdoc ? (
-            // SECURITY: never add allow-same-origin / allow-popups-to-escape-sandbox —
-            // opaque-origin isolation is required for untrusted AI-generated content
-            <iframe
-              title="preview"
-              sandbox="allow-scripts"
-              className="min-h-0 flex-1 rounded-xl border border-slate-200 bg-white"
-              srcDoc={srcdoc}
-            />
-          ) : (
-            <div className="grid min-h-0 flex-1 place-items-center rounded-xl border border-dashed border-slate-200 px-6 text-center text-xs text-slate-400">
-              พรีวิวจะขึ้นเมื่อ AI สร้าง Index.html
-            </div>
-          )}
-          {/* console panel */}
-          <div className="mt-2 h-28 overflow-auto rounded-xl bg-slate-900 p-2 font-mono text-[10.5px] leading-relaxed">
-            <div className="mb-1 flex items-center gap-1 text-slate-500">
-              <CommandLineIcon className="h-3.5 w-3.5" />
-              Console
-            </div>
-            {logs.length === 0 ? (
-              <div className="text-slate-600">— ยังไม่มี log —</div>
-            ) : (
-              logs.map((l, i) => (
-                <div
-                  key={i}
-                  className={
-                    l.level === "error" ? "text-red-400" : l.level === "warn" ? "text-amber-400" : "text-slate-300"
-                  }
-                >
-                  {l.text}
-                </div>
-              ))
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="grid min-h-0 flex-1 place-items-center rounded-xl border border-dashed border-slate-200 p-6 text-center">
-          <div className="flex max-w-sm flex-col items-center gap-3">
-            <p className="text-xs text-slate-500">
-              push ขึ้น Google แล้วเปิดแอปจริงในแท็บใหม่
-              <br />
-              (ต้อง login บัญชี Google ที่เชื่อมไว้)
-            </p>
-            <button
-              onClick={runLive}
-              disabled={liveBusy}
-              className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {liveBusy ? (
-                "กำลัง push…"
-              ) : (
-                <>
-                  <CloudIcon className="h-4 w-4" />
-                  รันจริงบน Google
-                </>
-              )}
-            </button>
-
-            {liveMsg && <p className="text-xs text-slate-500">{liveMsg}</p>}
-
-            {liveUrl && (
-              <>
-                <a
-                  href={liveUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
-                >
-                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                  เปิดแอปจริงบน Google
-                </a>
-                <p className="text-[11px] leading-relaxed text-slate-400">
-                  ครั้งแรก Google จะขอให้คุณ (เจ้าของ) อนุญาตสิทธิ์ของสคริปต์ เช่น Sheets/Gmail —
-                  กด Review permissions → Advanced → Allow ครั้งเดียว แล้วใช้ได้เลย
-                </p>
-              </>
-            )}
-          </div>
+      {/* run-live result */}
+      {liveUrl && (
+        <div className="mb-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-800">
+          <a
+            href={liveUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-semibold underline"
+          >
+            เปิดแอปจริงบน Google <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+          </a>
+          <p className="mt-1 text-emerald-700/80">
+            ครั้งแรก Google จะขอให้คุณ (เจ้าของ) อนุญาตสิทธิ์ของสคริปต์ — กด Allow ครั้งเดียว แล้วใช้ได้เลย
+          </p>
         </div>
       )}
+      {liveErr && (
+        <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+          {liveErr}
+        </div>
+      )}
+
+      {/* Tier-1 simulated render */}
+      {srcdoc ? (
+        // SECURITY: never add allow-same-origin / allow-popups-to-escape-sandbox —
+        // opaque-origin isolation is required for untrusted AI-generated content
+        <iframe
+          title="preview"
+          sandbox="allow-scripts"
+          className="min-h-0 flex-1 rounded-xl border border-slate-200 bg-white"
+          srcDoc={srcdoc}
+        />
+      ) : (
+        <div className="grid min-h-0 flex-1 place-items-center rounded-xl border border-dashed border-slate-200 px-6 text-center text-xs text-slate-400">
+          พรีวิวจะขึ้นเมื่อ AI สร้าง Index.html
+        </div>
+      )}
+      <p className="mt-1 px-1 text-[10px] leading-relaxed text-slate-400">
+        จำลอง — ปุ่ม/ฟอร์มที่เรียก server (google.script.run) ยังกดใช้จริงไม่ได้ · กด &ldquo;รันจริงบน
+        Google&rdquo; เพื่อทดสอบจริง
+      </p>
+
+      {/* console panel */}
+      <div className="mt-2 h-28 overflow-auto rounded-xl bg-slate-900 p-2 font-mono text-[10.5px] leading-relaxed">
+        <div className="mb-1 flex items-center gap-1 text-slate-500">
+          <CommandLineIcon className="h-3.5 w-3.5" />
+          Console
+        </div>
+        {logs.length === 0 ? (
+          <div className="text-slate-600">— ยังไม่มี log —</div>
+        ) : (
+          logs.map((l, i) => (
+            <div
+              key={i}
+              className={
+                l.level === "error" ? "text-red-400" : l.level === "warn" ? "text-amber-400" : "text-slate-300"
+              }
+            >
+              {l.text}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

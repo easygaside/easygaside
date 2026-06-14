@@ -240,19 +240,24 @@ export interface RunAgentArgs {
 
 export async function runAgentLoop(args: RunAgentArgs): Promise<void> {
   const client = new Anthropic(); // reads ANTHROPIC_API_KEY
-  await runTurn(client, args);
-  // Gate 1 — rulebook critic + one bounded auto-repair (skip for plan turns)
-  if ((args.turn ?? "codegen") === "codegen") {
+  const { mutated } = await runTurn(client, args);
+  // Gate 1 — rulebook critic + one bounded auto-repair. Only when this turn actually changed files:
+  // a pure Q&A turn ("ปกติไหม?") writes nothing, so re-reviewing the whole project there is wasted
+  // cost + noise (and makes it look like it's checking on a loop). Skip plan turns too.
+  if ((args.turn ?? "codegen") === "codegen" && mutated) {
     await runCriticGate(client, args);
   }
   args.emit({ type: "done" });
 }
 
-/** One model turn: stream → resolve tool_use in a loop → persist. Does NOT emit `done`. */
+/**
+ * One model turn: stream → resolve tool_use in a loop → persist. Does NOT emit `done`.
+ * Returns whether any file was created/edited/deleted this turn (gates the critic).
+ */
 async function runTurn(
   client: Anthropic,
   { projectId, project, userMessage, images = [], turn = "codegen", emit }: RunAgentArgs,
-): Promise<void> {
+): Promise<{ mutated: boolean }> {
   const history = await getHistory(projectId);
 
   // RAG seam (lib/retrieval.ts) — empty today. Prepended to the user message so the cached
@@ -295,6 +300,7 @@ async function runTurn(
     },
   ];
 
+  let mutated = false; // did any write/edit/delete actually change a file this turn?
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     const stream = client.messages.stream({
       model: pickModel(turn),
@@ -323,6 +329,8 @@ async function runTurn(
         block.input as Record<string, unknown>,
         emit,
       );
+      if (block.name === "write_file" || block.name === "delete_file") mutated = true;
+      else if (block.name === "edit_file" && !outcome.isError) mutated = true;
       toolResults.push({
         type: "tool_result",
         tool_use_id: block.id,
@@ -373,6 +381,7 @@ async function runTurn(
     persisted[0] = { role: "user", content: userMessage + note };
   }
   await appendMessages(projectId, persisted, turn);
+  return { mutated };
 }
 
 /**

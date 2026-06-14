@@ -187,27 +187,37 @@ export function ChatPanel({
         </span>
         AI Assistant
       </div>
-      {/* quick actions only make sense once there's code to act on */}
-      {hasFiles && (
-        <div className="flex flex-wrap gap-1.5 px-3 py-2">
-          <button
-            onClick={() => send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ")}
-            disabled={busy}
-            className="rounded-full border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 text-[11px] text-slate-500 dark:text-slate-400 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-50"
-          >
-            อธิบายโค้ด
-          </button>
-          <button
-            onClick={() =>
-              send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย")
-            }
-            disabled={busy}
-            className="rounded-full border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 text-[11px] text-slate-500 dark:text-slate-400 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-50"
-          >
-            ตรวจ &amp; แก้บั๊ก
-          </button>
-        </div>
-      )}
+      {/* action chips — same level, equal size in one row. explain/fix only when there's code;
+          the wizard ("ผู้ช่วย") is always available and styled as the green primary. */}
+      <div className={`grid gap-1.5 px-3 py-2 ${hasFiles ? "grid-cols-3" : "grid-cols-1"}`}>
+        {hasFiles && (
+          <>
+            <button
+              onClick={() => send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ")}
+              disabled={busy}
+              className="flex items-center justify-center gap-1 rounded-full border border-slate-200 px-2.5 py-1.5 text-[11.5px] font-medium text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+            >
+              อธิบายโค้ด
+            </button>
+            <button
+              onClick={() =>
+                send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย")
+              }
+              disabled={busy}
+              className="flex items-center justify-center gap-1 rounded-full border border-slate-200 px-2.5 py-1.5 text-[11.5px] font-medium text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+            >
+              ตรวจ &amp; แก้บั๊ก
+            </button>
+          </>
+        )}
+        <button
+          onClick={() => setWizardOpen(true)}
+          className="flex items-center justify-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1.5 text-[11.5px] font-semibold text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400"
+        >
+          <SparklesIcon className="h-3.5 w-3.5 shrink-0" />
+          ผู้ช่วย
+        </button>
+      </div>
 
       <div ref={bodyRef} className="flex-1 space-y-3 overflow-auto px-3 pb-2">
         {initialImages && initialImages.length > 0 && (
@@ -232,23 +242,8 @@ export function ChatPanel({
         )}
         {messages.length === 0 && (
           <div className="px-1 pt-6">
-            {/* primary path — guided wizard, leads the empty state */}
-            <button
-              onClick={() => setWizardOpen(true)}
-              className="flex w-full items-center gap-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-3.5 py-3 text-left text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:from-emerald-400 hover:to-emerald-500"
-            >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/20">
-                <SparklesIcon className="h-5 w-5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[13px] font-semibold">ใช้ตัวช่วยแบบไกด์</span>
-                <span className="block text-[11px] text-emerald-50/90">เลือกทีละขั้น แล้วสรุปเป็นสเปคให้ก่อนสร้าง</span>
-              </span>
-            </button>
-
-            {/* secondary — type your own or tap a short example */}
-            <p className="mb-2 mt-4 text-center text-[11px] text-slate-400 dark:text-slate-500">
-              หรือพิมพ์เอง / แตะตัวอย่าง
+            <p className="mb-2 text-center text-[12px] text-slate-400 dark:text-slate-500">
+              พิมพ์บอกสิ่งที่อยากได้ · แตะตัวอย่าง · หรือกด <b className="text-emerald-600 dark:text-emerald-400">ผู้ช่วย</b> ด้านบน
             </p>
             <div className="grid grid-cols-2 gap-1.5">
               {SUGGESTIONS.map((s) => (

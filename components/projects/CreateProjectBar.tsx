@@ -1,9 +1,16 @@
 "use client";
 
-import { SparklesIcon } from "@heroicons/react/24/outline";
+import { useState } from "react";
+import { ExclamationCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { newProjectAction } from "@/app/projects/actions";
 
-export function CreateProjectBar() {
+export function CreateProjectBar({ existingNames = [] }: { existingNames?: string[] }) {
+  const [name, setName] = useState("");
+  const trimmed = name.trim();
+  const dup =
+    trimmed.length > 0 &&
+    existingNames.some((n) => n.trim().toLowerCase() === trimmed.toLowerCase());
+
   return (
     <form
       action={newProjectAction}
@@ -17,8 +24,15 @@ export function CreateProjectBar() {
           name="name"
           required
           maxLength={80}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           placeholder="ตั้งชื่อโปรเจกต์ใหม่ เช่น ระบบจองคิวร้านตัดผม"
-          className="min-w-[220px] flex-1 rounded-2xl bg-white/80 dark:bg-slate-900/70 px-4 py-3 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none ring-1 ring-slate-200 dark:ring-slate-700/60 transition focus:ring-2 focus:ring-emerald-300"
+          aria-invalid={dup}
+          className={`min-w-[220px] flex-1 rounded-2xl bg-white/80 dark:bg-slate-900/70 px-4 py-3 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none ring-1 transition focus:ring-2 ${
+            dup
+              ? "ring-amber-300 focus:ring-amber-400 dark:ring-amber-700/60"
+              : "ring-slate-200 focus:ring-emerald-300 dark:ring-slate-700/60"
+          }`}
         />
         <button
           type="submit"
@@ -27,9 +41,16 @@ export function CreateProjectBar() {
           สร้างโปรเจกต์ →
         </button>
       </div>
-      <p className="mt-2 pl-1 text-xs text-slate-400 dark:text-slate-500">
-        ตั้งชื่อก่อน — เดี๋ยวเข้าไปบอก AI ว่าอยากได้ระบบอะไรในหน้าโปรเจกต์
-      </p>
+      {dup ? (
+        <p className="mt-2 flex items-center gap-1.5 pl-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+          <ExclamationCircleIcon className="h-4 w-4 shrink-0" />
+          มีโปรเจกต์ชื่อ &ldquo;{trimmed}&rdquo; อยู่แล้ว — สร้างต่อได้ จะกลายเป็น &ldquo;{trimmed} (2)&rdquo; หรือเปลี่ยนชื่อก่อน
+        </p>
+      ) : (
+        <p className="mt-2 pl-1 text-xs text-slate-400 dark:text-slate-500">
+          ตั้งชื่อก่อน — เดี๋ยวเข้าไปบอก AI ว่าอยากได้ระบบอะไรในหน้าโปรเจกต์
+        </p>
+      )}
     </form>
   );
 }

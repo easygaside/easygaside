@@ -76,7 +76,7 @@ export default async function ProjectsPage() {
         </header>
 
         <div className="mb-8">
-          <CreateProjectBar />
+          <CreateProjectBar existingNames={projects.map((p) => p.name)} />
         </div>
 
         {projects.length === 0 ? (

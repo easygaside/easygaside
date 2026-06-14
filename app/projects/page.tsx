@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircleIcon, InboxIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, FolderIcon, InboxIcon, RocketLaunchIcon } from "@heroicons/react/24/outline";
 import { CreateProjectBar } from "@/components/projects/CreateProjectBar";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -27,42 +27,52 @@ export default async function ProjectsPage() {
       <div className="pointer-events-none absolute right-0 top-28 h-72 w-72 rounded-full bg-violet-200/30 blur-3xl dark:bg-violet-500/10" />
 
       <div className="relative mx-auto max-w-5xl">
-        <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">โปรเจกต์ของฉัน</h1>
-            <p className="mt-1 max-w-xl text-sm text-slate-500 dark:text-slate-400">
-              พิมพ์คุยกับ AI แล้วได้เครื่องมือ Google Apps Script จริง — deploy เข้าบัญชี Google ของคุณ
-            </p>
-            {projects.length > 0 && (
-              <p className="mt-2 text-xs font-medium text-slate-400 dark:text-slate-500">
-                {projects.length} โปรเจกต์ · {deployedCount} deploy แล้ว
+        <header className="mb-7">
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <div className="min-w-0">
+              <h1 className="text-3xl font-bold tracking-tight">โปรเจกต์ของฉัน</h1>
+              <p className="mt-1.5 max-w-lg text-sm text-slate-500 dark:text-slate-400">
+                พิมพ์คุยกับ AI แล้วได้เครื่องมือ Google Apps Script จริง — deploy เข้าบัญชี Google ของคุณ
               </p>
-            )}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <ThemeToggle className="h-9 w-9 rounded-full border border-slate-200 bg-white/70 dark:border-slate-700/60 dark:bg-slate-900/50" />
+              {conn.connected && conn.status === "active" ? (
+                <Link
+                  href="/connect"
+                  className="flex h-9 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+                  title="จัดการการเชื่อมต่อ Google"
+                >
+                  <CheckCircleIcon className="h-4 w-4" />
+                  Google เชื่อมแล้ว
+                </Link>
+              ) : (
+                <Link
+                  href="/connect"
+                  className={`flex h-9 items-center rounded-full border px-4 text-sm font-medium shadow-sm transition ${
+                    conn.status === "needs_reauth"
+                      ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300"
+                      : "border-slate-300 bg-white text-slate-600 hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-emerald-500"
+                  }`}
+                >
+                  {conn.status === "needs_reauth" ? "เชื่อมต่อ Google ใหม่" : "เชื่อมต่อ Google"}
+                </Link>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            {conn.connected && conn.status === "active" ? (
-              <Link
-                href="/connect"
-                className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
-                title="จัดการการเชื่อมต่อ Google"
-              >
-                <CheckCircleIcon className="h-4 w-4" />
-                Google เชื่อมแล้ว
-              </Link>
-            ) : (
-              <Link
-                href="/connect"
-                className={`rounded-full border px-4 py-2 text-sm font-medium shadow-sm transition ${
-                  conn.status === "needs_reauth"
-                    ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300"
-                    : "border-slate-300 bg-white text-slate-600 hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-emerald-500"
-                }`}
-              >
-                {conn.status === "needs_reauth" ? "เชื่อมต่อ Google ใหม่" : "เชื่อมต่อ Google"}
-              </Link>
-            )}
-          </div>
+
+          {projects.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-medium">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-slate-600 dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-300">
+                <FolderIcon className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                {projects.length} โปรเจกต์
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <RocketLaunchIcon className="h-3.5 w-3.5" />
+                {deployedCount} deploy แล้ว
+              </span>
+            </div>
+          )}
         </header>
 
         <div className="mb-8">

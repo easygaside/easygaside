@@ -53,10 +53,10 @@ export function ChatPanel({ projectId }: { projectId: string }) {
     });
   }
 
-  async function send() {
-    const msg = input.trim();
+  async function send(text?: string) {
+    const msg = (text ?? input).trim();
     if (!msg || busy) return;
-    setInput("");
+    if (!text) setInput("");
     setBusy(true);
     setStatus("");
     setMessages((m) => [...m, { role: "user", text: msg }, { role: "assistant", text: "" }]);
@@ -106,11 +106,29 @@ export function ChatPanel({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 px-4 py-3 text-sm font-semibold">
+      <div className="flex items-center gap-2 px-4 pt-3 text-sm font-semibold">
         <span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-100 text-violet-600">
           <ChatBubbleLeftRightIcon className="h-4 w-4" />
         </span>
-        แชตกับ AI
+        AI Assistant
+      </div>
+      <div className="flex flex-wrap gap-1.5 px-3 py-2">
+        <button
+          onClick={() => send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ")}
+          disabled={busy}
+          className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50"
+        >
+          อธิบายโค้ด
+        </button>
+        <button
+          onClick={() =>
+            send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย")
+          }
+          disabled={busy}
+          className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50"
+        >
+          ตรวจ &amp; แก้บั๊ก
+        </button>
       </div>
 
       <div ref={bodyRef} className="flex-1 space-y-3 overflow-auto px-3 pb-2">
@@ -183,7 +201,7 @@ export function ChatPanel({ projectId }: { projectId: string }) {
             className="min-h-[72px] flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none placeholder:text-slate-400 disabled:opacity-60"
           />
           <button
-            onClick={send}
+            onClick={() => send()}
             disabled={busy}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-500 text-white disabled:opacity-50"
             aria-label="ส่ง"

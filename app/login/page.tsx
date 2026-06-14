@@ -83,7 +83,7 @@ export default function LoginPage() {
         <div>
           <h1 className="text-2xl font-bold">เข้าสู่ระบบ EasyGAS IDE</h1>
           <p className="mt-1 text-sm text-slate-400">
-            เข้าสู่ระบบด้วย Google = บัญชีเดียวจบ ทั้งล็อกอินและเชื่อม Google สำหรับ deploy
+            ใช้บัญชี Google เดียว — เข้าสู่ระบบ แล้วติดตั้งงานขึ้น Google ของคุณได้เลย
           </p>
         </div>
       </div>

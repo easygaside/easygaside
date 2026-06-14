@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { getConnectionStatus } from "@/lib/google-connection";
 import { createClient } from "@/lib/supabase/server";
 
@@ -49,8 +50,9 @@ export default async function ConnectPage({
 
       {connected && status === "active" ? (
         <div className="flex flex-col gap-3">
-          <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-300">
-            ✓ เชื่อมต่อแล้ว
+          <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+            <CheckCircleIcon className="h-4 w-4" />
+            เชื่อมต่อแล้ว
           </div>
           <Link
             href="/connect/done"

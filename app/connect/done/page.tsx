@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowTopRightOnSquareIcon, CheckCircleIcon, RocketLaunchIcon } from "@heroicons/react/24/outline";
 
 type Result =
   | { kind: "idle" }
@@ -48,14 +49,24 @@ export default function ConnectDonePage() {
       <button
         onClick={deploy}
         disabled={result.kind === "busy"}
-        className="w-fit rounded-lg bg-emerald-500 px-5 py-2.5 font-medium text-emerald-950 hover:bg-emerald-400 disabled:opacity-50"
+        className="flex w-fit items-center gap-1.5 rounded-lg bg-emerald-500 px-5 py-2.5 font-medium text-emerald-950 hover:bg-emerald-400 disabled:opacity-50"
       >
-        {result.kind === "busy" ? "กำลัง deploy…" : "🚀 Deploy ตัวอย่าง"}
+        {result.kind === "busy" ? (
+          "กำลัง deploy…"
+        ) : (
+          <>
+            <RocketLaunchIcon className="h-4 w-4" />
+            Deploy ตัวอย่าง
+          </>
+        )}
       </button>
 
       {result.kind === "ok" && (
         <div className="flex flex-col gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4">
-          <p className="font-semibold text-emerald-300">✓ สำเร็จ! Chain ทำงานครบ</p>
+          <p className="flex items-center gap-1.5 font-semibold text-emerald-300">
+            <CheckCircleIcon className="h-4 w-4" />
+            สำเร็จ! Chain ทำงานครบ
+          </p>
           <a
             href={result.execUrl}
             target="_blank"
@@ -76,9 +87,10 @@ export default function ConnectDonePage() {
             href={result.enableUrl}
             target="_blank"
             rel="noreferrer"
-            className="w-fit rounded-lg border border-amber-400 px-4 py-2 text-sm text-amber-200 hover:bg-amber-500/10"
+            className="flex w-fit items-center gap-1 rounded-lg border border-amber-400 px-4 py-2 text-sm text-amber-200 hover:bg-amber-500/10"
           >
-            เปิดหน้า usersettings ↗
+            เปิดหน้า usersettings
+            <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
           </a>
           <button onClick={deploy} className="w-fit text-sm text-amber-200 underline">
             เปิดแล้ว — ลองอีกครั้ง

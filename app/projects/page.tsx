@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { InboxIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { getCurrentUserId, listProjects } from "@/lib/projects";
 import { newProjectAction } from "./actions";
 
@@ -36,7 +37,7 @@ export default async function ProjectsPage() {
           action={newProjectAction}
           className="mb-8 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_rgba(60,70,110,0.06)]"
         >
-          <span className="text-lg">✨</span>
+          <SparklesIcon className="h-5 w-5 text-emerald-500" />
           <input
             name="name"
             placeholder="อยากสร้างอะไร? เช่น ระบบจองคิวร้านตัดผม…"
@@ -53,7 +54,9 @@ export default async function ProjectsPage() {
         {/* list */}
         {projects.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white/50 p-12 text-center text-slate-400">
-            <div className="text-3xl">📭</div>
+            <div className="flex justify-center">
+              <InboxIcon className="h-10 w-10 text-slate-300" />
+            </div>
             <p className="mt-2 text-sm">ยังไม่มีโปรเจกต์ — พิมพ์ด้านบนเพื่อเริ่มสร้างเลย</p>
           </div>
         ) : (

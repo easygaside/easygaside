@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChatBubbleLeftRightIcon, PaperAirplaneIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
 
 // mirror of lib/anthropic-agent AgentEvent (defined locally to avoid pulling server-only code)
@@ -83,7 +84,7 @@ export function ChatPanel({ projectId }: { projectId: string }) {
           else if (ev.type === "tool_call") setStatus(`${TOOL_LABEL[ev.name] ?? ev.name}…`);
           else if (ev.type === "file_mutation")
             applyMutation({ op: ev.op, path: ev.path, content: ev.content });
-          else if (ev.type === "lint") setStatus("⚠ " + ev.messages.join(" · "));
+          else if (ev.type === "lint") setStatus(ev.messages.join(" · "));
           else if (ev.type === "error") appendAssistant(`\n\n[ผิดพลาด: ${ev.message}]`);
           else if (ev.type === "done") setStatus("");
         }
@@ -99,7 +100,9 @@ export function ChatPanel({ projectId }: { projectId: string }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 px-4 py-3 text-sm font-semibold">
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-100 text-violet-600">💬</span>
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-100 text-violet-600">
+          <ChatBubbleLeftRightIcon className="h-4 w-4" />
+        </span>
         แชตกับ AI
       </div>
 
@@ -112,8 +115,15 @@ export function ChatPanel({ projectId }: { projectId: string }) {
         )}
         {messages.map((m, i) => (
           <div key={i} className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-slate-400">
-              {m.role === "user" ? "คุณ" : "✦ easygas AI"}
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+              {m.role === "user" ? (
+                "คุณ"
+              ) : (
+                <>
+                  <SparklesIcon className="h-3 w-3" />
+                  easygas AI
+                </>
+              )}
             </span>
             <div
               className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
@@ -142,9 +152,9 @@ export function ChatPanel({ projectId }: { projectId: string }) {
           <button
             onClick={send}
             disabled={busy}
-            className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-500 font-bold text-white disabled:opacity-50"
+            className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-500 text-white disabled:opacity-50"
           >
-            ↑
+            <PaperAirplaneIcon className="h-4 w-4" />
           </button>
         </div>
       </div>

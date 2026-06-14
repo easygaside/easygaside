@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowTopRightOnSquareIcon,
+  BoltIcon,
+  CloudIcon,
+  CommandLineIcon,
+  EyeIcon,
+} from "@heroicons/react/24/outline";
 import { useProjectStore, type FileEntry } from "@/store/useProjectStore";
 
 /**
  * Tier-1: inline GAS includes + render Index.html in a sandboxed srcdoc iframe with a console
- * shim (captures console.* + window.onerror → postMessage to parent) and a no-op google.script.run.
+ * shim (captures console.* + window.onerror, posts to parent) and a no-op google.script.run.
  * Tier-2: push to a scratch script and open the live /dev URL on Google (best-effort, opens new tab).
  */
 const INCLUDE_RE = /<\?!?=?\s*include\(\s*['"]([^'"]+)['"]\s*\)\s*\?>/g;
@@ -88,7 +95,9 @@ export function PreviewPane({ projectId }: { projectId: string }) {
     <div className="flex h-full flex-col">
       <div className="mb-2 flex items-center justify-between">
         <span className="flex items-center gap-2 text-sm font-semibold">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-100 text-emerald-600">👁</span>
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-100 text-emerald-600">
+            <EyeIcon className="h-4 w-4" />
+          </span>
           พรีวิว
         </span>
         <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5 text-[11px]">
@@ -96,13 +105,19 @@ export function PreviewPane({ projectId }: { projectId: string }) {
             onClick={() => setTier("sim")}
             className={`rounded-md px-2.5 py-1 ${tier === "sim" ? "bg-white font-semibold text-emerald-600 shadow-sm" : "text-slate-500"}`}
           >
-            ⚡ จำลอง
+            <span className="flex items-center gap-1">
+              <BoltIcon className="h-3.5 w-3.5" />
+              จำลอง
+            </span>
           </button>
           <button
             onClick={() => setTier("live")}
             className={`rounded-md px-2.5 py-1 ${tier === "live" ? "bg-white font-semibold text-emerald-600 shadow-sm" : "text-slate-500"}`}
           >
-            ☁ รันจริง
+            <span className="flex items-center gap-1">
+              <CloudIcon className="h-3.5 w-3.5" />
+              รันจริง
+            </span>
           </button>
         </div>
       </div>
@@ -125,7 +140,10 @@ export function PreviewPane({ projectId }: { projectId: string }) {
           )}
           {/* console panel */}
           <div className="mt-2 h-28 overflow-auto rounded-xl bg-slate-900 p-2 font-mono text-[10.5px] leading-relaxed">
-            <div className="mb-1 text-slate-500">🖥 Console</div>
+            <div className="mb-1 flex items-center gap-1 text-slate-500">
+              <CommandLineIcon className="h-3.5 w-3.5" />
+              Console
+            </div>
             {logs.length === 0 ? (
               <div className="text-slate-600">— ยังไม่มี log —</div>
             ) : (
@@ -153,9 +171,17 @@ export function PreviewPane({ projectId }: { projectId: string }) {
             <button
               onClick={runLive}
               disabled={liveBusy}
-              className="rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {liveBusy ? "กำลัง push…" : "☁ รันจริงบน Google ↗"}
+              {liveBusy ? (
+                "กำลัง push…"
+              ) : (
+                <>
+                  <CloudIcon className="h-4 w-4" />
+                  รันจริงบน Google
+                  <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+                </>
+              )}
             </button>
             {liveMsg && <p className="text-xs text-slate-500">{liveMsg}</p>}
           </div>

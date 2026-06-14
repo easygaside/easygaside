@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import {
+  ArrowTopRightOnSquareIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  RocketLaunchIcon,
+} from "@heroicons/react/24/outline";
 
 type Result =
   | { kind: "idle" }
@@ -47,9 +53,16 @@ export function DeployButton({ projectId }: { projectId: string }) {
       <button
         onClick={deploy}
         disabled={res.kind === "busy"}
-        className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:opacity-50"
+        className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:opacity-50"
       >
-        {res.kind === "busy" ? "กำลัง deploy…" : "🚀 Deploy เข้า Google"}
+        {res.kind === "busy" ? (
+          "กำลัง deploy…"
+        ) : (
+          <>
+            <RocketLaunchIcon className="h-4 w-4" />
+            Deploy เข้า Google
+          </>
+        )}
       </button>
 
       {res.kind !== "idle" && res.kind !== "busy" && (
@@ -57,7 +70,7 @@ export function DeployButton({ projectId }: { projectId: string }) {
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             {res.kind === "ok" && (
               <div className="flex flex-col gap-3">
-                <div className="text-center text-2xl">✅</div>
+                <CheckCircleIcon className="mx-auto h-10 w-10 text-emerald-500" />
                 <h3 className="text-center font-bold">Deploy สำเร็จ! แอปอยู่ในบัญชี Google ของคุณ</h3>
                 {res.execUrl && (
                   <a
@@ -66,13 +79,14 @@ export function DeployButton({ projectId }: { projectId: string }) {
                     rel="noreferrer"
                     className="break-all rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs font-medium text-emerald-700 hover:bg-emerald-100"
                   >
-                    เปิดแอปของคุณ ↗<br />
+                    เปิดแอปของคุณ <ArrowTopRightOnSquareIcon className="inline h-3 w-3 align-text-bottom" />
+                    <br />
                     {res.execUrl}
                   </a>
                 )}
                 {res.needsTriggerSetup && (
                   <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
-                    ⏰ ระบบนี้มีการแจ้งเตือน/ตั้งเวลา — เปิดสคริปต์แล้วรันฟังก์ชัน{" "}
+                    <ClockIcon className="inline h-4 w-4 align-text-bottom text-amber-600" /> ระบบนี้มีการแจ้งเตือน/ตั้งเวลา — เปิดสคริปต์แล้วรันฟังก์ชัน{" "}
                     <code>installTriggers()</code> ครั้งเดียวเพื่อเปิดใช้
                     <a
                       href={res.scriptEditorUrl}
@@ -80,7 +94,7 @@ export function DeployButton({ projectId }: { projectId: string }) {
                       rel="noreferrer"
                       className="ml-1 underline"
                     >
-                      เปิดสคริปต์ ↗
+                      เปิดสคริปต์ <ArrowTopRightOnSquareIcon className="inline h-3 w-3 align-text-bottom" />
                     </a>
                   </div>
                 )}
@@ -103,7 +117,7 @@ export function DeployButton({ projectId }: { projectId: string }) {
                   rel="noreferrer"
                   className="rounded-xl border border-amber-400 py-2 text-center text-sm text-amber-700 hover:bg-amber-50"
                 >
-                  เปิดหน้า usersettings ↗
+                  เปิดหน้า usersettings <ArrowTopRightOnSquareIcon className="inline h-3 w-3 align-text-bottom" />
                 </a>
                 <button
                   onClick={deploy}

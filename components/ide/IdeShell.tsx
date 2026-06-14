@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ArrowLeftIcon, ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
 import { ChatPanel } from "./ChatPanel";
 import { DeployButton } from "./DeployButton";
@@ -32,8 +33,12 @@ export function IdeShell({
   return (
     <main className="flex h-screen flex-col bg-[#eef2f8] text-slate-800">
       <div className="flex items-center gap-3 px-4 py-3">
-        <Link href="/projects" className="text-sm text-slate-500 hover:text-slate-800">
-          ← โปรเจกต์
+        <Link
+          href="/projects"
+          className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"
+        >
+          <ArrowLeftIcon className="h-4 w-4" />
+          โปรเจกต์
         </Link>
         <span className="text-slate-300">/</span>
         <b className="text-sm">{projectName}</b>
@@ -43,7 +48,7 @@ export function IdeShell({
 
       {webHint && webHint.length > 0 && hintOpen && (
         <div className="mx-3 mb-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800">
-          <span className="mt-0.5">⚠</span>
+          <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
             งานนี้ดูเหมือนต้องใช้ฟีเจอร์ที่ Google Apps Script ทำไม่ได้:{" "}
             <b>{webHint.join(" · ")}</b>
@@ -55,7 +60,7 @@ export function IdeShell({
             className="shrink-0 text-amber-500 hover:text-amber-700"
             aria-label="ปิด"
           >
-            ✕
+            <XMarkIcon className="h-4 w-4" />
           </button>
         </div>
       )}

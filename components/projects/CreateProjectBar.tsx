@@ -1,19 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { SparklesIcon } from "@heroicons/react/24/outline";
 import { newProjectAction } from "@/app/projects/actions";
 
-const EXAMPLES = [
-  "ฟอร์มจองคิว บันทึกลง Sheet ส่งอีเมลยืนยัน",
-  "ระบบเช็คสต๊อกสินค้า ตัด/เพิ่มสต๊อก",
-  "ส่งอีเมลอัตโนมัติจากรายชื่อใน Google Sheet",
-  "แดชบอร์ดสรุปยอดขายรายวัน",
-];
-
 export function CreateProjectBar() {
-  const [name, setName] = useState("");
-
   return (
     <form
       action={newProjectAction}
@@ -25,9 +15,9 @@ export function CreateProjectBar() {
         </span>
         <input
           name="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="อยากสร้างอะไร? พิมพ์บอกเป็นภาษาคนได้เลย…"
+          required
+          maxLength={80}
+          placeholder="ตั้งชื่อโปรเจกต์ใหม่ เช่น ระบบจองคิวร้านตัดผม"
           className="min-w-[220px] flex-1 rounded-2xl bg-white/80 px-4 py-3 text-sm outline-none ring-1 ring-slate-200 transition focus:ring-2 focus:ring-emerald-300"
         />
         <button
@@ -37,19 +27,9 @@ export function CreateProjectBar() {
           สร้างโปรเจกต์ →
         </button>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 pl-1">
-        <span className="text-xs text-slate-400">ลองเช่น</span>
-        {EXAMPLES.map((ex) => (
-          <button
-            key={ex}
-            type="button"
-            onClick={() => setName(ex)}
-            className="rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-xs text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600"
-          >
-            {ex}
-          </button>
-        ))}
-      </div>
+      <p className="mt-2 pl-1 text-xs text-slate-400">
+        ตั้งชื่อก่อน — เดี๋ยวเข้าไปบอก AI ว่าอยากได้ระบบอะไรในหน้าโปรเจกต์
+      </p>
     </form>
   );
 }

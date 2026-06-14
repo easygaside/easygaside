@@ -11,11 +11,14 @@ export async function getHistory(
   projectId: string,
 ): Promise<Anthropic.MessageParam[]> {
   const svc = createServiceClient();
+  // Order by the monotonic seq, NOT created_at: a whole turn is inserted in one batch and shares an
+  // identical created_at, so created_at ordering is nondeterministic and can split a tool_use from
+  // its tool_result (→ Anthropic 400). seq reflects insertion order.
   const { data, error } = await svc
     .from("egs_messages")
     .select("role, content")
     .eq("project_id", projectId)
-    .order("created_at", { ascending: true });
+    .order("seq", { ascending: true });
   if (error) throw new Error(`getHistory: ${error.message}`);
   return (data ?? []).map((m) => ({
     role: m.role as MessageRole,

@@ -22,7 +22,8 @@ function pickModel(turn: "codegen" | "plan"): string {
 }
 
 const MAX_ITERATIONS = 8;
-const MAX_TOKENS = 8000;
+const REPAIR_MAX_ITERATIONS = 4; // critic auto-repair is bounded tighter so it can't run a long turn
+const MAX_TOKENS = 16000; // higher cap → a big file rarely gets truncated mid-tool_use (would poison history)
 
 // ── project spec (Guided UX §5 — proposed before generating, confirmed by the user) ──
 export interface ProjectSpec {
@@ -235,6 +236,8 @@ export interface RunAgentArgs {
   /** Reference images attached to this turn (already stored by the route). Fed to the model once. */
   images?: AttachedImage[];
   turn?: "codegen" | "plan";
+  /** iteration cap for this turn (critic repair passes a smaller value). Defaults to MAX_ITERATIONS. */
+  maxIterations?: number;
   emit: Emit;
 }
 
@@ -256,7 +259,15 @@ export async function runAgentLoop(args: RunAgentArgs): Promise<void> {
  */
 async function runTurn(
   client: Anthropic,
-  { projectId, project, userMessage, images = [], turn = "codegen", emit }: RunAgentArgs,
+  {
+    projectId,
+    project,
+    userMessage,
+    images = [],
+    turn = "codegen",
+    maxIterations = MAX_ITERATIONS,
+    emit,
+  }: RunAgentArgs,
 ): Promise<{ mutated: boolean }> {
   const history = await getHistory(projectId);
 
@@ -301,7 +312,7 @@ async function runTurn(
   ];
 
   let mutated = false; // did any write/edit/delete actually change a file this turn?
-  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+  for (let iter = 0; iter < maxIterations; iter++) {
     const stream = client.messages.stream({
       model: pickModel(turn),
       max_tokens: MAX_TOKENS,
@@ -312,6 +323,25 @@ async function runTurn(
     stream.on("text", (delta: string) => emit({ type: "text", delta }));
 
     const final = await stream.finalMessage();
+
+    // Truncated mid-tool_use (e.g. stop_reason "max_tokens" while emitting a large write_file):
+    // the assistant message carries a tool_use we can't resolve. Persisting it poisons history
+    // ("tool_use ids without tool_result" → every later request 400s). Keep only the text and stop.
+    if (final.stop_reason !== "tool_use" && final.content.some((b) => b.type === "tool_use")) {
+      const textBlocks = final.content.filter((b) => b.type === "text");
+      messages.push({
+        role: "assistant",
+        content: (textBlocks.length
+          ? textBlocks
+          : "เนื้อหายาวเกินรอบเดียว") as Anthropic.MessageParam["content"],
+      });
+      emit({
+        type: "text",
+        delta: '\n\n(เนื้อหายาวเกินขีดจำกัดรอบเดียว — พิมพ์ "ทำต่อ" ให้เขียนส่วนที่เหลือได้ครับ)',
+      });
+      break;
+    }
+
     messages.push({
       role: "assistant",
       content: final.content as Anthropic.MessageParam["content"],
@@ -412,8 +442,16 @@ async function runCriticGate(client: Anthropic, args: RunAgentArgs): Promise<voi
     const repairMsg =
       "ตรวจคุณภาพ (rulebook critic) พบปัญหาต่อไปนี้ แก้ไฟล์ที่เกี่ยวข้องให้เรียบร้อยด้วย edit_file/write_file:\n" +
       actionable.map((i) => `- ${i.file}: ${i.problem} — แนวทาง: ${i.fix}`).join("\n");
-    await runTurn(client, { ...args, userMessage: repairMsg, turn: "codegen" });
+    await runTurn(client, {
+      ...args,
+      userMessage: repairMsg,
+      turn: "codegen",
+      maxIterations: REPAIR_MAX_ITERATIONS,
+    });
+    emit({ type: "text", delta: "\n\n✓ แก้ตามผลตรวจคุณภาพแล้ว" });
   } catch (e) {
+    // never leave the "กำลังแก้ให้อัตโนมัติ…" line hanging — close it out visibly.
     console.error("[agent] critic gate failed (non-fatal):", e);
+    emit({ type: "text", delta: "\n\n(ข้ามการแก้อัตโนมัติรอบนี้ — โค้ดที่สร้างยังใช้ได้ พิมพ์บอกถ้าอยากให้แก้จุดไหน)" });
   }
 }

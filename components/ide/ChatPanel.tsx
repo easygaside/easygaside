@@ -332,9 +332,14 @@ export function ChatPanel({
       <div className="border-t border-slate-200/70 dark:border-slate-700/60 p-3">
         {/* live status — what the AI is doing right now */}
         {busy && (
-          <div className="mb-2 flex items-center gap-2 px-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            <span className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-            {status || "AI กำลังคิด…"}
+          <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] font-semibold text-emerald-700 shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+            <span className="flex-1 truncate">{status || "AI กำลังทำงาน…"}</span>
+            <span className="flex shrink-0 gap-0.5">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-500 [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-500 [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-500" />
+            </span>
           </div>
         )}
 

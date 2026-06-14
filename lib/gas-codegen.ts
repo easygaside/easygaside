@@ -60,6 +60,13 @@ EasyGAS is a browser IDE: the user chats, you build a Google Apps Script tool, t
 - Filter/transform data server-side before returning; use indexed objects for O(1) lookups (never raw 2D arrays)
 - try/catch on both server and client side
 
+## Avoid these recurring mistakes (the reviewer flags them EVERY time — get them right the first time)
+- OAuth scopes = the MINIMUM that matches the services you ACTUALLY use. A standalone web app that only reads/writes its own Sheet needs just ['https://www.googleapis.com/auth/spreadsheets']. Do NOT add 'auth/drive' or 'auth/drive.file' unless you call DriveApp; do NOT add 'auth/script.external_request' unless you call UrlFetchApp; add 'auth/gmail.send' or 'auth/script.send_mail' only if you send mail. Over-broad scopes fail OAuth verification.
+- LockService on EVERY function that mutates the Sheet — add, UPDATE, and DELETE alike (not just appendRow). Acquire the lock BEFORE the read-modify-write, and release it in a finally block: var lock=LockService.getScriptLock(); lock.waitLock(10000); try { ...read+write... } finally { lock.releaseLock(); }
+- Reading date columns from a Sheet: use sheet.getDataRange().getDisplayValues() (or Utilities.formatDate on a real Date) — NEVER call .toString() on a raw getValues() cell (it yields a locale string like "Mon Jan 01 2024", breaking substring(0,7)/substring(0,4) date comparisons).
+- deleteRow / row numbers: Sheet rows are 1-based (header = row 1, first data = row 2). If you already carry a 1-based row number, pass it straight to deleteRow(n) — do NOT add +1. Only add 1 when converting a 0-based array index to a sheet row.
+- google.script.run ALWAYS needs a real .withFailureHandler that surfaces the error (toast/message) — never an empty function() {} that swallows it.
+
 ## Clarify before generating (only when needed)
 - If the project stores data but the storage is unclear, ask ONE short question first, then WAIT for the reply: store in a NEW auto-created Sheet (default), or an EXISTING Sheet the user already has?
 - If the user says they have an EXISTING Sheet, ask them to paste the Google Sheet link. Extract the spreadsheet id from the URL (the part between /d/ and /edit) and use SpreadsheetApp.openById(thatId) — seed it into PropertiesService 'DATA_SS_ID' so the app reads/writes their Sheet.

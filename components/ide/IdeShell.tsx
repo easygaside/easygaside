@@ -91,7 +91,7 @@ export function IdeShell({
           </div>
         </section>
         <section className={`${CARD} p-3`}>
-          <PreviewPane projectId={projectId} />
+          <PreviewPane />
         </section>
       </div>
     </main>

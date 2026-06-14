@@ -84,6 +84,11 @@ export function DeployButton({ projectId }: { projectId: string }) {
                     {res.execUrl}
                   </a>
                 )}
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+                  ครั้งแรกที่เปิด Google จะขอให้คุณ (เจ้าของ) อนุญาตสิทธิ์ของสคริปต์ เช่น Sheets/Gmail —
+                  กด <b>Review permissions → Advanced → Allow</b> ครั้งเดียว แล้วใช้ได้เลย ·
+                  แอปนี้อยู่บนบัญชี Google ของคุณ (ตั้งให้รัน &ldquo;ในนามเจ้าของ&rdquo; — คนอื่นเปิดไม่ต้องขอสิทธิ์ซ้ำ)
+                </p>
                 {res.needsTriggerSetup && (
                   <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
                     <ClockIcon className="inline h-4 w-4 align-text-bottom text-amber-600" /> ระบบนี้มีการแจ้งเตือน/ตั้งเวลา — เปิดสคริปต์แล้วรันฟังก์ชัน{" "}

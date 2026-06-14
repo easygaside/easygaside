@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircleIcon, InboxIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { getConnectionStatus } from "@/lib/google-connection";
-import { getCurrentUserId, listProjects } from "@/lib/projects";
+import { getCurrentUserId, getDeployedMap, listProjects } from "@/lib/projects";
 import { newProjectAction } from "./actions";
 
 export const metadata = { title: "โปรเจกต์ของฉัน — easygas" };
@@ -13,7 +13,11 @@ export default async function ProjectsPage() {
   const userId = await getCurrentUserId();
   if (!userId) redirect("/login");
 
-  const [projects, conn] = await Promise.all([listProjects(), getConnectionStatus(userId)]);
+  const [projects, conn, deployed] = await Promise.all([
+    listProjects(),
+    getConnectionStatus(userId),
+    getDeployedMap(),
+  ]);
 
   return (
     <main className="min-h-screen bg-[#eef2f8] px-6 py-10 text-slate-800">
@@ -91,13 +95,25 @@ export default async function ProjectsPage() {
                     {KIND_LABEL[p.kind] ?? p.kind}
                   </span>
                 </div>
-                <p className="mt-3 text-xs text-slate-400">
-                  แก้ไขล่าสุด{" "}
-                  {new Date(p.updated_at).toLocaleDateString("th-TH", {
-                    day: "numeric",
-                    month: "short",
-                  })}
-                </p>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <p className="text-xs text-slate-400">
+                    แก้ไขล่าสุด{" "}
+                    {new Date(p.updated_at).toLocaleDateString("th-TH", {
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </p>
+                  {deployed[p.id] ? (
+                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
+                      <CheckCircleIcon className="h-3 w-3" />
+                      deploy แล้ว
+                    </span>
+                  ) : (
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                      ยังไม่ deploy
+                    </span>
+                  )}
+                </div>
               </Link>
             ))}
           </div>

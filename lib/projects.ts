@@ -54,3 +54,21 @@ export async function createProject(
   if (error) throw new Error(`createProject: ${error.message}`);
   return (data as { id: string }).id;
 }
+
+/**
+ * Map of project_id → live exec URL for the current user's deployed web apps.
+ * RLS scopes egs_deployments to the owner via the parent project, so no owner filter is needed.
+ */
+export async function getDeployedMap(): Promise<Record<string, string>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("egs_deployments")
+    .select("project_id, exec_url")
+    .eq("entry_type", "webapp");
+  if (error) throw new Error(`getDeployedMap: ${error.message}`);
+  const map: Record<string, string> = {};
+  for (const d of (data ?? []) as { project_id: string; exec_url: string | null }[]) {
+    if (d.exec_url) map[d.project_id] = d.exec_url;
+  }
+  return map;
+}

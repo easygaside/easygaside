@@ -136,23 +136,36 @@ export function ChatPanel({ projectId }: { projectId: string }) {
             </div>
           </div>
         ))}
-        {status && <div className="px-1 text-xs text-emerald-600">{status}</div>}
       </div>
 
       <div className="border-t border-slate-200/70 p-3">
-        <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
-          <input
+        {/* live status — what the AI is doing right now */}
+        {busy && (
+          <div className="mb-2 flex items-center gap-2 px-1 text-xs font-medium text-emerald-600">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+            {status || "AI กำลังคิด…"}
+          </div>
+        )}
+        <div className="flex items-end gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), send())}
-            placeholder="พิมพ์บอก AI…"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder="บอกสิ่งที่อยากให้ AI สร้างหรือแก้…&#10;Enter = ส่ง · Shift+Enter = ขึ้นบรรทัดใหม่"
             disabled={busy}
-            className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-slate-400 disabled:opacity-60"
+            rows={3}
+            className="min-h-[72px] flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none placeholder:text-slate-400 disabled:opacity-60"
           />
           <button
             onClick={send}
             disabled={busy}
-            className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-500 text-white disabled:opacity-50"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-500 text-white disabled:opacity-50"
+            aria-label="ส่ง"
           >
             <PaperAirplaneIcon className="h-4 w-4" />
           </button>

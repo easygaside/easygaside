@@ -13,7 +13,8 @@ import { useProjectStore, type FileEntry } from "@/store/useProjectStore";
 /**
  * Tier-1: inline GAS includes + render Index.html in a sandboxed srcdoc iframe with a console
  * shim (captures console.* + window.onerror, posts to parent) and a no-op google.script.run.
- * Tier-2: push to a scratch script and open the live /dev URL on Google (best-effort, opens new tab).
+ * Tier-2: push to a scratch script and surface the live /dev URL as a click-to-open button
+ * (NOT window.open — that gets popup-blocked when fired after an await).
  */
 const INCLUDE_RE = /<\?!?=?\s*include\(\s*['"]([^'"]+)['"]\s*\)\s*\?>/g;
 
@@ -55,6 +56,7 @@ export function PreviewPane({ projectId }: { projectId: string }) {
   const [logs, setLogs] = useState<ConsoleLine[]>([]);
   const [liveBusy, setLiveBusy] = useState(false);
   const [liveMsg, setLiveMsg] = useState("");
+  const [liveUrl, setLiveUrl] = useState("");
 
   useEffect(() => {
     function onMsg(e: MessageEvent) {
@@ -73,12 +75,15 @@ export function PreviewPane({ projectId }: { projectId: string }) {
   async function runLive() {
     setLiveBusy(true);
     setLiveMsg("");
+    setLiveUrl("");
     try {
       const r = await fetch(`/api/preview/${projectId}`, { method: "POST" });
       const data = await r.json();
       if (r.ok && data.devUrl) {
-        window.open(data.devUrl, "_blank", "noopener");
-        setLiveMsg("เปิดแอปจริงในแท็บใหม่แล้ว (ต้อง login บัญชี Google ที่เชื่อมไว้)");
+        // Do NOT window.open here — fired after await, Chrome blocks it as a popup.
+        // Surface a click-to-open button instead (user gesture = not blocked).
+        setLiveUrl(data.devUrl);
+        setLiveMsg("push สำเร็จ — กดปุ่มด้านล่างเปิดแอปจริง");
       } else if (data.error === "USER_SETTINGS_DISABLED") {
         setLiveMsg("ต้องเปิด Apps Script API ที่ usersettings ก่อน");
       } else {
@@ -162,7 +167,7 @@ export function PreviewPane({ projectId }: { projectId: string }) {
         </>
       ) : (
         <div className="grid min-h-0 flex-1 place-items-center rounded-xl border border-dashed border-slate-200 p-6 text-center">
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex max-w-sm flex-col items-center gap-3">
             <p className="text-xs text-slate-500">
               push ขึ้น Google แล้วเปิดแอปจริงในแท็บใหม่
               <br />
@@ -179,11 +184,29 @@ export function PreviewPane({ projectId }: { projectId: string }) {
                 <>
                   <CloudIcon className="h-4 w-4" />
                   รันจริงบน Google
-                  <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
                 </>
               )}
             </button>
+
             {liveMsg && <p className="text-xs text-slate-500">{liveMsg}</p>}
+
+            {liveUrl && (
+              <>
+                <a
+                  href={liveUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                >
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  เปิดแอปจริงบน Google
+                </a>
+                <p className="text-[11px] leading-relaxed text-slate-400">
+                  ครั้งแรก Google จะขอให้คุณ (เจ้าของ) อนุญาตสิทธิ์ของสคริปต์ เช่น Sheets/Gmail —
+                  กด Review permissions → Advanced → Allow ครั้งเดียว แล้วใช้ได้เลย
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}

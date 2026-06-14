@@ -35,8 +35,8 @@ export function IdeShell({
 
   return (
     <main className="flex h-screen flex-col bg-[#eef2f8] text-slate-800">
-      <div className="flex items-center gap-3 px-4 py-3">
-        <span className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5 border-b border-slate-200/70 bg-white/70 px-4 py-2.5 backdrop-blur">
+        <span className="flex shrink-0 items-center gap-2">
           <Image
             src="/icon/android-icon-192x192.png"
             alt="EasyGAS IDE"
@@ -48,16 +48,15 @@ export function IdeShell({
             EasyGAS <span className="text-emerald-600">IDE</span>
           </b>
         </span>
-        <span className="text-slate-300">·</span>
+        <span className="h-5 w-px shrink-0 bg-slate-200" />
         <Link
           href="/projects"
-          className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"
+          title="กลับไปหน้าโปรเจกต์"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
         >
           <ArrowLeftIcon className="h-4 w-4" />
-          โปรเจกต์
         </Link>
-        <span className="text-slate-300">/</span>
-        <b className="truncate text-sm">{projectName}</b>
+        <b className="truncate text-sm font-semibold text-slate-700">{projectName}</b>
         <span className="flex-1" />
         <DeployButton projectId={projectId} googleConnected={googleConnected} />
       </div>

@@ -62,6 +62,7 @@ export function ChatPanel({
 }) {
   const applyMutation = useProjectStore((s) => s.applyMutation);
   const setWorking = useProjectStore((s) => s.setWorking);
+  const hasFiles = useProjectStore((s) => s.order.length > 0);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -186,24 +187,27 @@ export function ChatPanel({
         </span>
         AI Assistant
       </div>
-      <div className="flex flex-wrap gap-1.5 px-3 py-2">
-        <button
-          onClick={() => send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ")}
-          disabled={busy}
-          className="rounded-full border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 text-[11px] text-slate-500 dark:text-slate-400 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-50"
-        >
-          อธิบายโค้ด
-        </button>
-        <button
-          onClick={() =>
-            send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย")
-          }
-          disabled={busy}
-          className="rounded-full border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 text-[11px] text-slate-500 dark:text-slate-400 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-50"
-        >
-          ตรวจ &amp; แก้บั๊ก
-        </button>
-      </div>
+      {/* quick actions only make sense once there's code to act on */}
+      {hasFiles && (
+        <div className="flex flex-wrap gap-1.5 px-3 py-2">
+          <button
+            onClick={() => send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ")}
+            disabled={busy}
+            className="rounded-full border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 text-[11px] text-slate-500 dark:text-slate-400 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-50"
+          >
+            อธิบายโค้ด
+          </button>
+          <button
+            onClick={() =>
+              send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย")
+            }
+            disabled={busy}
+            className="rounded-full border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 text-[11px] text-slate-500 dark:text-slate-400 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-50"
+          >
+            ตรวจ &amp; แก้บั๊ก
+          </button>
+        </div>
+      )}
 
       <div ref={bodyRef} className="flex-1 space-y-3 overflow-auto px-3 pb-2">
         {initialImages && initialImages.length > 0 && (
@@ -246,13 +250,13 @@ export function ChatPanel({
             <p className="mb-2 mt-4 text-center text-[11px] text-slate-400 dark:text-slate-500">
               หรือพิมพ์เอง / แตะตัวอย่าง
             </p>
-            <div className="flex flex-wrap justify-center gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   onClick={() => setInput(s)}
                   disabled={busy}
-                  className="rounded-full border border-slate-200 px-3 py-1.5 text-[11.5px] text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+                  className="truncate rounded-full border border-slate-200 px-3 py-1.5 text-center text-[11.5px] text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
                 >
                   {s}
                 </button>

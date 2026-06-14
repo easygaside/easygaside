@@ -1,0 +1,196 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { decrypt, encrypt } from "@/lib/crypto";
+import { createServiceClient } from "@/lib/supabase/service";
+
+/**
+ * Closed-beta gating, per-user daily quota, and optional BYOK (bring-your-own Anthropic key).
+ * Server-only — all access goes through the service role (RLS denies clients on these tables).
+ *
+ * Hybrid model:
+ *  - DEFAULT path: invite allowlist + the platform key + a per-user daily generation cap.
+ *  - BYOK path (optional): the user stores their own Anthropic key (encrypted). BYOK users run on
+ *    their own key and bypass the daily cap (they pay their own cost) and the allowlist.
+ */
+
+// Beta gating is ON unless BETA_MODE is explicitly "off". Owner is seeded in the allowlist.
+export const BETA_ENFORCED = process.env.BETA_MODE !== "off";
+export const DAILY_GENERATION_LIMIT = Number(process.env.EASYGAS_DAILY_LIMIT ?? 30);
+
+export interface AccessGate {
+  allowed: boolean;
+  reason: "ok" | "not_in_beta";
+}
+
+/** Is this email allowed in the closed beta? (Always true when beta is not enforced.) */
+export async function isBetaAllowed(email: string | null | undefined): Promise<boolean> {
+  if (!BETA_ENFORCED) return true;
+  if (!email) return false;
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_beta_allowlist")
+    .select("email")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+  return !!data;
+}
+
+/**
+ * Whether the user may use the app at all. BYOK users are always allowed (own key, own cost);
+ * otherwise they must be on the allowlist when beta is enforced.
+ */
+export async function getAccessGate(
+  userId: string,
+  email: string | null | undefined,
+): Promise<AccessGate> {
+  if (!BETA_ENFORCED) return { allowed: true, reason: "ok" };
+  if (await hasOwnApiKey(userId)) return { allowed: true, reason: "ok" };
+  return (await isBetaAllowed(email))
+    ? { allowed: true, reason: "ok" }
+    : { allowed: false, reason: "not_in_beta" };
+}
+
+// ── BYOK ──
+
+interface KeyRow {
+  anthropic_key_enc: string | null;
+  anthropic_key_iv: string | null;
+  anthropic_key_tag: string | null;
+}
+
+export async function hasOwnApiKey(userId: string): Promise<boolean> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_user_settings")
+    .select("anthropic_key_enc")
+    .eq("user_id", userId)
+    .maybeSingle<{ anthropic_key_enc: string | null }>();
+  return !!data?.anthropic_key_enc;
+}
+
+/** Decrypt the user's stored Anthropic key, or null if none. Server-only. */
+export async function getOwnApiKey(userId: string): Promise<string | null> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_user_settings")
+    .select("anthropic_key_enc, anthropic_key_iv, anthropic_key_tag")
+    .eq("user_id", userId)
+    .maybeSingle<KeyRow>();
+  if (!data?.anthropic_key_enc || !data.anthropic_key_iv || !data.anthropic_key_tag) return null;
+  try {
+    return decrypt({ enc: data.anthropic_key_enc, iv: data.anthropic_key_iv, tag: data.anthropic_key_tag });
+  } catch {
+    return null;
+  }
+}
+
+/** Cheap liveness check that a key actually works before we store it. */
+export async function validateAnthropicKey(key: string): Promise<boolean> {
+  try {
+    const client = new Anthropic({ apiKey: key });
+    await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "hi" }],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function setOwnApiKey(userId: string, key: string): Promise<void> {
+  const secret = encrypt(key);
+  const svc = createServiceClient();
+  const { error } = await svc.from("egs_user_settings").upsert(
+    {
+      user_id: userId,
+      anthropic_key_enc: secret.enc,
+      anthropic_key_iv: secret.iv,
+      anthropic_key_tag: secret.tag,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (error) throw new Error(`setOwnApiKey: ${error.message}`);
+}
+
+export async function removeOwnApiKey(userId: string): Promise<void> {
+  const svc = createServiceClient();
+  const { error } = await svc
+    .from("egs_user_settings")
+    .update({
+      anthropic_key_enc: null,
+      anthropic_key_iv: null,
+      anthropic_key_tag: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+  if (error) throw new Error(`removeOwnApiKey: ${error.message}`);
+}
+
+// ── daily quota (default path only) ──
+
+export interface QuotaStatus {
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export async function getDailyUsage(userId: string): Promise<QuotaStatus> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_usage_daily")
+    .select("requests")
+    .eq("user_id", userId)
+    .eq("day", new Date().toISOString().slice(0, 10))
+    .maybeSingle<{ requests: number }>();
+  const used = data?.requests ?? 0;
+  return { used, limit: DAILY_GENERATION_LIMIT, remaining: Math.max(0, DAILY_GENERATION_LIMIT - used) };
+}
+
+/**
+ * Atomically count one generation against today's cap. Returns ok:false (without incrementing)
+ * when the cap is already reached. Uses an RPC-free upsert + guarded increment.
+ */
+export async function checkAndConsumeQuota(
+  userId: string,
+): Promise<{ ok: boolean } & QuotaStatus> {
+  const svc = createServiceClient();
+  const day = new Date().toISOString().slice(0, 10);
+  // ensure a row exists, then increment only if under the cap
+  await svc.from("egs_usage_daily").upsert({ user_id: userId, day }, { onConflict: "user_id,day" });
+  const { data } = await svc
+    .from("egs_usage_daily")
+    .update({ requests: (await currentRequests(svc, userId, day)) + 1 })
+    .eq("user_id", userId)
+    .eq("day", day)
+    .lt("requests", DAILY_GENERATION_LIMIT)
+    .select("requests")
+    .maybeSingle<{ requests: number }>();
+
+  if (!data) {
+    // cap reached (the .lt guard matched no row)
+    const used = await currentRequests(svc, userId, day);
+    return { ok: false, used, limit: DAILY_GENERATION_LIMIT, remaining: 0 };
+  }
+  return {
+    ok: true,
+    used: data.requests,
+    limit: DAILY_GENERATION_LIMIT,
+    remaining: Math.max(0, DAILY_GENERATION_LIMIT - data.requests),
+  };
+}
+
+async function currentRequests(
+  svc: ReturnType<typeof createServiceClient>,
+  userId: string,
+  day: string,
+): Promise<number> {
+  const { data } = await svc
+    .from("egs_usage_daily")
+    .select("requests")
+    .eq("user_id", userId)
+    .eq("day", day)
+    .maybeSingle<{ requests: number }>();
+  return data?.requests ?? 0;
+}

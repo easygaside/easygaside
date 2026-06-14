@@ -240,11 +240,13 @@ export interface RunAgentArgs {
   maxIterations?: number;
   /** internal turn (e.g. the critic auto-repair) — suppresses user-facing "hit the cap" notes */
   internal?: boolean;
+  /** BYOK: the user's own Anthropic key. Omit to use the platform key (ANTHROPIC_API_KEY). */
+  apiKey?: string;
   emit: Emit;
 }
 
 export async function runAgentLoop(args: RunAgentArgs): Promise<void> {
-  const client = new Anthropic(); // reads ANTHROPIC_API_KEY
+  const client = new Anthropic(args.apiKey ? { apiKey: args.apiKey } : undefined); // BYOK or platform key
   const { mutated } = await runTurn(client, args);
   // Gate 1 — rulebook critic + one bounded auto-repair. Only when this turn actually changed files:
   // a pure Q&A turn ("ปกติไหม?") writes nothing, so re-reviewing the whole project there is wasted

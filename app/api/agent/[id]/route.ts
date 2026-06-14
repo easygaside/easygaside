@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
+import { checkAndConsumeQuota, getAccessGate, getOwnApiKey } from "@/lib/beta";
 import { parseAttachedImages, storeChatImages, type AttachedImage } from "@/lib/chat-images";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
@@ -25,6 +26,29 @@ export async function POST(
 
   const project = await getProject(id); // RLS-scoped → null if not owned
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+  // Closed-beta gate (BYOK users + allowlisted users pass; bypassed when BETA_MODE=off)
+  const gate = await getAccessGate(user.id, user.email);
+  if (!gate.allowed)
+    return NextResponse.json(
+      { error: "not_in_beta", message: "ยังไม่เปิดให้ใช้งานทั่วไป — บัญชีนี้ยังไม่อยู่ในรอบทดสอบ" },
+      { status: 403 },
+    );
+
+  // BYOK: run on the user's own key (and skip the daily cap — their cost). Else the platform key
+  // under a per-user daily generation cap.
+  const apiKey = (await getOwnApiKey(user.id)) ?? undefined;
+  if (!apiKey) {
+    const quota = await checkAndConsumeQuota(user.id);
+    if (!quota.ok)
+      return NextResponse.json(
+        {
+          error: "quota_exceeded",
+          message: `วันนี้ใช้ครบโควตาแล้ว (${quota.limit} ครั้ง/วัน) — ลองใหม่พรุ่งนี้ หรือใส่ Anthropic API key ของคุณเองในหน้า ตั้งค่า เพื่อใช้แบบไม่จำกัด`,
+        },
+        { status: 429 },
+      );
+  }
 
   let message = "";
   let images: AttachedImage[] = [];
@@ -54,7 +78,7 @@ export async function POST(
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
       };
       try {
-        await runAgentLoop({ projectId: id, project, userMessage: message, images, emit });
+        await runAgentLoop({ projectId: id, project, userMessage: message, images, apiKey, emit });
       } catch (e) {
         console.error("[agent] loop error:", e);
         emit({ type: "error", message: "agent_error" });

@@ -1,17 +1,21 @@
 import { notFound, redirect } from "next/navigation";
 import { IdeShell } from "@/components/ide/IdeShell";
+import { getAccessGate } from "@/lib/beta";
 import { listProjectChatImages } from "@/lib/chat-images";
 import { getFiles } from "@/lib/files";
 import { getConnectionStatus } from "@/lib/google-connection";
-import { getCurrentUserId, getProject } from "@/lib/projects";
+import { getCurrentUser, getProject } from "@/lib/projects";
 
 export default async function ProjectBuilderPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const userId = await getCurrentUserId();
-  if (!userId) redirect("/login");
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  const userId = user.id;
+  const gate = await getAccessGate(userId, user.email);
+  if (!gate.allowed) redirect("/waitlist");
 
   const { id } = await params;
   const project = await getProject(id); // RLS-scoped → null if not owned

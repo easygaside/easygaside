@@ -137,7 +137,19 @@ export function ChatPanel({
           images: attached.map((a) => ({ dataBase64: a.dataBase64, mediaType: a.mediaType })),
         }),
       });
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        // gate (403) / quota (429) and other errors carry a friendly Thai message
+        let msg = "เชื่อมต่อล้มเหลว — ลองใหม่อีกครั้ง";
+        try {
+          const j = (await res.json()) as { message?: string };
+          if (j?.message) msg = j.message;
+        } catch {
+          /* non-JSON */
+        }
+        appendAssistant(`\n\n[${msg}]`);
+        return;
+      }
+      if (!res.body) throw new Error("no body");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

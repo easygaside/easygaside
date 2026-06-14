@@ -14,6 +14,14 @@ export async function getCurrentUserId(): Promise<string | null> {
   return user?.id ?? null;
 }
 
+export async function getCurrentUser(): Promise<{ id: string; email: string | null } | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user ? { id: user.id, email: user.email ?? null } : null;
+}
+
 export async function listProjects(): Promise<EgsProject[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

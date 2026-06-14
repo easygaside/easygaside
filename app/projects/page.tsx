@@ -1,18 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircleIcon, FolderIcon, InboxIcon, RocketLaunchIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, Cog6ToothIcon, FolderIcon, InboxIcon, RocketLaunchIcon } from "@heroicons/react/24/outline";
 import { CreateProjectBar } from "@/components/projects/CreateProjectBar";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { getAccessGate } from "@/lib/beta";
 import { getConnectionStatus } from "@/lib/google-connection";
-import { getCurrentUserId, getDeployedMap, listProjects } from "@/lib/projects";
+import { getCurrentUser, getDeployedMap, listProjects } from "@/lib/projects";
 
 export const metadata = { title: "โปรเจกต์ของฉัน — easygas" };
 
 export default async function ProjectsPage() {
-  const userId = await getCurrentUserId();
-  if (!userId) redirect("/login");
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  const userId = user.id;
+  const gate = await getAccessGate(userId, user.email);
+  if (!gate.allowed) redirect("/waitlist");
 
   const [projects, conn, deployed] = await Promise.all([
     listProjects(),
@@ -38,6 +42,13 @@ export default async function ProjectsPage() {
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <ReportButton />
+              <Link
+                href="/settings"
+                title="ตั้งค่า / โควตา / API key"
+                className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white/70 text-slate-500 transition hover:text-emerald-600 dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-400 dark:hover:text-emerald-400"
+              >
+                <Cog6ToothIcon className="h-4 w-4" />
+              </Link>
               <ThemeToggle className="h-9 w-9 rounded-full border border-slate-200 bg-white/70 dark:border-slate-700/60 dark:bg-slate-900/50" />
               {conn.connected && conn.status === "active" ? (
                 <Link

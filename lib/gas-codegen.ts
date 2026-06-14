@@ -101,7 +101,24 @@ const WEBAPP_ADDENDUM = `
 ## This is a STANDALONE web app (NOT bound to a Sheet)
 - There is NO active spreadsheet — SpreadsheetApp.getActiveSpreadsheet() returns null. NEVER call it here.
 - If the app stores data in a Sheet, MANAGE YOUR OWN spreadsheet so it is auto-provisioned (the user must NOT create the Sheet by hand):
-  - getDataSpreadsheet_(): read a cached id from PropertiesService.getScriptProperties() ('DATA_SS_ID'); SpreadsheetApp.openById(id). If the user gave an EXISTING Sheet link, seed its id into 'DATA_SS_ID' first so the app uses THEIR Sheet (openById works for any Sheet the owner can access — the app runs as the owner). If there is no id and none was provided, SpreadsheetApp.create('<AppName> Data'), save the new id, return it.
+  - getDataSpreadsheet_() MUST provision ATOMICALLY. On first load the client fires several google.script.run calls in parallel; if each does a plain "read id → none → create", they EACH create a duplicate Sheet (a real, common bug). Use double-checked locking — copy this shape exactly:
+      function getDataSpreadsheet_() {
+        var props = PropertiesService.getScriptProperties();
+        var id = props.getProperty('DATA_SS_ID');
+        if (id) return SpreadsheetApp.openById(id);            // fast path, no lock
+        var lock = LockService.getScriptLock();
+        lock.waitLock(30000);
+        try {
+          id = props.getProperty('DATA_SS_ID');                // RE-CHECK inside the lock — another call may have created it
+          if (id) return SpreadsheetApp.openById(id);
+          var ss = SpreadsheetApp.create('<AppName> Data');    // only the first caller ever reaches here
+          props.setProperty('DATA_SS_ID', ss.getId());
+          return ss;
+        } finally {
+          lock.releaseLock();
+        }
+      }
+    If the user gave an EXISTING Sheet link, seed its id into 'DATA_SS_ID' BEFORE any data call (so openById uses THEIR Sheet — the app runs as the owner, so openById works for any Sheet they can access).
   - setupSheet_(ss, tabName, headers): get-or-insert the tab; if row 1 is empty, write the header columns ONCE; setNumberFormat('@') on phone/idcard columns before writing.
   - Run setup on first use (top of doGet or each data function) so the spreadsheet + tabs + header columns are created automatically on the first request.
   - Expose the spreadsheet URL to the owner (a link in an admin view or returned from a function) so they can find their data.

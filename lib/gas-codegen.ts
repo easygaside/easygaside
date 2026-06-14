@@ -141,7 +141,22 @@ const WEBAPP_ADDENDUM = `
         }
       }
     If the user gave an EXISTING Sheet link, seed its id into 'DATA_SS_ID' BEFORE any data call (so openById uses THEIR Sheet — the app runs as the owner, so openById works for any Sheet they can access).
-  - setupSheet_(ss, tabName, headers): get-or-insert the tab; if row 1 is empty, write the header columns ONCE; setNumberFormat('@') on phone/idcard columns before writing.
+  - setupSheet_(ss) MUST be race-safe. doGet calls it on every request and the page fires several google.script.run calls at once on first load — a plain getSheetByName→insertSheet lets two callers both create the same tab → "sheet already exists". Guard create + header init with a script lock and a re-check inside it:
+      function setupSheet_(ss) {
+        var name = 'Transactions';
+        var sheet = ss.getSheetByName(name);
+        if (sheet) return sheet;                                  // fast path
+        var lock = LockService.getScriptLock();
+        lock.waitLock(30000);
+        try {
+          sheet = ss.getSheetByName(name) || ss.insertSheet(name); // re-check INSIDE the lock
+          if (sheet.getLastRow() === 0) sheet.appendRow(['id','date','type','category','amount','note']);
+          return sheet;
+        } finally {
+          lock.releaseLock();
+        }
+      }
+    NEVER call ss.insertSheet(name) without the getSheetByName re-check inside a lock. (setNumberFormat('@') on phone/idcard columns before writing them.)
   - Run setup on first use (top of doGet or each data function) so the spreadsheet + tabs + header columns are created automatically on the first request.
   - Expose the spreadsheet URL to the owner (a link in an admin view or returned from a function) so they can find their data.
 - Use LockService around appendRow for concurrent writes.`;

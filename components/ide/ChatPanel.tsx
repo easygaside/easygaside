@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChatBubbleLeftRightIcon, PaperAirplaneIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import {
+  ChatBubbleLeftRightIcon,
+  PaperAirplaneIcon,
+  PhotoIcon,
+  SparklesIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+import { compressImage, type CompressedImage } from "@/lib/client/image-compress";
 import { GuidedWizard } from "./GuidedWizard";
+
+const MAX_IMAGES = 4;
 
 interface ProjectSpec {
   title: string;
@@ -27,6 +36,7 @@ type AgentEvent =
 interface ChatMsg {
   role: "user" | "assistant";
   text: string;
+  images?: string[]; // data: URLs for local preview
 }
 
 const TOOL_LABEL: Record<string, string> = {
@@ -51,11 +61,37 @@ export function ChatPanel({ projectId }: { projectId: string }) {
   const [status, setStatus] = useState("");
   const [pendingSpec, setPendingSpec] = useState<ProjectSpec | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [images, setImages] = useState<CompressedImage[]>([]);
+  const [attaching, setAttaching] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bodyRef.current?.scrollTo(0, bodyRef.current.scrollHeight);
-  }, [messages, status]);
+  }, [messages, status, images]);
+
+  async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = ""; // allow re-picking the same file
+    if (picked.length === 0) return;
+    const slots = MAX_IMAGES - images.length;
+    if (slots <= 0) return;
+    setAttaching(true);
+    try {
+      const next: CompressedImage[] = [];
+      for (const file of picked.slice(0, slots)) {
+        if (!file.type.startsWith("image/")) continue;
+        try {
+          next.push(await compressImage(file));
+        } catch {
+          /* skip an unreadable image */
+        }
+      }
+      if (next.length) setImages((cur) => [...cur, ...next].slice(0, MAX_IMAGES));
+    } finally {
+      setAttaching(false);
+    }
+  }
 
   function appendAssistant(t: string) {
     setMessages((m) => {
@@ -68,18 +104,30 @@ export function ChatPanel({ projectId }: { projectId: string }) {
 
   async function send(text?: string) {
     const msg = (text ?? input).trim();
-    if (!msg || busy) return;
-    if (!text) setInput("");
+    // staged images attach only to a composer send (no explicit text arg from chips/spec/wizard)
+    const attached = text === undefined ? images : [];
+    if ((!msg && attached.length === 0) || busy) return;
+    if (text === undefined) {
+      setInput("");
+      setImages([]);
+    }
     setBusy(true);
     setStatus("");
     setPendingSpec(null);
-    setMessages((m) => [...m, { role: "user", text: msg }, { role: "assistant", text: "" }]);
+    setMessages((m) => [
+      ...m,
+      { role: "user", text: msg, images: attached.map((a) => a.dataUrl) },
+      { role: "assistant", text: "" },
+    ]);
 
     try {
       const res = await fetch(`/api/agent/${projectId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg }),
+        body: JSON.stringify({
+          message: msg,
+          images: attached.map((a) => ({ dataBase64: a.dataBase64, mediaType: a.mediaType })),
+        }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
@@ -187,13 +235,28 @@ export function ChatPanel({ projectId }: { projectId: string }) {
               )}
             </span>
             <div
-              className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
+              className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
                 m.role === "user"
                   ? "self-start bg-slate-100 text-slate-700"
                   : "bg-emerald-50 text-slate-700"
               }`}
             >
-              {m.text || (busy && i === messages.length - 1 ? "…" : "")}
+              {m.images && m.images.length > 0 && (
+                <div className="mb-1.5 flex flex-wrap gap-1.5">
+                  {m.images.map((src, j) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={j}
+                      src={src}
+                      alt="รูปแนบ"
+                      className="h-16 w-16 rounded-lg border border-slate-200 object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+              <span className="whitespace-pre-wrap">
+                {m.text || (busy && i === messages.length - 1 ? "…" : "")}
+              </span>
             </div>
           </div>
         ))}
@@ -243,7 +306,53 @@ export function ChatPanel({ projectId }: { projectId: string }) {
             {status || "AI กำลังคิด…"}
           </div>
         )}
-        <div className="flex items-end gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+
+        {/* staged image attachments (≤4) */}
+        {(images.length > 0 || attaching) && (
+          <div className="mb-2 flex flex-wrap gap-2 px-1">
+            {images.map((img, i) => (
+              <div key={i} className="group relative h-14 w-14">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={img.dataUrl}
+                  alt="รูปแนบ"
+                  className="h-14 w-14 rounded-lg border border-slate-200 object-cover"
+                />
+                <button
+                  onClick={() => setImages((cur) => cur.filter((_, j) => j !== i))}
+                  aria-label="เอารูปออก"
+                  className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-slate-700 text-white shadow transition hover:bg-red-500"
+                >
+                  <XMarkIcon className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+            {attaching && (
+              <div className="grid h-14 w-14 place-items-center rounded-lg border border-dashed border-slate-300 text-slate-400">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-end gap-2 rounded-2xl bg-slate-50 px-2.5 py-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            onChange={onPickFiles}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={busy || images.length >= MAX_IMAGES}
+            title={images.length >= MAX_IMAGES ? `แนบได้สูงสุด ${MAX_IMAGES} รูป` : "แนบรูปอ้างอิง"}
+            aria-label="แนบรูป"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-200 hover:text-slate-600 disabled:opacity-40"
+          >
+            <PhotoIcon className="h-5 w-5" />
+          </button>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -253,14 +362,14 @@ export function ChatPanel({ projectId }: { projectId: string }) {
                 send();
               }
             }}
-            placeholder="บอกสิ่งที่อยากให้ AI สร้างหรือแก้…&#10;Enter = ส่ง · Shift+Enter = ขึ้นบรรทัดใหม่"
+            placeholder="บอกสิ่งที่อยากให้ AI สร้างหรือแก้… แนบรูปอ้างอิงได้&#10;Enter = ส่ง · Shift+Enter = ขึ้นบรรทัดใหม่"
             disabled={busy}
             rows={3}
             className="min-h-[72px] flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none placeholder:text-slate-400 disabled:opacity-60"
           />
           <button
             onClick={() => send()}
-            disabled={busy}
+            disabled={busy || (!input.trim() && images.length === 0)}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-500 text-white disabled:opacity-50"
             aria-label="ส่ง"
           >

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { removeProjectChatImages } from "@/lib/chat-images";
 import { detectCapabilityNeeds, routeTarget } from "@/lib/deployment-targets";
 import { createProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
@@ -26,8 +27,9 @@ export async function newProjectAction(formData: FormData) {
 
 /**
  * Remove a project from EasyGAS only. RLS scopes the delete to the owner; FK ON DELETE CASCADE
- * removes its files/messages/deployments. Does NOT touch the user's Google Drive / Apps Script —
- * we make no Google API call here, so the deployed script + Sheet stay in their account.
+ * removes its files/messages/deployments/chat-image rows. We also purge the project's chat images
+ * from storage first (those bytes don't cascade). Does NOT touch the user's Google Drive / Apps
+ * Script — we make no Google API call here, so the deployed script + Sheet stay in their account.
  */
 export async function deleteProjectAction(id: string) {
   const supabase = await createClient();
@@ -35,6 +37,13 @@ export async function deleteProjectAction(id: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("not_authenticated");
+
+  // Confirm ownership under RLS before any service-role work (storage removal bypasses RLS).
+  const { data: owned } = await supabase.from("egs_projects").select("id").eq("id", id).maybeSingle();
+  if (!owned) throw new Error("not_found");
+
+  // Purge chat-image bytes from the bucket before the rows cascade away (paths live in those rows).
+  await removeProjectChatImages(id);
 
   const { error } = await supabase.from("egs_projects").delete().eq("id", id);
   if (error) throw new Error(`deleteProject: ${error.message}`);

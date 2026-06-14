@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
+import { parseAttachedImages, storeChatImages, type AttachedImage } from "@/lib/chat-images";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,13 +27,23 @@ export async function POST(
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   let message = "";
+  let images: AttachedImage[] = [];
   try {
-    const body = (await req.json()) as { message?: string };
+    const body = (await req.json()) as { message?: string; images?: unknown };
     message = (body.message ?? "").trim();
+    images = parseAttachedImages(body.images);
   } catch {
     /* empty body */
   }
-  if (!message) return NextResponse.json({ error: "empty_message" }, { status: 400 });
+  // a turn must carry text or at least one image
+  if (!message && images.length === 0)
+    return NextResponse.json({ error: "empty_message" }, { status: 400 });
+  // image-only turn → give the model a direction
+  if (!message && images.length > 0)
+    message = "ดูรูปอ้างอิงที่แนบมา แล้วออกแบบ/ปรับหน้าตาให้ใกล้เคียงรูป";
+
+  // persist attachments to the project's history bucket (best-effort; never blocks the turn)
+  if (images.length > 0) await storeChatImages(id, images);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -43,7 +54,7 @@ export async function POST(
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
       };
       try {
-        await runAgentLoop({ projectId: id, project, userMessage: message, emit });
+        await runAgentLoop({ projectId: id, project, userMessage: message, images, emit });
       } catch (e) {
         console.error("[agent] loop error:", e);
         emit({ type: "error", message: "agent_error" });

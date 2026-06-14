@@ -45,6 +45,15 @@ export interface EgsMessage {
   created_at: string;
 }
 
+export interface EgsChatImage {
+  id: string;
+  project_id: string;
+  storage_path: string;
+  media_type: string;
+  bytes: number | null;
+  created_at: string;
+}
+
 export type DeploymentEntryType = "webapp" | "api_executable";
 
 export interface EgsDeployment {

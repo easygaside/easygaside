@@ -5,6 +5,7 @@ import { retrieveContext } from "@/lib/retrieval";
 import { deleteFile, getFile, getFiles, writeFile } from "@/lib/files";
 import { appendMessages, getHistory } from "@/lib/messages";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { AttachedImage } from "@/lib/chat-images";
 import type { EgsProject } from "@/types/db";
 
 /**
@@ -231,6 +232,8 @@ export interface RunAgentArgs {
   projectId: string;
   project: EgsProject;
   userMessage: string;
+  /** Reference images attached to this turn (already stored by the route). Fed to the model once. */
+  images?: AttachedImage[];
   turn?: "codegen" | "plan";
   emit: Emit;
 }
@@ -248,7 +251,7 @@ export async function runAgentLoop(args: RunAgentArgs): Promise<void> {
 /** One model turn: stream → resolve tool_use in a loop → persist. Does NOT emit `done`. */
 async function runTurn(
   client: Anthropic,
-  { projectId, project, userMessage, turn = "codegen", emit }: RunAgentArgs,
+  { projectId, project, userMessage, images = [], turn = "codegen", emit }: RunAgentArgs,
 ): Promise<void> {
   const history = await getHistory(projectId);
 
@@ -259,9 +262,28 @@ async function runTurn(
     ? `${retrieved.text}\n\n---\n${userMessage}`
     : userMessage;
 
+  // Multimodal: when reference images are attached, the user turn is an [image…, text] block array;
+  // otherwise keep it a plain string (cheaper, and the common path). media_type is pre-validated
+  // against the Anthropic image union in parseAttachedImages.
+  const userContent: Anthropic.MessageParam["content"] = images.length
+    ? [
+        ...images.map(
+          (img): Anthropic.ImageBlockParam => ({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: img.mediaType as Anthropic.Base64ImageSource["media_type"],
+              data: img.dataBase64,
+            },
+          }),
+        ),
+        { type: "text", text: effectiveUserMessage } satisfies Anthropic.TextBlockParam,
+      ]
+    : effectiveUserMessage;
+
   const messages: Anthropic.MessageParam[] = [
     ...history,
-    { role: "user", content: effectiveUserMessage },
+    { role: "user", content: userContent },
   ];
 
   // cache the static GAS rulebook (model-scoped — keep byte-identical)
@@ -342,11 +364,13 @@ async function runTurn(
   }
 
   // persist the new turn(s) for resume (egs_files is the source of truth for code).
-  // Store the user's ORIGINAL message — never the RAG-injected prefix (keeps history lean
-  // and avoids re-feeding stale retrieved context on the next turn).
+  // Store the user's ORIGINAL message as TEXT only — never the RAG-injected prefix nor the
+  // image blocks. This keeps history lean and avoids re-feeding stale context / re-billing image
+  // tokens on every later turn (the bucket keeps the images as the project's reference history).
   const persisted = messages.slice(history.length);
-  if (retrieved.text && persisted[0]?.role === "user") {
-    persisted[0] = { role: "user", content: userMessage };
+  if (persisted[0]?.role === "user" && (retrieved.text || images.length)) {
+    const note = images.length ? `\n\n(แนบรูปอ้างอิง ${images.length} รูป)` : "";
+    persisted[0] = { role: "user", content: userMessage + note };
   }
   await appendMessages(projectId, persisted, turn);
 }

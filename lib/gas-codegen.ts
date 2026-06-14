@@ -37,7 +37,7 @@ Based on the project instruction, generate ALL complete source files for a Googl
 - Supported extensions: .gs, .html (HTML partials for CSS/JS use .html — GAS convention)
 - Include appsscript.json with correct oauthScopes that MATCH the services you actually use
 - Every file must be COMPLETE — no placeholders, no "// TODO", no "..."
-- Do NOT use import/export, require(), npm packages, fetch(), process.env, setTimeout/setInterval
+- In SERVER .gs code: do NOT use import/export, require(), npm packages, fetch(), process.env, setTimeout/setInterval (they don't exist in Apps Script). This ban does NOT apply to client-side HTML — see "UI libraries & web-app polish", which may use browser APIs + CDN libraries.
 
 ## Technical Rules
 - Use HtmlService.createTemplateFromFile() for includes
@@ -66,7 +66,27 @@ Based on the project instruction, generate ALL complete source files for a Googl
 - "ฟอร์มสะอาด": single-column form, generous spacing, one accent color, big clear labels and a prominent submit button.
 - "แดชบอร์ด": metric cards on top + a table/list below; top tabs or a side menu; data-focused.
 - "รายการการ์ด": responsive card grid; each item is a card with a title, key fields, and an action button.
-- "ใบเสร็จ / เอกสารไทย": print-friendly A4-ish layout, a header area for name/logo, an itemized table, totals, Thai-friendly typography.`;
+- "ใบเสร็จ / เอกสารไทย": print-friendly A4-ish layout, a header area for name/logo, an itemized table, totals, Thai-friendly typography.
+
+## UI libraries & web-app polish (CLIENT-SIDE, inside .html files)
+Browser libraries via CDN are ALLOWED and encouraged when they improve UX — load them with <link>/<script> tags in the HTML <head> (this is a normal CDN tag, NOT an npm import; the server-side ban does not apply here). Pin a major version. Apply ONLY what the request asks for; default to "clean modern" with the always-on UX below.
+
+- Navigation (default = top tabs). All navigation is client-side show/hide of sections — SPA feel, NEVER reload the page; mark the active item; keyboard-accessible:
+  - "แท็บด้านบน / Top tabs": horizontal tab bar that toggles sections.
+  - "เมนูข้าง / Sidebar": fixed left nav on desktop, collapses to a hamburger drawer on mobile.
+  - "เมนูล่างมือถือ / Bottom bar": fixed bottom tab bar, mobile-first, thumb-reachable, 3–5 items with icon + label.
+  - "หน้าเดียว ไม่มีเมนู": a single view, no nav chrome.
+- SweetAlert2 (https://cdn.jsdelivr.net/npm/sweetalert2@11): use Swal.fire() for confirm (delete/submit), success, and error dialogs INSTEAD of native alert()/confirm(). Use toast mode (toast:true, position:'top-end', timer:2500) for non-blocking success.
+- Font Awesome (https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css): use <i class="fa-solid fa-..."> icons in nav, buttons, and headings instead of emoji — meaningful and consistent.
+- Modal / popup: an accessible modal (role="dialog", aria-modal, ESC + backdrop-click to close, return focus on close) for forms/details — or SweetAlert2 for simple ones. Animate with transform/opacity only.
+- Toast: brief corner notifications for success/info (SweetAlert2 toast, or a small custom one) — non-blocking.
+- Thai web font (Google Fonts): for Thai UIs load a Thai-friendly font (e.g. Prompt or Sarabun) via <link> and set it as the body font.
+
+## Always-on web-app UX (regardless of style — these are feel/correctness, not decoration)
+- Loading state: while a google.script.run call is in flight, DISABLE the triggering button and show a spinner / "กำลังบันทึก…"; re-enable in BOTH withSuccessHandler AND withFailureHandler (prevents double-submit).
+- Validate inputs client-side before calling the server; show clear Thai inline errors and focus the first invalid field.
+- Empty state: when a list/table has no rows, show a friendly "ยังไม่มีข้อมูล" with an icon — never a blank area.
+- Show a spinner/skeleton while initial data loads; surface failures as a toast/dialog — never swallow errors.`;
 
 const BOUND_ADDENDUM = `
 

@@ -15,11 +15,20 @@ interface WizardProps {
   onComplete: (message: string) => void;
 }
 
-const STEPS = ["ใช้ทำอะไร", "เก็บข้อมูลอะไร", "ใครใช้", "ต้องการอะไรเพิ่ม", "หน้าตาแบบไหน"];
+const STEPS = ["ใช้ทำอะไร", "เก็บข้อมูลอะไร", "ใครใช้", "ต้องการอะไรเพิ่ม", "หน้าตาแบบไหน", "เมนูแบบไหน", "ลูกเล่น UI"];
 const PURPOSES = ["ฟอร์มเก็บข้อมูล", "ระบบจอง / นัดหมาย", "ส่งอีเมล / แจ้งเตือน", "แดชบอร์ด / รายงาน"];
 const AUDIENCES = ["ทีมงานภายใน", "ลูกค้า / บุคคลทั่วไป", "ต้องล็อกอิน Google"];
 const EXTRAS = ["ส่งอีเมลยืนยัน", "สร้าง PDF", "บันทึกไฟล์ลง Drive", "ตั้งเวลา / แจ้งเตือนอัตโนมัติ"];
 const STYLES = ["ฟอร์มสะอาด", "แดชบอร์ด", "รายการการ์ด", "ใบเสร็จ / เอกสารไทย"];
+const NAV = ["แท็บด้านบน (Top tabs)", "เมนูข้าง (Sidebar)", "เมนูล่างมือถือ (Bottom bar)", "หน้าเดียว ไม่มีเมนู"];
+const UI_EXTRAS = [
+  "SweetAlert2 (แจ้งเตือนสวย)",
+  "Font Awesome (ไอคอน)",
+  "ป็อปอัป (Modal)",
+  "Toast แจ้งผลมุมจอ",
+  "สถานะกำลังโหลด (spinner)",
+  "ฟอนต์ไทยสวย (Google Fonts)",
+];
 
 function CardGroup({
   options,
@@ -66,6 +75,8 @@ export function GuidedWizard({ open, onClose, onComplete }: WizardProps) {
   const [audience, setAudience] = useState("");
   const [extras, setExtras] = useState<string[]>([]);
   const [style, setStyle] = useState("");
+  const [nav, setNav] = useState("");
+  const [uiExtras, setUiExtras] = useState<string[]>([]);
 
   if (!open) return null;
 
@@ -76,6 +87,8 @@ export function GuidedWizard({ open, onClose, onComplete }: WizardProps) {
     setAudience("");
     setExtras([]);
     setStyle("");
+    setNav("");
+    setUiExtras([]);
   }
   function close() {
     reset();
@@ -88,6 +101,8 @@ export function GuidedWizard({ open, onClose, onComplete }: WizardProps) {
     if (audience) lines.push(`- ผู้ใช้: ${audience}`);
     if (extras.length) lines.push(`- ฟีเจอร์เพิ่ม: ${extras.join(", ")}`);
     if (style) lines.push(`- สไตล์หน้าตา: ${style}`);
+    if (nav) lines.push(`- เมนู/นำทาง: ${nav}`);
+    if (uiExtras.length) lines.push(`- ลูกเล่น UI: ${uiExtras.join(", ")}`);
     lines.push("ช่วยสรุปเป็น spec ให้ยืนยันก่อนได้เลย");
     const msg = lines.join("\n");
     reset();
@@ -135,6 +150,15 @@ export function GuidedWizard({ open, onClose, onComplete }: WizardProps) {
         {step === 2 && <CardGroup options={AUDIENCES} value={audience} onChange={setAudience} />}
         {step === 3 && <CardGroup options={EXTRAS} multi values={extras} onToggle={(x) => setExtras((e) => (e.includes(x) ? e.filter((v) => v !== x) : [...e, x]))} />}
         {step === 4 && <CardGroup options={STYLES} value={style} onChange={setStyle} />}
+        {step === 5 && <CardGroup options={NAV} value={nav} onChange={setNav} />}
+        {step === 6 && (
+          <CardGroup
+            options={UI_EXTRAS}
+            multi
+            values={uiExtras}
+            onToggle={(x) => setUiExtras((e) => (e.includes(x) ? e.filter((v) => v !== x) : [...e, x]))}
+          />
+        )}
 
         <div className="mt-6 flex items-center gap-2">
           {step > 0 && (

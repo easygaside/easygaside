@@ -52,7 +52,9 @@ Based on the project instruction, generate ALL complete source files for a Googl
 - try/catch on both server and client side
 
 ## Clarify before generating (only when needed)
-- If the project stores data but the storage is unclear, ask ONE short question first, then WAIT for the reply: does it need ONE data sheet or several? a NEW auto-created Sheet (default) or an existing one? Keep it to a single concise question; if the request is already clear, skip and generate immediately.`;
+- If the project stores data but the storage is unclear, ask ONE short question first, then WAIT for the reply: store in a NEW auto-created Sheet (default), or an EXISTING Sheet the user already has?
+- If the user says they have an EXISTING Sheet, ask them to paste the Google Sheet link. Extract the spreadsheet id from the URL (the part between /d/ and /edit) and use SpreadsheetApp.openById(thatId) — seed it into PropertiesService 'DATA_SS_ID' so the app reads/writes their Sheet.
+- Keep clarification to a single concise question; if the request is already clear, skip and generate immediately.`;
 
 const BOUND_ADDENDUM = `
 
@@ -67,7 +69,7 @@ const WEBAPP_ADDENDUM = `
 ## This is a STANDALONE web app (NOT bound to a Sheet)
 - There is NO active spreadsheet — SpreadsheetApp.getActiveSpreadsheet() returns null. NEVER call it here.
 - If the app stores data in a Sheet, MANAGE YOUR OWN spreadsheet so it is auto-provisioned (the user must NOT create the Sheet by hand):
-  - getDataSpreadsheet_(): read a cached id from PropertiesService.getScriptProperties() (key e.g. 'DATA_SS_ID'); SpreadsheetApp.openById(id); if missing or it throws, SpreadsheetApp.create('<AppName> Data'), save the new id, return it.
+  - getDataSpreadsheet_(): read a cached id from PropertiesService.getScriptProperties() ('DATA_SS_ID'); SpreadsheetApp.openById(id). If the user gave an EXISTING Sheet link, seed its id into 'DATA_SS_ID' first so the app uses THEIR Sheet (openById works for any Sheet the owner can access — the app runs as the owner). If there is no id and none was provided, SpreadsheetApp.create('<AppName> Data'), save the new id, return it.
   - setupSheet_(ss, tabName, headers): get-or-insert the tab; if row 1 is empty, write the header columns ONCE; setNumberFormat('@') on phone/idcard columns before writing.
   - Run setup on first use (top of doGet or each data function) so the spreadsheet + tabs + header columns are created automatically on the first request.
   - Expose the spreadsheet URL to the owner (a link in an admin view or returned from a function) so they can find their data.

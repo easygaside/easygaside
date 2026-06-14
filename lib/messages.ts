@@ -7,6 +7,35 @@ import type { MessageRole, TurnType } from "@/types/db";
  * agent loop can resume after disconnect / maxDuration.
  */
 
+// Context compaction: full file contents live in egs_files (source of truth), so we strip the bulky
+// payloads out of OLD tool blocks before re-sending history to the model. This keeps a big project
+// or a long edit session from ballooning the context window — without it, every past write_file's
+// full file content (and read_project dump) would be re-sent on every turn. The model fetches
+// current code with read_project when it needs it. Structure (tool_use/tool_result ids) is kept
+// intact so the message sequence stays API-valid.
+const MAX_TOOL_RESULT_CHARS = 200;
+
+function compactContent(content: unknown): unknown {
+  if (!Array.isArray(content)) return content;
+  return content.map((block) => {
+    if (!block || typeof block !== "object") return block;
+    const b = block as Record<string, unknown>;
+    if (b.type === "tool_use" && b.input && typeof b.input === "object") {
+      const input = { ...(b.input as Record<string, unknown>) };
+      if (typeof input.content === "string" && input.content.length > 0)
+        input.content = `<โค้ดถูกตัดจากประวัติ (${input.content.length} ตัวอักษร) — เรียก read_project เพื่อดูโค้ดล่าสุด>`;
+      if (typeof input.new_str === "string" && input.new_str.length > MAX_TOOL_RESULT_CHARS)
+        input.new_str = `<ตัด ${input.new_str.length} ตัวอักษร>`;
+      if (typeof input.old_str === "string" && input.old_str.length > MAX_TOOL_RESULT_CHARS)
+        input.old_str = `<ตัด ${input.old_str.length} ตัวอักษร>`;
+      return { ...b, input };
+    }
+    if (b.type === "tool_result" && typeof b.content === "string" && b.content.length > MAX_TOOL_RESULT_CHARS)
+      return { ...b, content: b.content.slice(0, MAX_TOOL_RESULT_CHARS) + " …<ตัดส่วนที่เหลือ>" };
+    return block;
+  });
+}
+
 export async function getHistory(
   projectId: string,
 ): Promise<Anthropic.MessageParam[]> {
@@ -22,7 +51,7 @@ export async function getHistory(
   if (error) throw new Error(`getHistory: ${error.message}`);
   return (data ?? []).map((m) => ({
     role: m.role as MessageRole,
-    content: m.content as Anthropic.MessageParam["content"],
+    content: compactContent(m.content) as Anthropic.MessageParam["content"],
   }));
 }
 

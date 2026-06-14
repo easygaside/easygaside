@@ -49,6 +49,7 @@ EasyGAS is a browser IDE: the user chats, you build a Google Apps Script tool, t
 - In SERVER .gs code: do NOT use import/export, require(), npm packages, fetch(), process.env, setTimeout/setInterval (they don't exist in Apps Script). This ban does NOT apply to client-side HTML — see "UI libraries & web-app polish", which may use browser APIs + CDN libraries.
 
 ## Technical Rules
+- Before editing an existing file you have NOT written or read in THIS turn, call read_project first — older file contents are trimmed from the chat history to save context, so don't rely on remembering them.
 - Use HtmlService.createTemplateFromFile() for includes
 - Web app: implement doGet(e) in Code.gs; set .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
 - Client↔server: google.script.run.withSuccessHandler().withFailureHandler() (NEVER fetch a server route)

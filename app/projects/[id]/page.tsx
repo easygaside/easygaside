@@ -18,11 +18,19 @@ export default async function ProjectBuilderPage({
   // ownership verified above → safe to read files via service-role
   const files = await getFiles(id);
 
+  // honest hint when the project asked for a capability GAS can't serve yet (web target)
+  const spec = (project.spec ?? {}) as { webOnlyReasons?: unknown };
+  const webHint =
+    Array.isArray(spec.webOnlyReasons) && spec.webOnlyReasons.length > 0
+      ? (spec.webOnlyReasons as string[])
+      : undefined;
+
   return (
     <IdeShell
       projectId={id}
       projectName={project.name}
       initialFiles={files.map((f) => ({ path: f.path, content: f.content }))}
+      webHint={webHint}
     />
   );
 }

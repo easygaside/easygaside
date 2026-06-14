@@ -43,3 +43,41 @@ export function routeTarget(needs: CapabilityNeeds = {}): RouteDecision {
     notImplemented: false,
   };
 }
+
+/**
+ * Cheap keyword detector (no model call) that infers capability needs from the user's free-text
+ * description. Feeds routeTarget(). Conservative: only clear web-only signals flip a project toward
+ * the web target; still-photo / Workspace keywords are informational and stay on GAS.
+ */
+const NEED_KEYWORDS: { key: keyof CapabilityNeeds; words: string[] }[] = [
+  {
+    key: "liveCamera",
+    words: [
+      "กล้องสด", "สแกนหน้า", "สแกนใบหน้า", "ตรวจจับใบหน้า", "สแกน qr", "สแกนคิวอาร์",
+      "สแกนบาร์โค้ด", "สแกนบาโค้ด", "webcam", "เว็บแคม", "วิดีโอคอล", "video call",
+      "live stream", "livestream", "สตรีมสด", "ถ่ายวิดีโอ", "scan face", "face scan",
+      "qr scan", "barcode scan", "กล้องเรียลไทม์",
+    ],
+  },
+  {
+    key: "realtime",
+    words: ["เรียลไทม์", "real-time", "realtime", "websocket", "แชทสด", "live chat", "แชทเรียลไทม์", "อัปเดตเรียลไทม์", "สตรีมข้อมูล"],
+  },
+  { key: "npmPackages", words: ["npm", "node module", "ไลบรารี npm"] },
+  {
+    key: "customDomain",
+    words: ["โดเมนตัวเอง", "โดเมนของตัวเอง", "custom domain", "ชื่อโดเมน", "เว็บจริง", "หน้าเว็บสาธารณะ", "เว็บสาธารณะ"],
+  },
+  { key: "publicSeo", words: ["seo", "ติดอันดับ google", "ค้นหาเจอใน google", "google search"] },
+  { key: "stillPhoto", words: ["แนบรูป", "อัปโหลดรูป", "ถ่ายรูป", "upload photo", "attach image", "แนบภาพ"] },
+  { key: "workspaceData", words: ["sheet", "ชีต", "drive", "gmail", "ส่งอีเมล", "ส่งเมล", "ปฏิทิน", "calendar"] },
+];
+
+export function detectCapabilityNeeds(text: string): CapabilityNeeds {
+  const t = (text || "").toLowerCase();
+  const needs: CapabilityNeeds = {};
+  for (const { key, words } of NEED_KEYWORDS) {
+    if (words.some((w) => t.includes(w.toLowerCase()))) needs[key] = true;
+  }
+  return needs;
+}

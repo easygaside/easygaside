@@ -38,6 +38,7 @@ export async function getProject(id: string): Promise<EgsProject | null> {
 export async function createProject(
   name: string,
   kind: ProjectKind = "webapp",
+  spec: Record<string, unknown> | null = null,
 ): Promise<string> {
   const supabase = await createClient();
   const {
@@ -47,7 +48,7 @@ export async function createProject(
 
   const { data, error } = await supabase
     .from("egs_projects")
-    .insert({ owner_id: user.id, name: name.trim() || "โปรเจกต์ใหม่", kind })
+    .insert({ owner_id: user.id, name: name.trim() || "โปรเจกต์ใหม่", kind, spec })
     .select("id")
     .single();
   if (error) throw new Error(`createProject: ${error.message}`);

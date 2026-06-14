@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useProjectStore } from "@/store/useProjectStore";
 import { ChatPanel } from "./ChatPanel";
@@ -16,12 +16,15 @@ export function IdeShell({
   projectId,
   projectName,
   initialFiles,
+  webHint,
 }: {
   projectId: string;
   projectName: string;
   initialFiles: { path: string; content: string }[];
+  webHint?: string[];
 }) {
   const setInitial = useProjectStore((s) => s.setInitial);
+  const [hintOpen, setHintOpen] = useState(true);
   useEffect(() => {
     setInitial(initialFiles);
   }, [initialFiles, setInitial]);
@@ -37,6 +40,25 @@ export function IdeShell({
         <span className="flex-1" />
         <DeployButton projectId={projectId} />
       </div>
+
+      {webHint && webHint.length > 0 && hintOpen && (
+        <div className="mx-3 mb-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800">
+          <span className="mt-0.5">⚠</span>
+          <div className="flex-1">
+            งานนี้ดูเหมือนต้องใช้ฟีเจอร์ที่ Google Apps Script ทำไม่ได้:{" "}
+            <b>{webHint.join(" · ")}</b>
+            <br />
+            ตอนนี้สร้างเป็น GAS ให้ก่อน — ส่วนนั้นจะยังไม่ทำงานจนกว่า web target (Cloudflare + Supabase) จะเปิด
+          </div>
+          <button
+            onClick={() => setHintOpen(false)}
+            className="shrink-0 text-amber-500 hover:text-amber-700"
+            aria-label="ปิด"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="grid min-h-0 flex-1 gap-3 px-3 pb-3 lg:grid-cols-[320px_1.3fr_1fr]">
         <section className={CARD}>

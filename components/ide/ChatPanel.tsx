@@ -47,10 +47,10 @@ const TOOL_LABEL: Record<string, string> = {
 };
 
 const SUGGESTIONS = [
-  "ฟอร์มจองคิว บันทึกลง Sheet ส่งอีเมลยืนยัน",
-  "ระบบเช็คสต๊อกสินค้า ตัด/เพิ่มสต๊อก",
-  "ส่งอีเมลอัตโนมัติจากรายชื่อใน Google Sheet",
-  "แดชบอร์ดสรุปยอดขายรายวัน",
+  "ฟอร์มจองคิว + อีเมลยืนยัน",
+  "ระบบเช็ค/ตัดสต๊อกสินค้า",
+  "ส่งอีเมลอัตโนมัติจาก Sheet",
+  "แดชบอร์ดสรุปยอดขาย",
 ];
 
 export function ChatPanel({
@@ -228,29 +228,36 @@ export function ChatPanel({
         )}
         {messages.length === 0 && (
           <div className="px-1 pt-6">
-            <p className="text-center text-[13px] text-slate-400 dark:text-slate-500">
-              พิมพ์บอกสิ่งที่อยากได้ หรือเริ่มจากตัวอย่าง
+            {/* primary path — guided wizard, leads the empty state */}
+            <button
+              onClick={() => setWizardOpen(true)}
+              className="flex w-full items-center gap-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-3.5 py-3 text-left text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:from-emerald-400 hover:to-emerald-500"
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/20">
+                <SparklesIcon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold">ใช้ตัวช่วยแบบไกด์</span>
+                <span className="block text-[11px] text-emerald-50/90">เลือกทีละขั้น แล้วสรุปเป็นสเปคให้ก่อนสร้าง</span>
+              </span>
+            </button>
+
+            {/* secondary — type your own or tap a short example */}
+            <p className="mb-2 mt-4 text-center text-[11px] text-slate-400 dark:text-slate-500">
+              หรือพิมพ์เอง / แตะตัวอย่าง
             </p>
-            <div className="mt-3 flex flex-col gap-2">
+            <div className="flex flex-wrap justify-center gap-1.5">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   onClick={() => setInput(s)}
                   disabled={busy}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 px-3 py-2.5 text-left text-[12px] text-slate-600 dark:text-slate-300 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 disabled:opacity-50"
+                  className="rounded-full border border-slate-200 px-3 py-1.5 text-[11.5px] text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
                 >
-                  <SparklesIcon className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                   {s}
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setWizardOpen(true)}
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/30 px-3 py-2.5 text-[12px] font-medium text-emerald-700 dark:text-emerald-300 transition hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-            >
-              <SparklesIcon className="h-3.5 w-3.5" />
-              ใช้ตัวช่วยแบบเลือก (ไกด์ทีละขั้น)
-            </button>
           </div>
         )}
         {messages.map((m, i) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircleIcon, GlobeAltIcon, TableCellsIcon, TrashIcon } from "@heroicons/react/24/outline";
@@ -82,41 +83,49 @@ export function ProjectCard({ project, deployUrl }: { project: EgsProject; deplo
         <TrashIcon className="h-4 w-4" />
       </button>
 
-      {confirm && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm"
-          onClick={() => !busy && setConfirm(false)}
-        >
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-center">
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-red-50 text-red-500">
-                <TrashIcon className="h-6 w-6" />
-              </span>
+      {/* confirm dialog — portal to body so the card's transform/overflow-hidden can't clip it */}
+      {confirm &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm"
+            onClick={() => !busy && setConfirm(false)}
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-center">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-red-50 text-red-500">
+                  <TrashIcon className="h-6 w-6" />
+                </span>
+              </div>
+              <h3 className="mt-3 text-center font-bold text-slate-800">ลบโปรเจกต์?</h3>
+              <p className="mt-1 line-clamp-2 text-center text-sm text-slate-500">
+                &ldquo;{project.name}&rdquo;
+              </p>
+              <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-[12px] leading-relaxed text-amber-700">
+                ลบเฉพาะใน EasyGAS เท่านั้น — ไฟล์/สคริปต์ใน Google Drive ของคุณ <b>ไม่ถูกลบ</b>
+              </p>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => setConfirm(false)}
+                  disabled={busy}
+                  className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={remove}
+                  disabled={busy}
+                  className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white transition hover:bg-red-400 disabled:opacity-50"
+                >
+                  {busy ? "กำลังลบ…" : "ลบเลย"}
+                </button>
+              </div>
             </div>
-            <h3 className="mt-3 text-center font-bold text-slate-800">ลบโปรเจกต์?</h3>
-            <p className="mt-1 line-clamp-2 text-center text-sm text-slate-500">&ldquo;{project.name}&rdquo;</p>
-            <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-[12px] leading-relaxed text-amber-700">
-              ลบเฉพาะใน EasyGAS เท่านั้น — ไฟล์/สคริปต์ใน Google Drive ของคุณ <b>ไม่ถูกลบ</b>
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setConfirm(false)}
-                disabled={busy}
-                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={remove}
-                disabled={busy}
-                className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white transition hover:bg-red-400 disabled:opacity-50"
-              >
-                {busy ? "กำลังลบ…" : "ลบเลย"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

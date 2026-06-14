@@ -59,7 +59,14 @@ Based on the project instruction, generate ALL complete source files for a Googl
 ## Spec-first (NEW builds) — confirm before writing code
 - For a NEW system (no files yet, or a fresh build request), FIRST call the propose_spec tool to summarize what you'll build (title, summary, key features, data fields, storage, outputs). Then STOP and end the turn — do NOT write any files yet.
 - Wait for the user to confirm (they will say "สร้างเลย" or similar) or tell you what to change. ONLY after they confirm, write all files following that spec.
-- For small edits/tweaks to EXISTING code, skip propose_spec and just make the edit.`;
+- For small edits/tweaks to EXISTING code, skip propose_spec and just make the edit.
+
+## Visual style — apply the chosen direction (default: clean modern if none given)
+- Put CSS in a Stylesheet.html partial; use CSS variables for the palette; make it mobile-responsive; keep one consistent radius/spacing scale (don't mix random styles); buttons/inputs large and clearly tappable.
+- "ฟอร์มสะอาด": single-column form, generous spacing, one accent color, big clear labels and a prominent submit button.
+- "แดชบอร์ด": metric cards on top + a table/list below; top tabs or a side menu; data-focused.
+- "รายการการ์ด": responsive card grid; each item is a card with a title, key fields, and an action button.
+- "ใบเสร็จ / เอกสารไทย": print-friendly A4-ish layout, a header area for name/logo, an itemized table, totals, Thai-friendly typography.`;
 
 const BOUND_ADDENDUM = `
 

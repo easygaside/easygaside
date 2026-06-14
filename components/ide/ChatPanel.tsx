@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatBubbleLeftRightIcon, PaperAirplaneIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+import { GuidedWizard } from "./GuidedWizard";
 
 interface ProjectSpec {
   title: string;
@@ -49,6 +50,7 @@ export function ChatPanel({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [pendingSpec, setPendingSpec] = useState<ProjectSpec | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -163,6 +165,13 @@ export function ChatPanel({ projectId }: { projectId: string }) {
                 </button>
               ))}
             </div>
+            <button
+              onClick={() => setWizardOpen(true)}
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50/50 px-3 py-2.5 text-[12px] font-medium text-emerald-700 transition hover:bg-emerald-50"
+            >
+              <SparklesIcon className="h-3.5 w-3.5" />
+              ใช้ตัวช่วยแบบเลือก (ไกด์ทีละขั้น)
+            </button>
           </div>
         )}
         {messages.map((m, i) => (
@@ -259,6 +268,15 @@ export function ChatPanel({ projectId }: { projectId: string }) {
           </button>
         </div>
       </div>
+
+      <GuidedWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onComplete={(msg) => {
+          setWizardOpen(false);
+          send(msg);
+        }}
+      />
     </div>
   );
 }

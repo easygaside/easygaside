@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircleIcon, InboxIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, GlobeAltIcon, InboxIcon, TableCellsIcon } from "@heroicons/react/24/outline";
+import { CreateProjectBar } from "@/components/projects/CreateProjectBar";
 import { getConnectionStatus } from "@/lib/google-connection";
 import { getCurrentUserId, getDeployedMap, listProjects } from "@/lib/projects";
-import { newProjectAction } from "./actions";
 
 export const metadata = { title: "โปรเจกต์ของฉัน — easygas" };
 
@@ -18,16 +18,26 @@ export default async function ProjectsPage() {
     getConnectionStatus(userId),
     getDeployedMap(),
   ]);
+  const deployedCount = projects.filter((p) => deployed[p.id]).length;
 
   return (
-    <main className="min-h-screen bg-[#eef2f8] px-6 py-10 text-slate-800">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#eef3fb] to-[#e6ecf7] px-6 py-10 text-slate-800">
+      {/* atmosphere */}
+      <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
+      <div className="pointer-events-none absolute right-0 top-28 h-72 w-72 rounded-full bg-violet-200/30 blur-3xl" />
+
+      <div className="relative mx-auto max-w-5xl">
+        <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">โปรเจกต์ของฉัน</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              สร้างเครื่องมือ Google Apps Script ด้วยการคุยกับ AI
+            <h1 className="text-3xl font-bold tracking-tight">โปรเจกต์ของฉัน</h1>
+            <p className="mt-1 max-w-xl text-sm text-slate-500">
+              พิมพ์คุยกับ AI แล้วได้เครื่องมือ Google Apps Script จริง — deploy เข้าบัญชี Google ของคุณ
             </p>
+            {projects.length > 0 && (
+              <p className="mt-2 text-xs font-medium text-slate-400">
+                {projects.length} โปรเจกต์ · {deployedCount} deploy แล้ว
+              </p>
+            )}
           </div>
           {conn.connected && conn.status === "active" ? (
             <Link
@@ -52,70 +62,71 @@ export default async function ProjectsPage() {
           )}
         </header>
 
-        {/* new project */}
-        <form
-          action={newProjectAction}
-          className="mb-8 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_rgba(60,70,110,0.06)]"
-        >
-          <SparklesIcon className="h-5 w-5 text-emerald-500" />
-          <input
-            name="name"
-            placeholder="อยากสร้างอะไร? เช่น ระบบจองคิวร้านตัดผม…"
-            className="min-w-[220px] flex-1 rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-emerald-300 focus:ring-2"
-          />
-          <button
-            type="submit"
-            className="rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400"
-          >
-            สร้างโปรเจกต์ →
-          </button>
-        </form>
+        <div className="mb-8">
+          <CreateProjectBar />
+        </div>
 
-        {/* list */}
         {projects.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white/50 p-12 text-center text-slate-400">
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white/50 p-14 text-center text-slate-400">
             <div className="flex justify-center">
-              <InboxIcon className="h-10 w-10 text-slate-300" />
+              <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-slate-300 shadow-sm">
+                <InboxIcon className="h-7 w-7" />
+              </span>
             </div>
-            <p className="mt-2 text-sm">ยังไม่มีโปรเจกต์ — พิมพ์ด้านบนเพื่อเริ่มสร้างเลย</p>
+            <p className="mt-3 text-sm">ยังไม่มีโปรเจกต์ — พิมพ์ด้านบนหรือกดตัวอย่างเพื่อเริ่มสร้างเลย</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((p) => (
-              <Link
-                key={p.id}
-                href={`/projects/${p.id}`}
-                className="group rounded-2xl border border-slate-200/70 bg-white p-5 shadow-[0_8px_24px_rgba(60,70,110,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(60,70,110,0.1)]"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold leading-snug text-slate-800 group-hover:text-emerald-600">
-                    {p.name}
-                  </h3>
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">
-                    {KIND_LABEL[p.kind] ?? p.kind}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <p className="text-xs text-slate-400">
-                    แก้ไขล่าสุด{" "}
-                    {new Date(p.updated_at).toLocaleDateString("th-TH", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </p>
-                  {deployed[p.id] ? (
-                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
-                      <CheckCircleIcon className="h-3 w-3" />
-                      deploy แล้ว
+            {projects.map((p) => {
+              const isBound = p.kind === "bound";
+              return (
+                <Link
+                  key={p.id}
+                  href={`/projects/${p.id}`}
+                  className="group relative overflow-hidden rounded-2xl border border-white/70 bg-white p-5 shadow-[0_8px_24px_rgba(60,70,110,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(60,70,110,0.13)]"
+                >
+                  <span
+                    className={`absolute inset-x-0 top-0 h-1 ${isBound ? "bg-blue-400" : "bg-emerald-400"}`}
+                  />
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+                        isBound ? "bg-blue-50 text-blue-500" : "bg-emerald-50 text-emerald-500"
+                      }`}
+                    >
+                      {isBound ? <TableCellsIcon className="h-5 w-5" /> : <GlobeAltIcon className="h-5 w-5" />}
                     </span>
-                  ) : (
-                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400">
-                      ยังไม่ deploy
-                    </span>
-                  )}
-                </div>
-              </Link>
-            ))}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="line-clamp-2 font-semibold leading-snug text-slate-800 group-hover:text-emerald-600">
+                        {p.name}
+                      </h3>
+                      <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                        {KIND_LABEL[p.kind] ?? p.kind}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between gap-2">
+                    <p className="text-xs text-slate-400">
+                      แก้ไข{" "}
+                      {new Date(p.updated_at).toLocaleDateString("th-TH", {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </p>
+                    {deployed[p.id] ? (
+                      <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
+                        <CheckCircleIcon className="h-3 w-3" />
+                        deploy แล้ว
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                        ยังไม่ deploy
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { InboxIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, InboxIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { getConnectionStatus } from "@/lib/google-connection";
 import { getCurrentUserId, listProjects } from "@/lib/projects";
 import { newProjectAction } from "./actions";
 
@@ -12,7 +13,7 @@ export default async function ProjectsPage() {
   const userId = await getCurrentUserId();
   if (!userId) redirect("/login");
 
-  const projects = await listProjects();
+  const [projects, conn] = await Promise.all([listProjects(), getConnectionStatus(userId)]);
 
   return (
     <main className="min-h-screen bg-[#eef2f8] px-6 py-10 text-slate-800">
@@ -24,12 +25,27 @@ export default async function ProjectsPage() {
               สร้างเครื่องมือ Google Apps Script ด้วยการคุยกับ AI
             </p>
           </div>
-          <Link
-            href="/connect"
-            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-emerald-400 hover:text-emerald-600"
-          >
-            เชื่อมต่อ Google
-          </Link>
+          {conn.connected && conn.status === "active" ? (
+            <Link
+              href="/connect"
+              className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
+              title="จัดการการเชื่อมต่อ Google"
+            >
+              <CheckCircleIcon className="h-4 w-4" />
+              Google เชื่อมแล้ว
+            </Link>
+          ) : (
+            <Link
+              href="/connect"
+              className={`rounded-full border px-4 py-2 text-sm font-medium shadow-sm transition ${
+                conn.status === "needs_reauth"
+                  ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                  : "border-slate-300 bg-white text-slate-600 hover:border-emerald-400 hover:text-emerald-600"
+              }`}
+            >
+              {conn.status === "needs_reauth" ? "เชื่อมต่อ Google ใหม่" : "เชื่อมต่อ Google"}
+            </Link>
+          )}
         </header>
 
         {/* new project */}

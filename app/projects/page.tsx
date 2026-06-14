@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircleIcon, GlobeAltIcon, InboxIcon, TableCellsIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, InboxIcon } from "@heroicons/react/24/outline";
 import { CreateProjectBar } from "@/components/projects/CreateProjectBar";
+import { ProjectCard } from "@/components/projects/ProjectCard";
 import { getConnectionStatus } from "@/lib/google-connection";
 import { getCurrentUserId, getDeployedMap, listProjects } from "@/lib/projects";
 
 export const metadata = { title: "โปรเจกต์ของฉัน — easygas" };
-
-const KIND_LABEL: Record<string, string> = { webapp: "เว็บแอป", bound: "ผูก Sheet" };
 
 export default async function ProjectsPage() {
   const userId = await getCurrentUserId();
@@ -77,56 +76,9 @@ export default async function ProjectsPage() {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((p) => {
-              const isBound = p.kind === "bound";
-              return (
-                <Link
-                  key={p.id}
-                  href={`/projects/${p.id}`}
-                  className="group relative overflow-hidden rounded-2xl border border-white/70 bg-white p-5 shadow-[0_8px_24px_rgba(60,70,110,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(60,70,110,0.13)]"
-                >
-                  <span
-                    className={`absolute inset-x-0 top-0 h-1 ${isBound ? "bg-blue-400" : "bg-emerald-400"}`}
-                  />
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-                        isBound ? "bg-blue-50 text-blue-500" : "bg-emerald-50 text-emerald-500"
-                      }`}
-                    >
-                      {isBound ? <TableCellsIcon className="h-5 w-5" /> : <GlobeAltIcon className="h-5 w-5" />}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="line-clamp-2 font-semibold leading-snug text-slate-800 group-hover:text-emerald-600">
-                        {p.name}
-                      </h3>
-                      <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
-                        {KIND_LABEL[p.kind] ?? p.kind}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center justify-between gap-2">
-                    <p className="text-xs text-slate-400">
-                      แก้ไข{" "}
-                      {new Date(p.updated_at).toLocaleDateString("th-TH", {
-                        day: "numeric",
-                        month: "short",
-                      })}
-                    </p>
-                    {deployed[p.id] ? (
-                      <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
-                        <CheckCircleIcon className="h-3 w-3" />
-                        deploy แล้ว
-                      </span>
-                    ) : (
-                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400">
-                        ยังไม่ deploy
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
+            {projects.map((p) => (
+              <ProjectCard key={p.id} project={p} deployUrl={deployed[p.id]} />
+            ))}
           </div>
         )}
       </div>

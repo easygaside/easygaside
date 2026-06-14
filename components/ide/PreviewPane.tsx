@@ -28,8 +28,19 @@ const SHIM = `<script>
   ['log','info','warn','error'].forEach(function(l){var o=console[l];console[l]=function(){post(l,arguments);if(o)o.apply(console,arguments)}});
   window.onerror=function(m,s,line,col){post('error',[m+' ('+line+':'+col+')']);return false};
   window.addEventListener('unhandledrejection',function(ev){post('error',['Unhandled: '+((ev.reason&&ev.reason.message)||ev.reason)])});
-  var noop=function(){return g};var g=new Proxy(noop,{get:function(){return noop},apply:function(){return g}});
-  window.google={script:{run:g,host:{close:noop,setHeight:noop},url:{}}};
+  var noop=function(){};
+  // google.script.run is stubbed in preview (no server). Log each server call so the console
+  // shows activity and explains why data-loading "hangs" here — handlers never fire without deploy.
+  var BUILDERS={withSuccessHandler:1,withFailureHandler:1,withUserObject:1};
+  var runner=new Proxy({},{get:function(_,prop){
+    return function(){
+      if(BUILDERS[prop]) return runner;
+      var a=Array.prototype.map.call(arguments,ser).join(', ');
+      post('info',['google.script.run.'+String(prop)+'('+a+') — จำลอง: ต้อง Deploy ถึงจะดึงข้อมูลจริง']);
+      return runner;
+    };
+  }});
+  window.google={script:{run:runner,host:{close:noop,setHeight:noop},url:{}}};
 })();
 </script>`;
 
@@ -160,7 +171,7 @@ export function PreviewPane() {
           Console
         </div>
         {logs.length === 0 ? (
-          <div className="text-slate-600">— ยังไม่มี log —</div>
+          <div className="text-slate-600">— ยังไม่มี log — (จะโชว์ error และการเรียก server จากตัวอย่าง)</div>
         ) : (
           logs.map((l, i) => (
             <div

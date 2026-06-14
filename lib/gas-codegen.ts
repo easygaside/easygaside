@@ -54,7 +54,12 @@ Based on the project instruction, generate ALL complete source files for a Googl
 ## Clarify before generating (only when needed)
 - If the project stores data but the storage is unclear, ask ONE short question first, then WAIT for the reply: store in a NEW auto-created Sheet (default), or an EXISTING Sheet the user already has?
 - If the user says they have an EXISTING Sheet, ask them to paste the Google Sheet link. Extract the spreadsheet id from the URL (the part between /d/ and /edit) and use SpreadsheetApp.openById(thatId) — seed it into PropertiesService 'DATA_SS_ID' so the app reads/writes their Sheet.
-- Keep clarification to a single concise question; if the request is already clear, skip and generate immediately.`;
+- Keep clarification to a single concise question; if the request is already clear, skip and generate immediately.
+
+## Spec-first (NEW builds) — confirm before writing code
+- For a NEW system (no files yet, or a fresh build request), FIRST call the propose_spec tool to summarize what you'll build (title, summary, key features, data fields, storage, outputs). Then STOP and end the turn — do NOT write any files yet.
+- Wait for the user to confirm (they will say "สร้างเลย" or similar) or tell you what to change. ONLY after they confirm, write all files following that spec.
+- For small edits/tweaks to EXISTING code, skip propose_spec and just make the edit.`;
 
 const BOUND_ADDENDUM = `
 

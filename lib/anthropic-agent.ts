@@ -4,6 +4,7 @@ import { reviewProject } from "@/lib/critic";
 import { retrieveContext } from "@/lib/retrieval";
 import { deleteFile, getFile, getFiles, writeFile } from "@/lib/files";
 import { appendMessages, getHistory } from "@/lib/messages";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { EgsProject } from "@/types/db";
 
 /**
@@ -22,12 +23,23 @@ function pickModel(turn: "codegen" | "plan"): string {
 const MAX_ITERATIONS = 8;
 const MAX_TOKENS = 8000;
 
+// ── project spec (Guided UX §5 — proposed before generating, confirmed by the user) ──
+export interface ProjectSpec {
+  title: string;
+  summary: string;
+  features: string[];
+  dataModel?: string[];
+  storage?: string;
+  outputs?: string[];
+}
+
 // ── SSE events emitted to the client ──
 export type AgentEvent =
   | { type: "text"; delta: string }
   | { type: "tool_call"; name: string; input: unknown }
   | { type: "file_mutation"; op: "write" | "edit" | "delete"; path: string; content?: string }
   | { type: "lint"; messages: string[] }
+  | { type: "spec"; spec: ProjectSpec }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -73,6 +85,31 @@ export const EGS_TOOLS: Anthropic.Tool[] = [
     name: "read_project",
     description: "อ่านไฟล์ทั้งหมดในโปรเจกต์ปัจจุบัน",
     input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "propose_spec",
+    description:
+      "สรุปสิ่งที่ผู้ใช้ต้องการเป็น spec แล้วแสดงให้ผู้ใช้ยืนยันก่อนเขียนโค้ด — เรียกตอนเริ่มงานใหม่ที่ยังไม่ยืนยัน แล้วหยุดรอผู้ใช้ (อย่าเขียนไฟล์ในเทิร์นเดียวกัน)",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "ชื่อระบบสั้น ๆ" },
+        summary: { type: "string", description: "สรุประบบ 1-2 ประโยค" },
+        features: { type: "array", items: { type: "string" }, description: "ฟีเจอร์หลักเป็นข้อ ๆ" },
+        dataModel: {
+          type: "array",
+          items: { type: "string" },
+          description: "ข้อมูล/คอลัมน์ที่เก็บ เช่น ชื่อ, เบอร์โทร, วันที่",
+        },
+        storage: { type: "string", description: "ที่เก็บข้อมูล เช่น 'Google Sheet ใหม่' หรือ 'ชีทเดิม (ลิงก์)'" },
+        outputs: {
+          type: "array",
+          items: { type: "string" },
+          description: "ผลลัพธ์/การกระทำ เช่น ส่งอีเมลยืนยัน, พิมพ์ PDF",
+        },
+      },
+      required: ["title", "summary", "features"],
+    },
   },
 ];
 
@@ -151,6 +188,37 @@ async function executeEgsTool(
       const files = await getFiles(projectId);
       const body = files.map((f) => `=== ${f.path} ===\n${f.content}`).join("\n\n");
       return { isError: false, content: body || "(ยังไม่มีไฟล์)" };
+    }
+    if (name === "propose_spec") {
+      const spec: ProjectSpec = {
+        title: String(input.title ?? ""),
+        summary: String(input.summary ?? ""),
+        features: Array.isArray(input.features) ? input.features.map(String) : [],
+        dataModel: Array.isArray(input.dataModel) ? input.dataModel.map(String) : undefined,
+        storage: input.storage ? String(input.storage) : undefined,
+        outputs: Array.isArray(input.outputs) ? input.outputs.map(String) : undefined,
+      };
+      // persist (merge — keep creation-time keys like webOnlyReasons) for later re-check
+      try {
+        const svc = createServiceClient();
+        const { data } = await svc
+          .from("egs_projects")
+          .select("spec")
+          .eq("id", projectId)
+          .maybeSingle<{ spec: Record<string, unknown> | null }>();
+        await svc
+          .from("egs_projects")
+          .update({ spec: { ...(data?.spec ?? {}), ...spec }, updated_at: new Date().toISOString() })
+          .eq("id", projectId);
+      } catch (e) {
+        console.error("[agent] store spec failed:", e);
+      }
+      emit({ type: "spec", spec });
+      return {
+        isError: false,
+        content:
+          "แสดงสรุป spec ให้ผู้ใช้แล้ว — จบเทิร์นนี้ รอผู้ใช้กด 'สร้างเลย' หรือบอกที่อยากแก้ ก่อนค่อยเขียนไฟล์ (อย่าเรียก tool อื่นต่อในเทิร์นนี้)",
+      };
     }
     return { isError: true, content: `ไม่รู้จัก tool: ${name}` };
   } catch (e) {

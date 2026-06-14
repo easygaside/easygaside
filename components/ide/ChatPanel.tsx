@@ -4,12 +4,22 @@ import { useEffect, useRef, useState } from "react";
 import { ChatBubbleLeftRightIcon, PaperAirplaneIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
 
+interface ProjectSpec {
+  title: string;
+  summary: string;
+  features: string[];
+  dataModel?: string[];
+  storage?: string;
+  outputs?: string[];
+}
+
 // mirror of lib/anthropic-agent AgentEvent (defined locally to avoid pulling server-only code)
 type AgentEvent =
   | { type: "text"; delta: string }
   | { type: "tool_call"; name: string; input: unknown }
   | { type: "file_mutation"; op: "write" | "edit" | "delete"; path: string; content?: string }
   | { type: "lint"; messages: string[] }
+  | { type: "spec"; spec: ProjectSpec }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -38,6 +48,7 @@ export function ChatPanel({ projectId }: { projectId: string }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [pendingSpec, setPendingSpec] = useState<ProjectSpec | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,6 +70,7 @@ export function ChatPanel({ projectId }: { projectId: string }) {
     if (!text) setInput("");
     setBusy(true);
     setStatus("");
+    setPendingSpec(null);
     setMessages((m) => [...m, { role: "user", text: msg }, { role: "assistant", text: "" }]);
 
     try {
@@ -92,6 +104,7 @@ export function ChatPanel({ projectId }: { projectId: string }) {
           else if (ev.type === "file_mutation")
             applyMutation({ op: ev.op, path: ev.path, content: ev.content });
           else if (ev.type === "lint") setStatus(ev.messages.join(" · "));
+          else if (ev.type === "spec") setPendingSpec(ev.spec);
           else if (ev.type === "error") appendAssistant(`\n\n[ผิดพลาด: ${ev.message}]`);
           else if (ev.type === "done") setStatus("");
         }
@@ -175,6 +188,42 @@ export function ChatPanel({ projectId }: { projectId: string }) {
             </div>
           </div>
         ))}
+
+        {pendingSpec && (
+          <div className="rounded-2xl border border-emerald-200 bg-white p-3.5 shadow-sm">
+            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-emerald-700">
+              <SparklesIcon className="h-4 w-4" />
+              สรุปสิ่งที่จะสร้าง
+            </div>
+            <p className="mt-1.5 text-[13px] font-semibold text-slate-800">{pendingSpec.title}</p>
+            {pendingSpec.summary && <p className="text-[12px] text-slate-500">{pendingSpec.summary}</p>}
+            {pendingSpec.features.length > 0 && (
+              <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[12px] text-slate-600">
+                {pendingSpec.features.map((f, i) => (
+                  <li key={i}>{f}</li>
+                ))}
+              </ul>
+            )}
+            {pendingSpec.dataModel && pendingSpec.dataModel.length > 0 && (
+              <p className="mt-2 text-[11px] text-slate-500">ข้อมูล: {pendingSpec.dataModel.join(" · ")}</p>
+            )}
+            {pendingSpec.storage && (
+              <p className="text-[11px] text-slate-500">เก็บที่: {pendingSpec.storage}</p>
+            )}
+            {pendingSpec.outputs && pendingSpec.outputs.length > 0 && (
+              <p className="text-[11px] text-slate-500">ผลลัพธ์: {pendingSpec.outputs.join(" · ")}</p>
+            )}
+            <button
+              onClick={() => send("ยืนยัน สร้างเลยตาม spec ที่สรุปไว้")}
+              disabled={busy}
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-500 py-2 text-[13px] font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
+            >
+              <SparklesIcon className="h-4 w-4" />
+              สร้างเลย
+            </button>
+            <p className="mt-1.5 text-center text-[11px] text-slate-400">หรือพิมพ์บอกสิ่งที่อยากแก้</p>
+          </div>
+        )}
       </div>
 
       <div className="border-t border-slate-200/70 p-3">

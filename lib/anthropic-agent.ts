@@ -22,7 +22,7 @@ function pickModel(turn: "codegen" | "plan"): string {
 }
 
 const MAX_ITERATIONS = 8;
-const REPAIR_MAX_ITERATIONS = 4; // critic auto-repair is bounded tighter so it can't run a long turn
+const REPAIR_MAX_ITERATIONS = 6; // critic auto-repair — enough for a server+client multi-file fix, still bounded
 const MAX_TOKENS = 16000; // higher cap → a big file rarely gets truncated mid-tool_use (would poison history)
 
 // ── project spec (Guided UX §5 — proposed before generating, confirmed by the user) ──
@@ -238,6 +238,8 @@ export interface RunAgentArgs {
   turn?: "codegen" | "plan";
   /** iteration cap for this turn (critic repair passes a smaller value). Defaults to MAX_ITERATIONS. */
   maxIterations?: number;
+  /** internal turn (e.g. the critic auto-repair) — suppresses user-facing "hit the cap" notes */
+  internal?: boolean;
   emit: Emit;
 }
 
@@ -266,9 +268,10 @@ async function runTurn(
     images = [],
     turn = "codegen",
     maxIterations = MAX_ITERATIONS,
+    internal = false,
     emit,
   }: RunAgentArgs,
-): Promise<{ mutated: boolean }> {
+): Promise<{ mutated: boolean; capped: boolean }> {
   const history = await getHistory(projectId);
 
   // RAG seam (lib/retrieval.ts) — empty today. Prepended to the user message so the cached
@@ -312,6 +315,7 @@ async function runTurn(
   ];
 
   let mutated = false; // did any write/edit/delete actually change a file this turn?
+  let capped = false; // did the turn stop early (iteration cap / truncation) with work pending?
   for (let iter = 0; iter < maxIterations; iter++) {
     const stream = client.messages.stream({
       model: pickModel(turn),
@@ -335,10 +339,12 @@ async function runTurn(
           ? textBlocks
           : "เนื้อหายาวเกินรอบเดียว") as Anthropic.MessageParam["content"],
       });
-      emit({
-        type: "text",
-        delta: '\n\n(เนื้อหายาวเกินขีดจำกัดรอบเดียว — พิมพ์ "ทำต่อ" ให้เขียนส่วนที่เหลือได้ครับ)',
-      });
+      capped = true;
+      if (!internal)
+        emit({
+          type: "text",
+          delta: '\n\n(เนื้อหายาวเกินขีดจำกัดรอบเดียว — พิมพ์ "ทำต่อ" ให้เขียนส่วนที่เหลือได้ครับ)',
+        });
       break;
     }
 
@@ -394,10 +400,15 @@ async function runTurn(
     Array.isArray(tail.content) &&
     tail.content.some((b) => (b as { type?: string }).type === "tool_result");
   if (dangling) {
+    capped = true;
     messages.pop(); // tool_result (user)
     messages.pop(); // assistant tool_use turn
-    const note = "หยุดไว้ก่อน — ถึงขีดจำกัดรอบการแก้ในเทิร์นนี้ พิมพ์บอกต่อได้เลยครับ";
-    emit({ type: "text", delta: "\n" + note });
+    // user-facing note only for the user's OWN turn; the critic's internal repair handles this via
+    // its own close-out so the note doesn't leak into chat (and contradict "✓ แก้แล้ว").
+    const note = internal
+      ? "(แก้บางส่วนในรอบตรวจคุณภาพ)"
+      : "หยุดไว้ก่อน — ถึงขีดจำกัดรอบการแก้ในเทิร์นนี้ พิมพ์บอกต่อได้เลยครับ";
+    if (!internal) emit({ type: "text", delta: "\n" + note });
     messages.push({ role: "assistant", content: note });
   }
 
@@ -411,7 +422,7 @@ async function runTurn(
     persisted[0] = { role: "user", content: userMessage + note };
   }
   await appendMessages(projectId, persisted, turn);
-  return { mutated };
+  return { mutated, capped };
 }
 
 /**
@@ -442,13 +453,19 @@ async function runCriticGate(client: Anthropic, args: RunAgentArgs): Promise<voi
     const repairMsg =
       "ตรวจคุณภาพ (rulebook critic) พบปัญหาต่อไปนี้ แก้ไฟล์ที่เกี่ยวข้องให้เรียบร้อยด้วย edit_file/write_file:\n" +
       actionable.map((i) => `- ${i.file}: ${i.problem} — แนวทาง: ${i.fix}`).join("\n");
-    await runTurn(client, {
+    const repair = await runTurn(client, {
       ...args,
       userMessage: repairMsg,
       turn: "codegen",
       maxIterations: REPAIR_MAX_ITERATIONS,
+      internal: true,
     });
-    emit({ type: "text", delta: "\n\n✓ แก้ตามผลตรวจคุณภาพแล้ว" });
+    emit({
+      type: "text",
+      delta: repair.capped
+        ? '\n\n✓ แก้ตามผลตรวจคุณภาพบางส่วนแล้ว — ถ้ายังมีจุดค้าง พิมพ์ "แก้ต่อ" ได้ครับ'
+        : "\n\n✓ แก้ตามผลตรวจคุณภาพแล้ว",
+    });
   } catch (e) {
     // never leave the "กำลังแก้ให้อัตโนมัติ…" line hanging — close it out visibly.
     console.error("[agent] critic gate failed (non-fatal):", e);

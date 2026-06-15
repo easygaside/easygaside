@@ -1,7 +1,7 @@
 # easygas — HOSTING-PRICING: รายได้จากการโฮสต์ (stream ที่ 2)
 
-> สรุปจากการคุยเรื่องกลยุทธ์ 2026-06-15. เอกสารนี้ว่าด้วย **ค่าโฮสต์รายเดือน** — รายได้ก้อนที่ 2 ที่เสริมจาก AI credit
-> เกี่ยวข้อง: [[MONETIZATION.md]] (AI credit ตอน build = รายได้หลัก) · [[WEB-TARGET.md]] §6 (สถาปัตยกรรม hosting) · [[COST-MODEL.md]] (ต้นทุน data backend)
+> สรุปจากการคุยเรื่องกลยุทธ์ 2026-06-15. เอกสารนี้ว่าด้วย **เหตุผล/เศรษฐศาสตร์ฝั่งโฮสต์** — **ราคา/tier รวมเป็นแพ็กเกจเดียว (build × hosting) ที่ [[MONETIZATION.md]] §3 แล้ว** (เลิกแยก 2 ladder)
+> เกี่ยวข้อง: [[MONETIZATION.md]] §3 (แพ็กเกจรวม = source of truth ราคา) · [[WEB-TARGET.md]] §6 (สถาปัตยกรรม hosting) · [[COST-MODEL.md]] (ต้นทุน data backend)
 > **อัตราอ้างอิง ~34 THB/USD · ตัวเลขราคา cloud "verify ก่อนเดิมพันเงิน"**
 
 ---
@@ -37,22 +37,16 @@ GAS มีเพดานเชิงโครงสร้างที่แก�
 
 ---
 
-## 3. ตารางแพ็กเกจโฮสต์ (พร้อมขาย)
+## 3. ตารางแพ็กเกจ → รวมกับ build แล้ว
 
-| | **ฟรี** | **Starter** เริ่มต้น | **Business** ธุรกิจ | **Pro** มืออาชีพ |
-|---|---|---|---|---|
-| **รายเดือน** | ฿0 | **฿149** | **฿390** | **฿990** |
-| **รายปี** (ประหยัด ~2 เดือน) | — | ฿1,490 | ฿3,900 | ฿9,900 |
-| **โดเมน** | `ชื่อ.easygas.app` | **โดเมนตัวเอง 1** + SSL | โดเมนตัวเอง 1 | **โดเมนตัวเอง 5** |
-| **badge "สร้างด้วย EasyGAS"** | แสดง (บังคับ) | **เอาออก** | เอาออก | เอาออก |
-| **ใช้เชิงพาณิชย์** | **ไม่ได้** (ส่วนตัว/ทดลอง) | **ได้** | ได้ | ได้ |
-| **แอปที่โฮสต์** | 1 | 1 | 3 | 10 |
-| **always-on (ไม่หลับ)** | อาจหลับถ้าไม่มีคนเข้า 30 วัน | ✓ | ✓ | ✓ |
-| **backend ข้อมูล** | Sheet เท่านั้น | Sheet (+Supabase ถ้าต้องกล้อง) | Supabase (pooled) | **BYO-Supabase** |
-| **กล้อง/realtime** | ✗ | ✓ (ถ้าต่อ Supabase) | ✓ | ✓ |
-| **ป้องกันด้วยรหัส / หน้า coming soon** | — | — | ✓ | ✓ |
-| **ซัพพอร์ต** | docs/ชุมชน | LINE (best-effort) | LINE priority | LINE priority + onboarding |
-| **จ่ายเงิน** | — | PromptPay / LINE Pay / บัตร | เท่ากัน | เท่ากัน |
+**ตารางราคา/tier ย้ายไปรวมเป็นแพ็กเกจเดียว (build × hosting) ที่ [[MONETIZATION.md]] §3 แล้ว** (เคาะ 2026-06-15 — เลิกแยก 2 ladder). hosting capability ต่อ tier:
+
+- **Free** → GAS ฟรี + `ชื่อ.easygas.app` 1, มี badge, ห้ามเชิงพาณิชย์, Sheet
+- **Lite ฿149** → โดเมนตัวเอง 1, เอา badge ออก, ใช้เชิงพาณิชย์ได้, always-on, Sheet
+- **Starter ฿299** → + Supabase pooled (กล้อง/realtime)
+- **Pro ฿990** → โดเมนตัวเอง 5, BYO-Supabase, password/coming-soon page, priority
+
+เอกสารนี้เก็บเฉพาะ **เหตุผล/เศรษฐศาสตร์ฝั่ง hosting** (§1–2 ใครจ่าย, §4 cost, §5 retention, §6 ToS, §7 guardrails) — ราคาเป็น source of truth เดียวที่ MONETIZATION §3
 
 ## 4. ต้นทุนเรา vs รายได้ (ทำไมกำไร)
 

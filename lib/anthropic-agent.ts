@@ -42,6 +42,7 @@ export type AgentEvent =
   | { type: "file_mutation"; op: "write" | "edit" | "delete"; path: string; content?: string }
   | { type: "lint"; messages: string[] }
   | { type: "spec"; spec: ProjectSpec }
+  | { type: "generation"; id: string }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -245,16 +246,29 @@ export interface RunAgentArgs {
   emit: Emit;
 }
 
-export async function runAgentLoop(args: RunAgentArgs): Promise<void> {
+export interface AgentRunResult {
+  inputTokens: number;
+  outputTokens: number;
+  criticIssues: number;
+}
+
+export async function runAgentLoop(args: RunAgentArgs): Promise<AgentRunResult> {
   const client = new Anthropic(args.apiKey ? { apiKey: args.apiKey } : undefined); // BYOK or platform key
-  const { mutated } = await runTurn(client, args);
+  const main = await runTurn(client, args);
+  let inputTokens = main.inputTokens;
+  let outputTokens = main.outputTokens;
+  let criticIssues = 0;
   // Gate 1 — rulebook critic + one bounded auto-repair. Only when this turn actually changed files:
   // a pure Q&A turn ("ปกติไหม?") writes nothing, so re-reviewing the whole project there is wasted
   // cost + noise (and makes it look like it's checking on a loop). Skip plan turns too.
-  if ((args.turn ?? "codegen") === "codegen" && mutated) {
-    await runCriticGate(client, args);
+  if ((args.turn ?? "codegen") === "codegen" && main.mutated) {
+    const c = await runCriticGate(client, args);
+    criticIssues = c.issues;
+    inputTokens += c.inputTokens;
+    outputTokens += c.outputTokens;
   }
-  args.emit({ type: "done" });
+  // NOTE: the route emits `generation` (with the logged id) then `done`.
+  return { inputTokens, outputTokens, criticIssues };
 }
 
 /**
@@ -273,7 +287,7 @@ async function runTurn(
     internal = false,
     emit,
   }: RunAgentArgs,
-): Promise<{ mutated: boolean; capped: boolean }> {
+): Promise<{ mutated: boolean; capped: boolean; inputTokens: number; outputTokens: number }> {
   const history = await getHistory(projectId);
 
   // RAG seam (lib/retrieval.ts) — empty today. Prepended to the user message so the cached
@@ -318,6 +332,8 @@ async function runTurn(
 
   let mutated = false; // did any write/edit/delete actually change a file this turn?
   let capped = false; // did the turn stop early (iteration cap / truncation) with work pending?
+  let inputTokens = 0;
+  let outputTokens = 0;
   for (let iter = 0; iter < maxIterations; iter++) {
     const stream = client.messages.stream({
       model: pickModel(turn),
@@ -329,6 +345,8 @@ async function runTurn(
     stream.on("text", (delta: string) => emit({ type: "text", delta }));
 
     const final = await stream.finalMessage();
+    inputTokens += final.usage?.input_tokens ?? 0;
+    outputTokens += final.usage?.output_tokens ?? 0;
 
     // Truncated mid-tool_use (e.g. stop_reason "max_tokens" while emitting a large write_file):
     // the assistant message carries a tool_use we can't resolve. Persisting it poisons history
@@ -424,7 +442,7 @@ async function runTurn(
     persisted[0] = { role: "user", content: userMessage + note };
   }
   await appendMessages(projectId, persisted, turn);
-  return { mutated, capped };
+  return { mutated, capped, inputTokens, outputTokens };
 }
 
 /**
@@ -433,13 +451,16 @@ async function runTurn(
  * Findings are surfaced through the existing `text`/`lint` events (no client change). Non-fatal:
  * a critic failure never blocks the user's result.
  */
-async function runCriticGate(client: Anthropic, args: RunAgentArgs): Promise<void> {
+async function runCriticGate(
+  client: Anthropic,
+  args: RunAgentArgs,
+): Promise<{ issues: number; inputTokens: number; outputTokens: number }> {
   const { projectId, project, emit } = args;
   try {
     const review = await reviewProject(client, project, projectId);
     if (review.issues.length === 0) {
       emit({ type: "text", delta: "\n\n✓ ตรวจคุณภาพ (rulebook critic) — ผ่าน" });
-      return;
+      return { issues: 0, inputTokens: 0, outputTokens: 0 };
     }
 
     const lines = review.issues.map(
@@ -449,7 +470,7 @@ async function runCriticGate(client: Anthropic, args: RunAgentArgs): Promise<voi
     emit({ type: "lint", messages: review.issues.map((i) => `${i.file}: ${i.problem}`) });
 
     const actionable = review.issues.filter((i) => i.severity !== "low");
-    if (actionable.length === 0) return;
+    if (actionable.length === 0) return { issues: review.issues.length, inputTokens: 0, outputTokens: 0 };
 
     emit({ type: "text", delta: "\n\nกำลังแก้ให้อัตโนมัติ…\n" });
     const repairMsg =
@@ -468,9 +489,11 @@ async function runCriticGate(client: Anthropic, args: RunAgentArgs): Promise<voi
         ? '\n\n✓ แก้ตามผลตรวจคุณภาพบางส่วนแล้ว — ถ้ายังมีจุดค้าง พิมพ์ "แก้ต่อ" ได้ครับ'
         : "\n\n✓ แก้ตามผลตรวจคุณภาพแล้ว",
     });
+    return { issues: review.issues.length, inputTokens: repair.inputTokens, outputTokens: repair.outputTokens };
   } catch (e) {
     // never leave the "กำลังแก้ให้อัตโนมัติ…" line hanging — close it out visibly.
     console.error("[agent] critic gate failed (non-fatal):", e);
     emit({ type: "text", delta: "\n\n(ข้ามการแก้อัตโนมัติรอบนี้ — โค้ดที่สร้างยังใช้ได้ พิมพ์บอกถ้าอยากให้แก้จุดไหน)" });
+    return { issues: 0, inputTokens: 0, outputTokens: 0 };
   }
 }

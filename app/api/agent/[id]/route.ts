@@ -4,6 +4,8 @@ import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
 import { checkAndConsumeQuota, getAccessGate, getOwnApiKey } from "@/lib/beta";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { parseAttachedImages, storeChatImages, type AttachedImage } from "@/lib/chat-images";
+import { providerConfig } from "@/lib/llm/provider";
+import { logGeneration } from "@/lib/metrics";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 
@@ -87,6 +89,12 @@ export async function POST(
   // persist attachments to the project's history bucket (best-effort; never blocks the turn)
   if (images.length > 0) await storeChatImages(id, images);
 
+  // P1b will route by resolveProjectProvider(); only the Claude loop exists today, so we run + log
+  // 'claude' regardless of the assigned arm (don't misattribute Claude's metrics to another arm).
+  const provider = "claude" as const;
+  const model = providerConfig(provider).model;
+  const startedAt = Date.now();
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -96,10 +104,35 @@ export async function POST(
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
       };
       try {
-        await runAgentLoop({ projectId: id, project, userMessage: message, images, apiKey, emit });
+        const r = await runAgentLoop({ projectId: id, project, userMessage: message, images, apiKey, emit });
+        const genId = await logGeneration({
+          projectId: id,
+          userId: user.id,
+          provider,
+          model,
+          inputTokens: r.inputTokens,
+          outputTokens: r.outputTokens,
+          criticIssues: r.criticIssues,
+          durationMs: Date.now() - startedAt,
+          outcome: "ok",
+        });
+        if (genId) emit({ type: "generation", id: genId });
+        emit({ type: "done" });
       } catch (e) {
         console.error("[agent] loop error:", e);
+        await logGeneration({
+          projectId: id,
+          userId: user.id,
+          provider,
+          model,
+          inputTokens: 0,
+          outputTokens: 0,
+          criticIssues: 0,
+          durationMs: Date.now() - startedAt,
+          outcome: "error",
+        }).catch(() => {});
         emit({ type: "error", message: "agent_error" });
+        emit({ type: "done" });
       } finally {
         await releaseProjectRun(id); // always free the per-project lock
         closed = true;

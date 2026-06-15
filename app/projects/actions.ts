@@ -49,3 +49,13 @@ export async function deleteProjectAction(id: string) {
   if (error) throw new Error(`deleteProject: ${error.message}`);
   revalidatePath("/projects");
 }
+
+/** Rate a generation (1 = 👍, -1 = 👎) for the A/B experiment. RLS scopes the update to the owner. */
+export async function rateGenerationAction(generationId: string, rating: 1 | -1): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("egs_generations").update({ rating }).eq("id", generationId);
+}

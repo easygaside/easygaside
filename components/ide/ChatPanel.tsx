@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ChatBubbleLeftRightIcon,
+  HandThumbDownIcon,
+  HandThumbUpIcon,
   PaperAirplaneIcon,
   PhotoIcon,
   SparklesIcon,
@@ -10,6 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
 import { compressImage, type CompressedImage } from "@/lib/client/image-compress";
+import { rateGenerationAction } from "@/app/projects/actions";
 import { GuidedWizard } from "./GuidedWizard";
 
 const MAX_IMAGES = 4;
@@ -30,6 +33,7 @@ type AgentEvent =
   | { type: "file_mutation"; op: "write" | "edit" | "delete"; path: string; content?: string }
   | { type: "lint"; messages: string[] }
   | { type: "spec"; spec: ProjectSpec }
+  | { type: "generation"; id: string }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -71,6 +75,8 @@ export function ChatPanel({
   const [wizardOpen, setWizardOpen] = useState(false);
   const [images, setImages] = useState<CompressedImage[]>([]);
   const [attaching, setAttaching] = useState(false);
+  const [genId, setGenId] = useState<string | null>(null); // latest generation, for 👍/👎 rating
+  const [rated, setRated] = useState<1 | -1 | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -101,6 +107,16 @@ export function ChatPanel({
     }
   }
 
+  async function rate(v: 1 | -1) {
+    if (!genId || rated) return;
+    setRated(v);
+    try {
+      await rateGenerationAction(genId, v);
+    } catch {
+      /* ignore */
+    }
+  }
+
   function appendAssistant(t: string) {
     setMessages((m) => {
       const c = [...m];
@@ -122,6 +138,8 @@ export function ChatPanel({
     setBusy(true);
     setStatus("");
     setPendingSpec(null);
+    setGenId(null);
+    setRated(null);
     setMessages((m) => [
       ...m,
       { role: "user", text: msg, images: attached.map((a) => a.dataUrl) },
@@ -175,6 +193,7 @@ export function ChatPanel({
             applyMutation({ op: ev.op, path: ev.path, content: ev.content });
           else if (ev.type === "lint") setStatus(ev.messages.join(" · "));
           else if (ev.type === "spec") setPendingSpec(ev.spec);
+          else if (ev.type === "generation") setGenId(ev.id);
           else if (ev.type === "error") appendAssistant(`\n\n[ผิดพลาด: ${ev.message}]`);
           else if (ev.type === "done") {
             setStatus("");
@@ -309,6 +328,32 @@ export function ChatPanel({
             </div>
           </div>
         ))}
+
+        {genId && !busy && (
+          <div className="flex items-center gap-2 px-1 text-[11px] text-slate-400 dark:text-slate-500">
+            {rated ? (
+              <span>ขอบคุณสำหรับฟีดแบ็ก 🙏</span>
+            ) : (
+              <>
+                <span>ผลลัพธ์นี้โอเคไหม?</span>
+                <button
+                  onClick={() => rate(1)}
+                  aria-label="ดี"
+                  className="grid h-6 w-6 place-items-center rounded-lg transition hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400"
+                >
+                  <HandThumbUpIcon className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => rate(-1)}
+                  aria-label="ไม่ดี"
+                  className="grid h-6 w-6 place-items-center rounded-lg transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                >
+                  <HandThumbDownIcon className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {pendingSpec && (
           <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-white dark:bg-slate-900 p-3.5 shadow-sm">

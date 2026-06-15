@@ -1,6 +1,8 @@
 # easygas — โมเดลหาเงิน (จาก research workflow, 2026-06-13)
 
 > วิจัยราคาคู่แข่งปี 2026 (bolt.new/Lovable/v0/Replit/Copilot) + คำนวณ unit economics จากราคา Anthropic จริง + ตลาดไทย
+>
+> **ขอบเขต:** เอกสารนี้ = รายได้ก้อน **AI credit (ตอน build) = รายได้หลัก ทุกคนจ่าย**. รายได้ก้อนที่ 2 (ค่าโฮสต์รายเดือน เฉพาะกลุ่ม "โตเกิน GAS") อยู่ใน [[HOSTING-PRICING.md]] — สองก้อนนี้แยกกัน อย่าปน
 
 ## 1. คำตอบสั้น
 **Subscription รายเดือนที่ผูก "เครดิต AI" ในแต่ละแพ็ก + ขายเครดิตเติม (top-up) ผ่าน PromptPay + เปิด BYOK (เอา Anthropic key ตัวเองมาใส่) สำหรับ power user** — ไม่ใช่ flat unlimited (เจ๊งถ้าคนใช้หนัก) และไม่ใช่ pure credits เปล่าๆ (ลูกค้าไทยกลัว "กดทีไรเสียเงิน")

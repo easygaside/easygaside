@@ -6,7 +6,7 @@
 ## สถานะ implement (2026-06-14)
 - ✅ **Gate 0 — STATIC** `validateGasFiles` (`lib/gas-codegen.ts`) คืน `is_error` ในลูป tool-use → AI ซ่อมในเทิร์นเดิม (v1 regex; AST `lib/gas-lint.ts` ยังไม่ทำ)
 - ✅ **Gate 1 — RULEBOOK CRITIC** `lib/critic.ts#reviewProject` (LLM-as-judge, sonnet 1 call) + auto-repair 1 รอบใน `lib/anthropic-agent.ts#runCriticGate` → emit ผ่าน `text`/`lint` (ไม่แตะ client)
-- ⏳ **Gate 2 — DYNAMIC run-and-repair** (THE moat, §4) — ยังไม่ทำ (ต่อจาก scratch /dev ที่ `lib/deploy.ts#pushScratch` มีแล้ว)
+- 🟡 **Gate 2 — DYNAMIC run-and-repair** (THE moat, §4) — **Channel 1 (HTTP probe /exec) ship แล้ว** เป็นปุ่ม "ทดสอบรันจริง" on-demand (`lib/gas-verify.ts` + `app/api/verify/[id]`); probe `/exec` (anonymous) ไม่ใช่ `/dev` (ต้อง owner login). Channel 2 (scripts.run) / Channel 3 (Cloud Logging) ยังไม่ทำ — ดู [[GATE2.md]]
 - 🪝 **RAG** — seam `lib/retrieval.ts#retrieveContext` วางแล้ว (คืนค่าว่าง) — แผนเต็มใน [[RAG-DESIGN.md]]
 
 ## 1. moat ใน 1 ประโยค

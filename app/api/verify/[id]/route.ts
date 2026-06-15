@@ -79,6 +79,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             verified = true;
             break;
           }
+          if (probe.authRequired) {
+            // not a code bug — the owner just needs to authorize once. Don't burn a repair on it.
+            emit({ type: "text", delta: `\n\n🔐 ${probe.error}` });
+            emit({
+              type: "text",
+              delta: '\n\nเปิดแอปของคุณ 1 ครั้ง กด Review permissions → Advanced → Allow (อนุญาตครั้งเดียว) แล้วค่อยกด "ทดสอบรันจริง" อีกที',
+            });
+            break;
+          }
           emit({ type: "text", delta: `\n\n🔧 พบปัญหาตอนรันจริง:\n${probe.error ?? "(ไม่ทราบสาเหตุ)"}` });
           if (i === MAX_REPAIRS) {
             emit({

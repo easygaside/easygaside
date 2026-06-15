@@ -62,6 +62,38 @@ export async function setDailyLimitAction(limit: number): Promise<void> {
   revalidatePath("/admin");
 }
 
+/** Beta allowlist: add an email (who can use the closed beta). Idempotent. */
+export async function addAllowlistEmailAction(email: string): Promise<void> {
+  await requireSuperAdmin();
+  const e = email.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error("bad_email");
+  const svc = createServiceClient();
+  const { error } = await svc.from("egs_beta_allowlist").upsert({ email: e }, { onConflict: "email" });
+  if (error) throw new Error(`addAllowlist: ${error.message}`);
+  revalidatePath("/admin");
+}
+
+/** Beta allowlist: remove an email. */
+export async function removeAllowlistEmailAction(email: string): Promise<void> {
+  await requireSuperAdmin();
+  const svc = createServiceClient();
+  const { error } = await svc.from("egs_beta_allowlist").delete().eq("email", email);
+  if (error) throw new Error(`removeAllowlist: ${error.message}`);
+  revalidatePath("/admin");
+}
+
+/** Mark a problem report open/done (triage of the failure-capture flywheel). */
+export async function setReportStatusAction(id: string, status: "open" | "done"): Promise<void> {
+  await requireSuperAdmin();
+  const svc = createServiceClient();
+  const { error } = await svc
+    .from("egs_reports")
+    .update({ status: status === "done" ? "done" : "open" })
+    .eq("id", id);
+  if (error) throw new Error(`setReportStatus: ${error.message}`);
+  revalidatePath("/admin");
+}
+
 /** Evenly distribute ALL users across the arms (round-robin) — for the even split. */
 export async function autoBalanceArmsAction(): Promise<void> {
   await requireSuperAdmin();

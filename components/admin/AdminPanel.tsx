@@ -12,6 +12,8 @@ import {
   setUserArmAction,
 } from "@/app/admin/actions";
 import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/provider";
+import { AllowlistManager, type AllowlistEntry } from "./AllowlistManager";
+import { ReportsViewer, type FailureReport } from "./ReportsViewer";
 
 export interface AdminUser {
   id: string;
@@ -147,6 +149,9 @@ export function AdminPanel({
   summary,
   projects,
   daily,
+  allowlist,
+  reports,
+  providerKeys,
 }: {
   users: AdminUser[];
   metrics: ArmMetric[];
@@ -156,6 +161,9 @@ export function AdminPanel({
   summary: TokenSummary;
   projects: ProjectTokens[];
   daily: DailyPoint[];
+  allowlist: AllowlistEntry[];
+  reports: FailureReport[];
+  providerKeys: Record<LlmProvider, boolean>;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -222,7 +230,7 @@ export function AdminPanel({
         <ArrowLeftIcon className="h-4 w-4" />
         กลับไปหน้าโปรเจกต์
       </Link>
-      <h1 className="text-2xl font-bold">Admin — A/B โมเดล</h1>
+      <h1 className="text-2xl font-bold">Admin — ข้อมูล &amp; ตั้งค่า</h1>
 
       {/* token summary */}
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -270,6 +278,22 @@ export function AdminPanel({
               {p}
               {defaultProvider === p ? " ✓" : ""}
             </button>
+          ))}
+        </div>
+
+        <p className="mb-1.5 mt-4 text-xs text-slate-500 dark:text-slate-400">สถานะ API key (จาก env) — provider ที่ไม่มี key จะใช้ไม่ได้:</p>
+        <div className="flex flex-wrap gap-1.5">
+          {LLM_PROVIDERS.map((p) => (
+            <span
+              key={p}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
+                providerKeys[p]
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400"
+              }`}
+            >
+              {p} {providerKeys[p] ? "✓" : "✗ ไม่มี key"}
+            </span>
           ))}
         </div>
 
@@ -403,6 +427,9 @@ export function AdminPanel({
           </div>
         ))}
       </div>
+
+      <AllowlistManager emails={allowlist} />
+      <ReportsViewer reports={reports} />
     </main>
   );
 }

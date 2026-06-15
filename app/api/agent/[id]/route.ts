@@ -4,7 +4,8 @@ import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
 import { checkAndConsumeQuota, getAccessGate, getOwnApiKey } from "@/lib/beta";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { parseAttachedImages, storeChatImages, type AttachedImage } from "@/lib/chat-images";
-import { providerConfig } from "@/lib/llm/provider";
+import { providerConfig, resolveProjectProvider } from "@/lib/llm/provider";
+import { runOpenAiAgentLoop } from "@/lib/openai-agent";
 import { logGeneration } from "@/lib/metrics";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
@@ -69,10 +70,24 @@ export async function POST(
       { status: 409 },
     );
 
-  // BYOK: run on the user's own key (and skip the daily cap — their cost). Else the platform key
-  // under a per-user daily generation cap. (lock acquired → release it on any early exit below.)
-  const apiKey = (await getOwnApiKey(user.id)) ?? undefined;
+  // Route to the user's assigned provider arm (locks the project to it on first generation).
+  const provider = await resolveProjectProvider(id, user.id);
+  const cfg = providerConfig(provider);
+  const model = cfg.model;
+
+  // Key: the Claude arm may use the user's own (BYOK) key; otherwise the platform env key for the arm.
+  const byok = provider === "claude" ? (await getOwnApiKey(user.id)) ?? undefined : undefined;
+  const apiKey = byok ?? cfg.apiKey;
   if (!apiKey) {
+    await releaseProjectRun(id);
+    return NextResponse.json(
+      { error: "provider_not_configured", message: `ยังไม่ได้ตั้งค่า API key ของ ${cfg.label} ในระบบ` },
+      { status: 400 },
+    );
+  }
+
+  // daily cap applies to the PLATFORM key only (BYOK = own cost → skip).
+  if (!byok) {
     const quota = await checkAndConsumeQuota(user.id);
     if (!quota.ok) {
       await releaseProjectRun(id);
@@ -89,10 +104,6 @@ export async function POST(
   // persist attachments to the project's history bucket (best-effort; never blocks the turn)
   if (images.length > 0) await storeChatImages(id, images);
 
-  // P1b will route by resolveProjectProvider(); only the Claude loop exists today, so we run + log
-  // 'claude' regardless of the assigned arm (don't misattribute Claude's metrics to another arm).
-  const provider = "claude" as const;
-  const model = providerConfig(provider).model;
   const startedAt = Date.now();
 
   const encoder = new TextEncoder();
@@ -104,7 +115,13 @@ export async function POST(
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
       };
       try {
-        const r = await runAgentLoop({ projectId: id, project, userMessage: message, images, apiKey, emit });
+        const r =
+          provider === "claude"
+            ? await runAgentLoop({ projectId: id, project, userMessage: message, images, apiKey, emit })
+            : await runOpenAiAgentLoop(
+                { projectId: id, project, userMessage: message, images, emit },
+                { ...cfg, apiKey },
+              );
         const genId = await logGeneration({
           projectId: id,
           userId: user.id,

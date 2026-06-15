@@ -71,3 +71,36 @@ export async function appendMessages(
   const { error } = await svc.from("egs_messages").insert(rows);
   if (error) throw new Error(`appendMessages: ${error.message}`);
 }
+
+/**
+ * Provider-neutral history for the OpenAI-format loop (ChatGPT/DeepSeek). content jsonb holds the
+ * FULL provider message object (incl. tool_calls / tool_call_id), so we store + return it verbatim.
+ * Ordered by seq (stable). No compaction yet (acceptable for the A/B's mostly-short sessions).
+ */
+export async function getRawHistory(projectId: string): Promise<unknown[]> {
+  const svc = createServiceClient();
+  const { data, error } = await svc
+    .from("egs_messages")
+    .select("content")
+    .eq("project_id", projectId)
+    .order("seq", { ascending: true });
+  if (error) throw new Error(`getRawHistory: ${error.message}`);
+  return (data ?? []).map((m) => m.content);
+}
+
+export async function appendRawMessages(
+  projectId: string,
+  msgs: { role: string; content: unknown }[],
+  turnType: TurnType = "codegen",
+): Promise<void> {
+  if (msgs.length === 0) return;
+  const svc = createServiceClient();
+  const rows = msgs.map((m) => ({
+    project_id: projectId,
+    role: m.role,
+    content: m.content as unknown,
+    turn_type: turnType,
+  }));
+  const { error } = await svc.from("egs_messages").insert(rows);
+  if (error) throw new Error(`appendRawMessages: ${error.message}`);
+}

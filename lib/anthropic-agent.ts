@@ -143,7 +143,7 @@ async function lintWritten(path: string, content: string, emit: Emit): Promise<T
   return { isError: false, content: `บันทึก ${path} เรียบร้อย` };
 }
 
-async function executeEgsTool(
+export async function executeEgsTool(
   projectId: string,
   name: string,
   input: Record<string, unknown>,

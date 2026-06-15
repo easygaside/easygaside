@@ -457,6 +457,9 @@ async function runCriticGate(
 ): Promise<{ issues: number; inputTokens: number; outputTokens: number }> {
   const { projectId, project, emit } = args;
   try {
+    // Announce the phase BEFORE the review call (it takes a few seconds) so the user sees
+    // "done → now checking" instead of a silent gap that jumps straight to "found N bugs".
+    emit({ type: "text", delta: "\n\n✓ สร้างโค้ดเสร็จแล้ว — กำลังวิเคราะห์เพื่อตรวจสอบความถูกต้อง…" });
     const review = await reviewProject(client, project, projectId);
     if (review.issues.length === 0) {
       emit({ type: "text", delta: "\n\n✓ ตรวจคุณภาพ (rulebook critic) — ผ่าน" });

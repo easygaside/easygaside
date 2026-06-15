@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircleIcon, Cog6ToothIcon, FolderIcon, InboxIcon, RocketLaunchIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, Cog6ToothIcon, FolderIcon, InboxIcon, RocketLaunchIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import { CreateProjectBar } from "@/components/projects/CreateProjectBar";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { ReportButton } from "@/components/ReportButton";
@@ -41,6 +41,14 @@ export default async function ProjectsPage() {
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href="/styleshopping"
+                title="เลือกสไตล์/หาไอเดียให้เว็บคุณ"
+                className="flex h-9 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+              >
+                <Squares2X2Icon className="h-4 w-4" />
+                หาไอเดีย
+              </Link>
               <ReportButton />
               <Link
                 href="/settings"
@@ -99,7 +107,14 @@ export default async function ProjectsPage() {
                 <InboxIcon className="h-7 w-7" />
               </span>
             </div>
-            <p className="mt-3 text-sm">ยังไม่มีโปรเจกต์ — พิมพ์ด้านบนหรือกดตัวอย่างเพื่อเริ่มสร้างเลย</p>
+            <p className="mt-3 text-sm">ยังไม่มีโปรเจกต์ — พิมพ์ด้านบน หรือเริ่มจากการเลือกสไตล์</p>
+            <Link
+              href="/styleshopping"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-2xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.35)] transition hover:bg-emerald-400"
+            >
+              <Squares2X2Icon className="h-4 w-4" />
+              หาไอเดีย / เลือกสไตล์
+            </Link>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -7,7 +7,7 @@
 ลูกค้า non-coder ไม่รู้ศัพท์ ("sidebar คืออะไร") → ให้ **เดินดูตัวอย่างกดเล่นได้ + ชื่อรูปแบบ** แล้วหยิบใส่ตะกร้า → รวมเป็น **คำสั่งภาษาไทยก้อนเดียว (แก้ได้)** → เปิดโปรเจกต์ใหม่พร้อม prompt ในแชต ต่างจาก PromptCreator ตรงที่ **ครบลูปในระบบ** (ไม่ต้อง copy ไปแปะที่อื่น) + snippet ผูกกับ rulebook → output ตรง+ปลอดภัย
 
 ## สถานะ implement (2026-06-15)
-- ✅ `lib/style-catalog.ts` — data shape + **seed catalog** (7 หมวด ~14 ตัว): nav (sidebar/topbar/bottom) · buttons (rounded / +loading) · feedback (SweetAlert2 / toast) · theme (dark toggle) · data (table / KPI) · thai (PromptPay / พ.ศ. / leading-zero phone) · forms (clean)
+- ✅ `lib/style-catalog.ts` — data shape + **catalog ครบ 17 หมวด ~38 ตัว**: nav · buttons (+loading) · feedback (SweetAlert2/toast) · theme · data (table/KPI) · thai (PromptPay/พ.ศ./leading-zero) · forms · **notify (email/LINE push/LIFF)** · **auto (trigger/onFormSubmit)** · **search** · **report (chart/CSV-PDF/Doc-PDF)** · **media (photo/QR/Drive)** · **map** · **workflow (approval/stepper)** · **admin** · **auth (secure login/remember/role-SPA/single)** · **robust (pagination/autosave/offline)**
 - ✅ `/styleshopping` (`app/styleshopping/page.tsx` + `components/style/StyleShopping.tsx`) — public, browsable; preview ใน `<iframe sandbox="allow-scripts" srcDoc>`; ตะกร้า + ช่อง "อยากได้ระบบอะไร" + prompt แก้ได้ (มีปุ่ม "↺ สร้างใหม่จากที่เลือก" เมื่อแก้มือ)
 - ✅ kickoff hand-off: `newProjectReturnId(name)` (action, คืน id) → client `sessionStorage['egs:kickoff']` → `ChatPanel` อ่าน **one-shot** ตอน mount แล้ว prefill ช่องแชต (ไม่ auto-send — ให้ผู้ใช้กดเอง)
 - ✅ landing `/` ใหม่ (hero + features + แถบ Style Lab + teaser Showcase); ล็อกอินแล้ว redirect `/projects`
@@ -16,7 +16,7 @@
 `{ id, category, title, when (คำแนะนำไทย), promptSnippet (ฉีดเข้า prompt), previewHtml (self-contained รันใน iframe) }`
 รวม prompt: `สร้าง<purpose>\n\nโดยใช้สไตล์และองค์ประกอบเหล่านี้:\n- <snippet>…`
 
-## roadmap หมวดที่ยัง "ขาด" (จากที่เสนอ — ยังไม่ seed)
+## หมวดทั้งหมด (✅ seed ครบแล้ว 2026-06-15 — ขยาย/เพิ่มตัวอย่างต่อได้)
 🔧=GAS · 🇹🇭=ไทย · ✨=SPA · ⚠️=มี caveat
 - 12. แจ้งเตือน/ส่งข้อความ 🔧🇹🇭 — อีเมล (MailApp) · **LINE Messaging API push** (ไม่ใช่ LINE Notify ที่ปิดแล้ว) · LIFF
 - 13. ตั้งเวลา/อัตโนมัติ 🔧 — time-trigger (รายงาน/เตือนนัด) · onFormSubmit/onEdit

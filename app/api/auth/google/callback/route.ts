@@ -7,6 +7,22 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 
 /**
+ * Origin to redirect back to after the flow. Pinned to the configured OAuth callback origin
+ * (a required env) rather than request.url, which behind Railway's TLS-terminating proxy can
+ * surface as http://. This guarantees https in prod, follows a custom domain automatically,
+ * and blocks Host-header injection (we only ever redirect to our own fixed paths).
+ */
+function appOrigin(request: NextRequest): string {
+  try {
+    if (process.env.GOOGLE_OAUTH_REDIRECT_URI)
+      return new URL(process.env.GOOGLE_OAUTH_REDIRECT_URI).origin;
+  } catch {
+    /* fall through to the request origin */
+  }
+  return new URL(request.url).origin;
+}
+
+/**
  * GET /api/auth/google/callback?code=...&state=...
  *
  * Verifies state, exchanges the code, then:
@@ -20,7 +36,7 @@ export async function GET(request: NextRequest) {
   const state = url.searchParams.get("state");
   const oauthError = url.searchParams.get("error");
 
-  const origin = url.origin;
+  const origin = appOrigin(request);
   const fail = (reason: string) => NextResponse.redirect(new URL(`/login?error=${reason}`, origin));
 
   if (oauthError) return fail(oauthError);

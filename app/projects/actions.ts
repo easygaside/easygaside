@@ -7,22 +7,37 @@ import { detectCapabilityNeeds, routeTarget } from "@/lib/deployment-targets";
 import { createProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 
-export async function newProjectAction(formData: FormData) {
-  const name = String(formData.get("name") ?? "");
-
+function buildSpec(name: string): Record<string, unknown> {
   // Capability router (§J.3): record what the project seems to need + whether it wants a target
   // we don't build yet, so the IDE can warn honestly. Always created as GAS for now.
   const needs = detectCapabilityNeeds(name);
   const route = routeTarget(needs);
-  const spec: Record<string, unknown> = {
+  return {
     description: name.trim() || null,
     capabilityNeeds: needs,
     recommendedTarget: route.target,
     webOnlyReasons: route.notImplemented ? route.reasons : [],
   };
+}
 
-  const id = await createProject(name, "webapp", spec);
+export async function newProjectAction(formData: FormData) {
+  const name = String(formData.get("name") ?? "");
+  const id = await createProject(name, "webapp", buildSpec(name));
   redirect(`/projects/${id}`);
+}
+
+/**
+ * Create a project and RETURN its id (no redirect) — used by the Style Lab so the client can stash
+ * the bundled kickoff prompt in sessionStorage before navigating into the IDE. createProject is
+ * RLS-scoped to the signed-in user; throws "not_authenticated" if there's no session.
+ */
+export async function newProjectReturnId(name: string): Promise<string> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("not_authenticated");
+  return createProject(name, "webapp", buildSpec(name));
 }
 
 /**

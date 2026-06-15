@@ -111,6 +111,17 @@ export function ChatPanel({
     bodyRef.current?.scrollTo(0, bodyRef.current.scrollHeight);
   }, [messages, status, images]);
 
+  // Style Lab hand-off: a bundled prompt stashed in sessionStorage right before navigating here.
+  // Prefill the composer (don't auto-send) so the user can still review/tweak before generating.
+  useEffect(() => {
+    const k = "egs:kickoff";
+    const prompt = typeof window !== "undefined" ? sessionStorage.getItem(k) : null;
+    if (prompt) {
+      sessionStorage.removeItem(k); // one-shot — never resurrects on refresh
+      setInput(prompt);
+    }
+  }, []);
+
   async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = ""; // allow re-picking the same file

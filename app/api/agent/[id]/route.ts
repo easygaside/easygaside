@@ -134,7 +134,7 @@ export async function POST(
           outcome: "ok",
         });
         if (genId) emit({ type: "generation", id: genId });
-        emit({ type: "done" });
+        emit({ type: "done", tokens: r.inputTokens + r.outputTokens });
       } catch (e) {
         console.error("[agent] loop error:", e);
         await logGeneration({

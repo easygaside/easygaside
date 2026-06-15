@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { IdeShell } from "@/components/ide/IdeShell";
 import { getAccessGate } from "@/lib/beta";
 import { listProjectChatImages } from "@/lib/chat-images";
+import { ENERGY_TANK, getProjectEnergyUsed } from "@/lib/energy";
 import { getFiles } from "@/lib/files";
 import { getConnectionStatus } from "@/lib/google-connection";
 import { getCurrentUser, getProject } from "@/lib/projects";
@@ -22,10 +23,11 @@ export default async function ProjectBuilderPage({
   if (!project) notFound();
 
   // ownership verified above → safe to read files / images via service-role
-  const [files, conn, chatImages] = await Promise.all([
+  const [files, conn, chatImages, energyUsed] = await Promise.all([
     getFiles(id),
     getConnectionStatus(userId),
     listProjectChatImages(id),
+    getProjectEnergyUsed(id),
   ]);
 
   // honest hint when the project asked for a capability GAS can't serve yet (web target)
@@ -43,6 +45,8 @@ export default async function ProjectBuilderPage({
       initialImages={chatImages.map((img) => ({ url: img.url }))}
       webHint={webHint}
       googleConnected={conn.connected && conn.status === "active"}
+      energyUsed={energyUsed}
+      energyTank={ENERGY_TANK}
     />
   );
 }

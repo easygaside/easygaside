@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  BoltIcon,
   ChatBubbleLeftRightIcon,
   HandThumbDownIcon,
   HandThumbUpIcon,
@@ -35,7 +36,7 @@ type AgentEvent =
   | { type: "lint"; messages: string[] }
   | { type: "spec"; spec: ProjectSpec }
   | { type: "generation"; id: string }
-  | { type: "done" }
+  | { type: "done"; tokens?: number }
   | { type: "error"; message: string };
 
 interface ChatMsg {
@@ -58,12 +59,36 @@ const SUGGESTIONS = [
   "แดชบอร์ดสรุปยอดขาย",
 ];
 
+/** Small "energy" gauge = remaining per-project token budget. We never show raw token counts. */
+function EnergyBar({ used, tank }: { used: number; tank: number }) {
+  const pct = Math.max(0, Math.min(100, Math.round((1 - used / tank) * 100)));
+  const color = pct > 40 ? "bg-emerald-500" : pct >= 15 ? "bg-amber-500" : "bg-red-500";
+  return (
+    <span
+      title={`พลังงานเหลือ ${pct}% — ใช้สำหรับสร้าง/แก้โปรเจกต์นี้`}
+      className="flex items-center gap-1.5 text-[11px] font-normal text-slate-400 dark:text-slate-500"
+    >
+      <BoltIcon className="h-3.5 w-3.5" />
+      <span className="h-1.5 w-14 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+        <span
+          className={`block h-full rounded-full transition-all ${color}`}
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+    </span>
+  );
+}
+
 export function ChatPanel({
   projectId,
   initialImages,
+  energyUsed = 0,
+  energyTank,
 }: {
   projectId: string;
   initialImages?: { url: string }[];
+  energyUsed?: number;
+  energyTank?: number;
 }) {
   const applyMutation = useProjectStore((s) => s.applyMutation);
   const setWorking = useProjectStore((s) => s.setWorking);
@@ -72,6 +97,7 @@ export function ChatPanel({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [energy, setEnergy] = useState(energyUsed); // tokens consumed by this project so far
   const [pendingSpec, setPendingSpec] = useState<ProjectSpec | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [images, setImages] = useState<CompressedImage[]>([]);
@@ -198,6 +224,7 @@ export function ChatPanel({
           else if (ev.type === "generation") setGenId(ev.id);
           else if (ev.type === "error") appendAssistant(`\n\n[ผิดพลาด: ${ev.message}]`);
           else if (ev.type === "done") {
+            if (ev.tokens) setEnergy((e) => e + ev.tokens!);
             setStatus("");
             setWorking(null);
           }
@@ -219,6 +246,12 @@ export function ChatPanel({
           <ChatBubbleLeftRightIcon className="h-4 w-4" />
         </span>
         AI Assistant
+        {energyTank ? (
+          <>
+            <span className="flex-1" />
+            <EnergyBar used={energy} tank={energyTank} />
+          </>
+        ) : null}
       </div>
       {/* action chips — same level, equal size in one row. explain/fix only when there's code;
           the wizard ("ผู้ช่วย") is always available and styled as the green primary. */}

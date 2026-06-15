@@ -44,7 +44,7 @@ export type AgentEvent =
   | { type: "lint"; messages: string[] }
   | { type: "spec"; spec: ProjectSpec }
   | { type: "generation"; id: string }
-  | { type: "done" }
+  | { type: "done"; tokens?: number } // tokens = this turn's input+output, for the energy bar
   | { type: "error"; message: string };
 
 export type Emit = (ev: AgentEvent) => void;

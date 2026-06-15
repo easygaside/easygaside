@@ -30,6 +30,8 @@ export function IdeShell({
   initialImages,
   webHint,
   googleConnected = true,
+  energyUsed = 0,
+  energyTank,
 }: {
   projectId: string;
   projectName: string;
@@ -37,6 +39,8 @@ export function IdeShell({
   initialImages?: { url: string }[];
   webHint?: string[];
   googleConnected?: boolean;
+  energyUsed?: number;
+  energyTank?: number;
 }) {
   const setInitial = useProjectStore((s) => s.setInitial);
   const [hintOpen, setHintOpen] = useState(true);
@@ -105,7 +109,12 @@ export function IdeShell({
 
       <div className="grid min-h-0 flex-1 gap-3 px-3 pb-3 lg:grid-cols-[320px_1.3fr_1fr]">
         <section className={`${CARD} ${hideOnMobile("chat")}`}>
-          <ChatPanel projectId={projectId} initialImages={initialImages} />
+          <ChatPanel
+            projectId={projectId}
+            initialImages={initialImages}
+            energyUsed={energyUsed}
+            energyTank={energyTank}
+          />
         </section>
         <section className={`${CARD} ${hideOnMobile("code")}`}>
           <FileTree />

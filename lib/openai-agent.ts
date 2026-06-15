@@ -225,7 +225,7 @@ export async function runOpenAiAgentLoop(
   let inputTokens = main.inputTokens;
   let outputTokens = main.outputTokens;
   let criticIssues = 0;
-  if ((args.turn ?? "codegen") === "codegen" && main.mutated) {
+  if ((args.turn ?? "codegen") === "codegen" && main.mutated && !args.skipCritic) {
     const c = await runOpenAiCriticGate(client, cfg, args);
     criticIssues = c.issues;
     inputTokens += c.inputTokens;

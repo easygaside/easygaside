@@ -244,6 +244,8 @@ export interface RunAgentArgs {
   internal?: boolean;
   /** BYOK: the user's own Anthropic key. Omit to use the platform key (ANTHROPIC_API_KEY). */
   apiKey?: string;
+  /** Skip the Gate-1 rulebook critic (e.g. Gate-2 verify repairs — execution is the stronger oracle). */
+  skipCritic?: boolean;
   emit: Emit;
 }
 
@@ -262,7 +264,7 @@ export async function runAgentLoop(args: RunAgentArgs): Promise<AgentRunResult> 
   // Gate 1 — rulebook critic + one bounded auto-repair. Only when this turn actually changed files:
   // a pure Q&A turn ("ปกติไหม?") writes nothing, so re-reviewing the whole project there is wasted
   // cost + noise (and makes it look like it's checking on a loop). Skip plan turns too.
-  if ((args.turn ?? "codegen") === "codegen" && main.mutated) {
+  if ((args.turn ?? "codegen") === "codegen" && main.mutated && !args.skipCritic) {
     const c = await runCriticGate(client, args);
     criticIssues = c.issues;
     inputTokens += c.inputTokens;

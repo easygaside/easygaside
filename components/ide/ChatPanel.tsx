@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  BeakerIcon,
   BoltIcon,
   ChatBubbleLeftRightIcon,
   HandThumbDownIcon,
@@ -172,6 +173,45 @@ export function ChatPanel({
     });
   }
 
+  // Consume an SSE stream of AgentEvents (shared by chat send + Gate-2 verify — same protocol).
+  async function pumpStream(res: Response) {
+    if (!res.body) throw new Error("no body");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const frames = buf.split("\n\n");
+      buf = frames.pop() ?? "";
+      for (const frame of frames) {
+        const line = frame.trim();
+        if (!line.startsWith("data:")) continue;
+        let ev: AgentEvent;
+        try {
+          ev = JSON.parse(line.slice(5).trim());
+        } catch {
+          continue;
+        }
+        if (ev.type === "text") appendAssistant(ev.delta);
+        else if (ev.type === "status") setStatus(ev.text);
+        else if (ev.type === "tool_call") setStatus(`${TOOL_LABEL[ev.name] ?? ev.name}…`);
+        else if (ev.type === "file_mutation")
+          applyMutation({ op: ev.op, path: ev.path, content: ev.content });
+        else if (ev.type === "lint") setStatus(ev.messages.join(" · "));
+        else if (ev.type === "spec") setPendingSpec(ev.spec);
+        else if (ev.type === "generation") setGenId(ev.id);
+        else if (ev.type === "error") appendAssistant(`\n\n[ผิดพลาด: ${ev.message}]`);
+        else if (ev.type === "done") {
+          if (ev.tokens) setEnergy((e) => e + ev.tokens!);
+          setStatus("");
+          setWorking(null);
+        }
+      }
+    }
+  }
+
   async function send(text?: string) {
     const msg = (text ?? input).trim();
     // staged images attach only to a composer send (no explicit text arg from chips/spec/wizard)
@@ -213,44 +253,40 @@ export function ChatPanel({
         appendAssistant(`\n\n[${msg}]`);
         return;
       }
-      if (!res.body) throw new Error("no body");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const frames = buf.split("\n\n");
-        buf = frames.pop() ?? "";
-        for (const frame of frames) {
-          const line = frame.trim();
-          if (!line.startsWith("data:")) continue;
-          let ev: AgentEvent;
-          try {
-            ev = JSON.parse(line.slice(5).trim());
-          } catch {
-            continue;
-          }
-          if (ev.type === "text") appendAssistant(ev.delta);
-          else if (ev.type === "status") setStatus(ev.text);
-          else if (ev.type === "tool_call") setStatus(`${TOOL_LABEL[ev.name] ?? ev.name}…`);
-          else if (ev.type === "file_mutation")
-            applyMutation({ op: ev.op, path: ev.path, content: ev.content });
-          else if (ev.type === "lint") setStatus(ev.messages.join(" · "));
-          else if (ev.type === "spec") setPendingSpec(ev.spec);
-          else if (ev.type === "generation") setGenId(ev.id);
-          else if (ev.type === "error") appendAssistant(`\n\n[ผิดพลาด: ${ev.message}]`);
-          else if (ev.type === "done") {
-            if (ev.tokens) setEnergy((e) => e + ev.tokens!);
-            setStatus("");
-            setWorking(null);
-          }
-        }
-      }
+      await pumpStream(res);
     } catch {
       appendAssistant("\n\n[เชื่อมต่อล้มเหลว — ลองใหม่อีกครั้ง]");
+    } finally {
+      setBusy(false);
+      setStatus("");
+      setWorking(null);
+    }
+  }
+
+  // Gate 2 — open the live app, and repair+redeploy if it failed at runtime. Streams into the chat.
+  async function verify() {
+    if (busy) return;
+    setBusy(true);
+    setStatus("");
+    setGenId(null);
+    setRated(null);
+    setMessages((m) => [...m, { role: "assistant", text: "" }]);
+    try {
+      const res = await fetch(`/api/verify/${projectId}`, { method: "POST" });
+      if (!res.ok) {
+        let m = "เชื่อมต่อล้มเหลว — ลองใหม่อีกครั้ง";
+        try {
+          const j = (await res.json()) as { message?: string };
+          if (j?.message) m = j.message;
+        } catch {
+          /* non-JSON */
+        }
+        appendAssistant(`[${m}]`);
+        return;
+      }
+      await pumpStream(res);
+    } catch {
+      appendAssistant("\n\n[ทดสอบไม่สำเร็จ — ลองใหม่อีกครั้ง]");
     } finally {
       setBusy(false);
       setStatus("");
@@ -265,12 +301,19 @@ export function ChatPanel({
           <ChatBubbleLeftRightIcon className="h-4 w-4" />
         </span>
         AI Assistant
-        {energyTank ? (
-          <>
-            <span className="flex-1" />
-            <EnergyBar used={energy} tank={energyTank} />
-          </>
-        ) : null}
+        <span className="flex-1" />
+        {hasFiles && (
+          <button
+            onClick={verify}
+            disabled={busy}
+            title="เปิดแอปจริงเพื่อทดสอบการรัน แล้วซ่อมให้ถ้าเจอปัญหา (ต้อง deploy ก่อน)"
+            className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+          >
+            <BeakerIcon className="h-3.5 w-3.5" />
+            ทดสอบรันจริง
+          </button>
+        )}
+        {energyTank ? <EnergyBar used={energy} tank={energyTank} /> : null}
       </div>
       {/* action chips — same level, equal size in one row. explain/fix only when there's code;
           the wizard ("ผู้ช่วย") is always available and styled as the green primary. */}

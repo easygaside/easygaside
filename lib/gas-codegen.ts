@@ -108,7 +108,17 @@ Browser libraries via CDN are ALLOWED and encouraged when they improve UX — lo
 - Loading state: while a google.script.run call is in flight, DISABLE the triggering button and show a spinner / "กำลังบันทึก…"; re-enable in BOTH withSuccessHandler AND withFailureHandler (prevents double-submit).
 - Validate inputs client-side before calling the server; show clear Thai inline errors and focus the first invalid field.
 - Empty state: when a list/table has no rows, show a friendly "ยังไม่มีข้อมูล" with an icon — never a blank area.
-- Show a spinner/skeleton while initial data loads; surface failures as a toast/dialog — never swallow errors.`;
+- Show a spinner/skeleton while initial data loads; surface failures as a toast/dialog — never swallow errors.
+
+## Custom login / auth (ONLY when the app needs its own username+password — otherwise PREFER Google identity)
+- Default to Google identity: Session.getActiveUser().getEmail() (no passwords to store, nothing to leak). Build a custom username/password login ONLY when the end-users won't sign in with Google.
+- Storing credentials in a Sheet: NEVER store the password in plaintext, and NEVER store a bare/single hash. GAS has no bcrypt/scrypt, so stretch the hash:
+  - per-user random salt (Utilities.getUuid()), stored in the user's row;
+  - a server-side PEPPER kept in PropertiesService.getScriptProperties() — NEVER in the Sheet, so a leaked Sheet alone is useless;
+  - iterate Utilities.computeHmacSha256Signature(password+pepper, salt) many times (e.g. 10000) — PBKDF2-style — and store ONLY the final hash + the salt.
+- Login = recompute the hash from the submitted password and compare to the stored one. Wrap the lookup in LockService; count failed attempts per user and lock/slow after several (rate-limit). Never log or return the password/hash/salt/pepper; return only a sanitized user object + a session token.
+- "จำการเข้าสู่ระบบ" / remember-me: NEVER put the password (or any reusable credential) in localStorage. On successful login issue a RANDOM session token; store only its HASH + an expiry (+ userId) in a sessions sheet; send the raw token to the client for localStorage. On load, validate server-side (hash matches AND not expired) → auto-login; logout deletes the session row. Tokens must expire and be revocable.
+- Scope stays lean: a Sheet-backed custom login needs only 'auth/spreadsheets' (the Sheet is private because the web app runs "execute as me") — do NOT add Drive/external scopes for auth.`;
 
 const BOUND_ADDENDUM = `
 

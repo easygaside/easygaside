@@ -4,7 +4,7 @@ import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
 import { checkAndConsumeQuota, getAccessGate, getOwnApiKey } from "@/lib/beta";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { parseAttachedImages, storeChatImages, type AttachedImage } from "@/lib/chat-images";
-import { providerConfig, resolveProjectProvider } from "@/lib/llm/provider";
+import { resolveProjectProvider, resolveProvider } from "@/lib/llm/provider";
 import { runOpenAiAgentLoop } from "@/lib/openai-agent";
 import { logGeneration } from "@/lib/metrics";
 import { getProject } from "@/lib/projects";
@@ -72,7 +72,7 @@ export async function POST(
 
   // Route to the user's assigned provider arm (locks the project to it on first generation).
   const provider = await resolveProjectProvider(id, user.id);
-  const cfg = providerConfig(provider);
+  const cfg = await resolveProvider(provider);
   const model = cfg.model;
 
   // Key: the Claude arm may use the user's own (BYOK) key; otherwise the platform env key for the arm.

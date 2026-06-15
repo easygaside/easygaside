@@ -4,7 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
-import { autoBalanceArmsAction, setUserArmAction } from "@/app/admin/actions";
+import {
+  autoBalanceArmsAction,
+  setDefaultProviderAction,
+  setProviderModelAction,
+  setUserArmAction,
+} from "@/app/admin/actions";
 import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/provider";
 
 export interface AdminUser {
@@ -31,9 +36,46 @@ const ARM_STYLE: Record<LlmProvider, string> = {
   deepseek: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
 };
 
-export function AdminPanel({ users, metrics }: { users: AdminUser[]; metrics: ArmMetric[] }) {
+export interface ProviderModel {
+  provider: LlmProvider;
+  model: string;
+}
+
+export function AdminPanel({
+  users,
+  metrics,
+  models,
+  defaultProvider,
+}: {
+  users: AdminUser[];
+  metrics: ArmMetric[];
+  models: ProviderModel[];
+  defaultProvider: LlmProvider;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [modelDraft, setModelDraft] = useState<Record<string, string>>(
+    Object.fromEntries(models.map((m) => [m.provider, m.model])),
+  );
+
+  async function saveModel(provider: LlmProvider) {
+    setBusy(true);
+    try {
+      await setProviderModelAction(provider, modelDraft[provider] ?? "");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function setDefault(provider: LlmProvider) {
+    setBusy(true);
+    try {
+      await setDefaultProviderAction(provider);
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function setArm(userId: string, arm: LlmProvider) {
     setBusy(true);
@@ -65,6 +107,52 @@ export function AdminPanel({ users, metrics }: { users: AdminUser[]; metrics: Ar
         กลับไปหน้าโปรเจกต์
       </Link>
       <h1 className="text-2xl font-bold">Admin — A/B โมเดล</h1>
+
+      {/* provider config: default + model names */}
+      <section className="mt-6 rounded-xl border border-slate-200 p-4 dark:border-slate-700/60">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">ตั้งค่า Provider</h2>
+
+        <p className="mb-2 mt-3 text-xs text-slate-500 dark:text-slate-400">Provider หลักของระบบ (ผู้ใช้ที่ยังไม่ถูก assign):</p>
+        <div className="flex gap-1.5">
+          {LLM_PROVIDERS.map((p) => (
+            <button
+              key={p}
+              onClick={() => setDefault(p)}
+              disabled={busy}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                defaultProvider === p
+                  ? "bg-emerald-500 text-white"
+                  : "border border-slate-200 text-slate-500 hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
+            >
+              {p}
+              {defaultProvider === p ? " ✓" : ""}
+            </button>
+          ))}
+        </div>
+
+        <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">ชื่อโมเดลของแต่ละ provider:</p>
+        <div className="space-y-2">
+          {LLM_PROVIDERS.map((p) => (
+            <div key={p} className="flex items-center gap-2">
+              <span className="w-20 shrink-0 text-xs font-medium text-slate-600 dark:text-slate-300">{p}</span>
+              <input
+                value={modelDraft[p] ?? ""}
+                onChange={(e) => setModelDraft((d) => ({ ...d, [p]: e.target.value }))}
+                placeholder="ชื่อโมเดล เช่น gpt-4o, deepseek-chat"
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 font-mono text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+              />
+              <button
+                onClick={() => saveModel(p)}
+                disabled={busy}
+                className="shrink-0 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
+              >
+                บันทึก
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* metrics per arm */}
       <h2 className="mb-2 mt-6 text-sm font-semibold text-slate-700 dark:text-slate-200">ผลเทียบราย provider</h2>

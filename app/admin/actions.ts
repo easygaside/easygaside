@@ -23,6 +23,32 @@ export async function setUserArmAction(userId: string, arm: LlmProvider): Promis
   revalidatePath("/admin");
 }
 
+/** Set the model name a provider uses (e.g. gpt-4o → gpt-4.1, deepseek-chat → deepseek-reasoner). */
+export async function setProviderModelAction(provider: LlmProvider, model: string): Promise<void> {
+  await requireSuperAdmin();
+  if (!LLM_PROVIDERS.includes(provider)) throw new Error("bad_provider");
+  const m = model.trim();
+  if (!m) throw new Error("empty_model");
+  const svc = createServiceClient();
+  const { error } = await svc
+    .from("egs_provider_config")
+    .upsert({ provider, model: m }, { onConflict: "provider" });
+  if (error) throw new Error(`setProviderModel: ${error.message}`);
+  revalidatePath("/admin");
+}
+
+/** Set the system-wide default provider (what unassigned users get). */
+export async function setDefaultProviderAction(provider: LlmProvider): Promise<void> {
+  await requireSuperAdmin();
+  if (!LLM_PROVIDERS.includes(provider)) throw new Error("bad_provider");
+  const svc = createServiceClient();
+  const { error } = await svc
+    .from("egs_app_settings")
+    .upsert({ key: "default_provider", value: provider }, { onConflict: "key" });
+  if (error) throw new Error(`setDefaultProvider: ${error.message}`);
+  revalidatePath("/admin");
+}
+
 /** Evenly distribute ALL users across the 3 arms (round-robin) — for the 10/10/10 split. */
 export async function autoBalanceArmsAction(): Promise<void> {
   await requireSuperAdmin();

@@ -52,7 +52,35 @@ export function providerConfig(p: LlmProvider): ProviderConfig {
   }
 }
 
-/** The user's assigned arm (defaults to claude). */
+/** System-wide default provider (superadmin-set in egs_app_settings; falls back to claude). */
+export async function getDefaultProvider(): Promise<LlmProvider> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_app_settings")
+    .select("value")
+    .eq("key", "default_provider")
+    .maybeSingle<{ value: string }>();
+  const v = data?.value as LlmProvider | undefined;
+  return v && LLM_PROVIDERS.includes(v) ? v : DEFAULT_PROVIDER;
+}
+
+/** Superadmin-set model name for a provider (egs_provider_config); falls back to the static default. */
+export async function getProviderModel(p: LlmProvider): Promise<string> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_provider_config")
+    .select("model")
+    .eq("provider", p)
+    .maybeSingle<{ model: string }>();
+  return data?.model?.trim() || providerConfig(p).model;
+}
+
+/** Full config with the model name resolved from DB (use this on the request path). */
+export async function resolveProvider(p: LlmProvider): Promise<ProviderConfig> {
+  return { ...providerConfig(p), model: await getProviderModel(p) };
+}
+
+/** The user's assigned arm, or the system default when unassigned. */
 export async function getUserProvider(userId: string): Promise<LlmProvider> {
   const svc = createServiceClient();
   const { data } = await svc
@@ -60,7 +88,7 @@ export async function getUserProvider(userId: string): Promise<LlmProvider> {
     .select("llm_provider")
     .eq("user_id", userId)
     .maybeSingle<{ llm_provider: LlmProvider | null }>();
-  return data?.llm_provider ?? DEFAULT_PROVIDER;
+  return data?.llm_provider ?? (await getDefaultProvider());
 }
 
 /**

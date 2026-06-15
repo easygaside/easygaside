@@ -23,13 +23,22 @@ export default async function AdminPage() {
   if (!isSuperAdmin(user.email)) redirect("/projects");
 
   const svc = createServiceClient();
-  const [{ data: list }, { data: settings }, { data: gens }] = await Promise.all([
-    svc.auth.admin.listUsers({ perPage: 1000 }),
-    svc.from("egs_user_settings").select("user_id, llm_provider"),
-    svc
-      .from("egs_generations")
-      .select("provider, input_tokens, output_tokens, critic_issues, duration_ms, outcome, rating"),
-  ]);
+  const [{ data: list }, { data: settings }, { data: gens }, { data: pcfg }, { data: appcfg }] =
+    await Promise.all([
+      svc.auth.admin.listUsers({ perPage: 1000 }),
+      svc.from("egs_user_settings").select("user_id, llm_provider"),
+      svc
+        .from("egs_generations")
+        .select("provider, input_tokens, output_tokens, critic_issues, duration_ms, outcome, rating"),
+      svc.from("egs_provider_config").select("provider, model"),
+      svc.from("egs_app_settings").select("value").eq("key", "default_provider").maybeSingle(),
+    ]);
+
+  const modelByProvider = new Map(
+    (pcfg ?? []).map((r) => [r.provider as LlmProvider, r.model as string]),
+  );
+  const models = LLM_PROVIDERS.map((p) => ({ provider: p, model: modelByProvider.get(p) ?? "" }));
+  const defaultProvider = ((appcfg?.value as LlmProvider) ?? "claude") as LlmProvider;
 
   const armByUser = new Map(
     (settings ?? []).map((s) => [s.user_id as string, s.llm_provider as LlmProvider | null]),
@@ -60,5 +69,7 @@ export default async function AdminPage() {
     };
   });
 
-  return <AdminPanel users={users} metrics={metrics} />;
+  return (
+    <AdminPanel users={users} metrics={metrics} models={models} defaultProvider={defaultProvider} />
+  );
 }

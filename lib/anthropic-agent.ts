@@ -470,7 +470,6 @@ async function runCriticGate(
       (i) => `- [${i.severity}] ${i.file}: ${i.problem} → ${i.fix}`,
     );
     emit({ type: "text", delta: `\n\n🔍 ตรวจคุณภาพพบ ${review.issues.length} จุด:\n${lines.join("\n")}` });
-    emit({ type: "lint", messages: review.issues.map((i) => `${i.file}: ${i.problem}`) });
 
     const actionable = review.issues.filter((i) => i.severity !== "low");
     if (actionable.length === 0) return { issues: review.issues.length, inputTokens: 0, outputTokens: 0 };

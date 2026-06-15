@@ -1,0 +1,142 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { autoBalanceArmsAction, setUserArmAction } from "@/app/admin/actions";
+import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/provider";
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  arm: LlmProvider;
+}
+export interface ArmMetric {
+  provider: LlmProvider;
+  assigned: number;
+  gens: number;
+  avgInTok: number;
+  avgOutTok: number;
+  avgCritic: number;
+  avgSec: number;
+  okRate: number;
+  up: number;
+  down: number;
+}
+
+const ARM_STYLE: Record<LlmProvider, string> = {
+  claude: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
+  chatgpt: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+  deepseek: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+};
+
+export function AdminPanel({ users, metrics }: { users: AdminUser[]; metrics: ArmMetric[] }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function setArm(userId: string, arm: LlmProvider) {
+    setBusy(true);
+    try {
+      await setUserArmAction(userId, arm);
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function balance() {
+    if (!confirm("แบ่งผู้ใช้ทั้งหมดเป็น 3 กลุ่มเท่า ๆ กัน (เขียนทับ arm เดิม)?")) return;
+    setBusy(true);
+    try {
+      await autoBalanceArmsAction();
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto min-h-screen max-w-4xl px-6 py-10">
+      <Link
+        href="/projects"
+        className="mb-6 inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400"
+      >
+        <ArrowLeftIcon className="h-4 w-4" />
+        กลับไปหน้าโปรเจกต์
+      </Link>
+      <h1 className="text-2xl font-bold">Admin — A/B โมเดล</h1>
+
+      {/* metrics per arm */}
+      <h2 className="mb-2 mt-6 text-sm font-semibold text-slate-700 dark:text-slate-200">ผลเทียบราย provider</h2>
+      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700/60">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            <tr>
+              {["provider", "คน", "gen", "in tok", "out tok", "critic/gen", "วินาที", "สำเร็จ%", "👍", "👎"].map((h) => (
+                <th key={h} className="px-3 py-2 font-medium">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {metrics.map((m) => (
+              <tr key={m.provider} className="border-t border-slate-100 dark:border-slate-800">
+                <td className="px-3 py-2">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ARM_STYLE[m.provider]}`}>{m.provider}</span>
+                </td>
+                <td className="px-3 py-2">{m.assigned}</td>
+                <td className="px-3 py-2">{m.gens}</td>
+                <td className="px-3 py-2">{m.avgInTok}</td>
+                <td className="px-3 py-2">{m.avgOutTok}</td>
+                <td className="px-3 py-2">{m.avgCritic}</td>
+                <td className="px-3 py-2">{m.avgSec}</td>
+                <td className="px-3 py-2">{m.okRate}%</td>
+                <td className="px-3 py-2 text-emerald-600 dark:text-emerald-400">{m.up}</td>
+                <td className="px-3 py-2 text-red-500 dark:text-red-400">{m.down}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* user assignment */}
+      <div className="mb-2 mt-8 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          ผู้ใช้ ({users.length}) — กำหนดกลุ่ม
+        </h2>
+        <button
+          onClick={balance}
+          disabled={busy}
+          className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
+        >
+          auto-balance 3 กลุ่มเท่ากัน
+        </button>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700/60">
+        {users.map((u) => (
+          <div
+            key={u.id}
+            className="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-2 first:border-t-0 dark:border-slate-800"
+          >
+            <span className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-300">{u.email}</span>
+            <div className="flex shrink-0 gap-1">
+              {LLM_PROVIDERS.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setArm(u.id, p)}
+                  disabled={busy}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
+                    u.arm === p
+                      ? ARM_STYLE[p]
+                      : "text-slate-400 hover:bg-slate-100 dark:text-slate-500 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </main>
+  );
+}

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import {
   autoBalanceArmsAction,
+  setDailyLimitAction,
   setDefaultProviderAction,
   setProviderModelAction,
   setUserArmAction,
@@ -52,7 +53,85 @@ const ARM_STYLE: Record<LlmProvider, string> = {
   gemini: "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
 };
 
+export interface DailyPoint {
+  day: string;
+  tokens: number;
+}
+
 const fmt = (n: number) => n.toLocaleString("en-US");
+
+const ARM_COLOR: Record<LlmProvider, string> = {
+  claude: "#fb923c",
+  chatgpt: "#34d399",
+  deepseek: "#60a5fa",
+  gemini: "#a78bfa",
+};
+
+function Bars({
+  title,
+  items,
+  unit = "",
+}: {
+  title: string;
+  items: { label: string; value: number; color: string }[];
+  unit?: string;
+}) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  return (
+    <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700/60">
+      {title && <h3 className="mb-2 text-xs font-semibold text-slate-600 dark:text-slate-300">{title}</h3>}
+      <div className="space-y-1.5">
+        {items.map((it, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="w-28 shrink-0 truncate text-[11px] text-slate-500 dark:text-slate-400">{it.label}</span>
+            <div className="h-4 flex-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
+              <div className="h-full rounded" style={{ width: `${(it.value / max) * 100}%`, background: it.color }} />
+            </div>
+            <span className="w-24 shrink-0 text-right font-mono text-[11px] text-slate-600 dark:text-slate-300">
+              {fmt(it.value)}
+              {unit}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LineChart({ data }: { data: DailyPoint[] }) {
+  const w = 600;
+  const h = 130;
+  const pad = 26;
+  const max = Math.max(1, ...data.map((d) => d.tokens));
+  const pts = data
+    .map((d, i) => {
+      const x = pad + (i / Math.max(1, data.length - 1)) * (w - 2 * pad);
+      const y = h - pad - (d.tokens / max) * (h - 2 * pad);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700/60">
+      <h3 className="mb-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+        Token ต่อวัน (14 วันล่าสุด) · สูงสุด {fmt(max)}
+      </h3>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" preserveAspectRatio="none">
+        <polyline points={pts} fill="none" stroke="#10b981" strokeWidth="2" />
+        {data.map((d, i) => {
+          const x = pad + (i / Math.max(1, data.length - 1)) * (w - 2 * pad);
+          const y = h - pad - (d.tokens / max) * (h - 2 * pad);
+          return <circle key={i} cx={x} cy={y} r="2.5" fill="#10b981" />;
+        })}
+        <text x={pad} y={h - 6} fontSize="10" fill="currentColor" className="text-slate-400">
+          {data[0]?.day}
+        </text>
+        <text x={w - pad} y={h - 6} fontSize="10" textAnchor="end" fill="currentColor" className="text-slate-400">
+          {data[data.length - 1]?.day}
+        </text>
+      </svg>
+    </div>
+  );
+}
 
 export interface ProviderModel {
   provider: LlmProvider;
@@ -64,21 +143,36 @@ export function AdminPanel({
   metrics,
   models,
   defaultProvider,
+  dailyLimit,
   summary,
   projects,
+  daily,
 }: {
   users: AdminUser[];
   metrics: ArmMetric[];
   models: ProviderModel[];
   defaultProvider: LlmProvider;
+  dailyLimit: number;
   summary: TokenSummary;
   projects: ProjectTokens[];
+  daily: DailyPoint[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [modelDraft, setModelDraft] = useState<Record<string, string>>(
     Object.fromEntries(models.map((m) => [m.provider, m.model])),
   );
+  const [limitDraft, setLimitDraft] = useState(String(dailyLimit));
+
+  async function saveLimit() {
+    setBusy(true);
+    try {
+      await setDailyLimitAction(Number(limitDraft));
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveModel(provider: LlmProvider) {
     setBusy(true);
@@ -109,7 +203,7 @@ export function AdminPanel({
     }
   }
   async function balance() {
-    if (!confirm("แบ่งผู้ใช้ทั้งหมดเป็น 3 กลุ่มเท่า ๆ กัน (เขียนทับ arm เดิม)?")) return;
+    if (!confirm("แบ่งผู้ใช้ทั้งหมดเป็นกลุ่มเท่า ๆ กัน (เขียนทับ arm เดิม)?")) return;
     setBusy(true);
     try {
       await autoBalanceArmsAction();
@@ -200,40 +294,60 @@ export function AdminPanel({
             </div>
           ))}
         </div>
+
+        <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">โควตา generation ต่อคน/วัน (คีย์ระบบ):</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            value={limitDraft}
+            onChange={(e) => setLimitDraft(e.target.value)}
+            className="w-28 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+          />
+          <span className="text-xs text-slate-400 dark:text-slate-500">ครั้ง/วัน</span>
+          <button
+            onClick={saveLimit}
+            disabled={busy}
+            className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
+          >
+            บันทึก
+          </button>
+        </div>
       </section>
 
-      {/* metrics per arm */}
-      <h2 className="mb-2 mt-6 text-sm font-semibold text-slate-700 dark:text-slate-200">ผลเทียบราย provider</h2>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700/60">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-            <tr>
-              {["provider", "คน", "gen", "in รวม", "out รวม", "in เฉลี่ย", "out เฉลี่ย", "critic/gen", "วินาที", "สำเร็จ%", "👍", "👎"].map((h) => (
-                <th key={h} className="px-3 py-2 font-medium">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {metrics.map((m) => (
-              <tr key={m.provider} className="border-t border-slate-100 dark:border-slate-800">
-                <td className="px-3 py-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ARM_STYLE[m.provider]}`}>{m.provider}</span>
-                </td>
-                <td className="px-3 py-2">{m.assigned}</td>
-                <td className="px-3 py-2">{m.gens}</td>
-                <td className="px-3 py-2">{fmt(m.inTok)}</td>
-                <td className="px-3 py-2">{fmt(m.outTok)}</td>
-                <td className="px-3 py-2">{m.avgInTok}</td>
-                <td className="px-3 py-2">{m.avgOutTok}</td>
-                <td className="px-3 py-2">{m.avgCritic}</td>
-                <td className="px-3 py-2">{m.avgSec}</td>
-                <td className="px-3 py-2">{m.okRate}%</td>
-                <td className="px-3 py-2 text-emerald-600 dark:text-emerald-400">{m.up}</td>
-                <td className="px-3 py-2 text-red-500 dark:text-red-400">{m.down}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* charts: per-provider comparison */}
+      <div className="mb-2 mt-6 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">ผลเทียบราย provider</h2>
+        <a
+          href="/api/admin/metrics.csv"
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          ⬇ Export CSV
+        </a>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Bars
+          title="Token รวม"
+          items={metrics.map((m) => ({ label: m.provider, value: m.inTok + m.outTok, color: ARM_COLOR[m.provider] }))}
+        />
+        <Bars
+          title="จำนวน generation"
+          items={metrics.map((m) => ({ label: m.provider, value: m.gens, color: ARM_COLOR[m.provider] }))}
+        />
+        <Bars
+          title="เวลาเฉลี่ย/gen (วินาที)"
+          items={metrics.map((m) => ({ label: m.provider, value: m.avgSec, color: ARM_COLOR[m.provider] }))}
+          unit="s"
+        />
+        <Bars
+          title="👍 ถูกใจ"
+          items={metrics.map((m) => ({ label: m.provider, value: m.up, color: ARM_COLOR[m.provider] }))}
+        />
+      </div>
+
+      {/* daily token trend */}
+      <div className="mt-3">
+        <LineChart data={daily} />
       </div>
 
       {/* tokens per project (top 15) */}
@@ -243,20 +357,11 @@ export function AdminPanel({
       {projects.length === 0 ? (
         <p className="text-xs text-slate-400 dark:text-slate-500">ยังไม่มีข้อมูล</p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700/60">
-          {projects.map((p, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-2 text-sm first:border-t-0 dark:border-slate-800"
-            >
-              <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-300">{p.name}</span>
-              <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">{p.gens} gen</span>
-              <span className="shrink-0 font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">
-                {fmt(p.tokens)} tok
-              </span>
-            </div>
-          ))}
-        </div>
+        <Bars
+          title=""
+          items={projects.map((p) => ({ label: p.name, value: p.tokens, color: "#94a3b8" }))}
+          unit=" tok"
+        />
       )}
 
       {/* user assignment */}
@@ -269,7 +374,7 @@ export function AdminPanel({
           disabled={busy}
           className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
         >
-          auto-balance 3 กลุ่มเท่ากัน
+          auto-balance เท่ากัน
         </button>
       </div>
       <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700/60">

@@ -49,7 +49,20 @@ export async function setDefaultProviderAction(provider: LlmProvider): Promise<v
   revalidatePath("/admin");
 }
 
-/** Evenly distribute ALL users across the 3 arms (round-robin) — for the 10/10/10 split. */
+/** Set the per-user daily generation cap (egs_app_settings.daily_limit). */
+export async function setDailyLimitAction(limit: number): Promise<void> {
+  await requireSuperAdmin();
+  const n = Math.floor(limit);
+  if (!Number.isFinite(n) || n < 1 || n > 100000) throw new Error("bad_limit");
+  const svc = createServiceClient();
+  const { error } = await svc
+    .from("egs_app_settings")
+    .upsert({ key: "daily_limit", value: String(n) }, { onConflict: "key" });
+  if (error) throw new Error(`setDailyLimit: ${error.message}`);
+  revalidatePath("/admin");
+}
+
+/** Evenly distribute ALL users across the arms (round-robin) — for the even split. */
 export async function autoBalanceArmsAction(): Promise<void> {
   await requireSuperAdmin();
   const svc = createServiceClient();

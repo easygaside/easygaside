@@ -14,7 +14,19 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 // Beta gating is ON unless BETA_MODE is explicitly "off". Owner is seeded in the allowlist.
 export const BETA_ENFORCED = process.env.BETA_MODE !== "off";
-export const DAILY_GENERATION_LIMIT = Number(process.env.EASYGAS_DAILY_LIMIT ?? 30);
+const FALLBACK_DAILY_LIMIT = Number(process.env.EASYGAS_DAILY_LIMIT ?? 30);
+
+/** Per-user daily generation cap — superadmin-set in egs_app_settings ('daily_limit'); env fallback. */
+export async function getDailyLimit(): Promise<number> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_app_settings")
+    .select("value")
+    .eq("key", "daily_limit")
+    .maybeSingle<{ value: string }>();
+  const n = Number(data?.value);
+  return Number.isFinite(n) && n > 0 ? n : FALLBACK_DAILY_LIMIT;
+}
 
 export interface AccessGate {
   allowed: boolean;
@@ -138,6 +150,7 @@ export interface QuotaStatus {
 
 export async function getDailyUsage(userId: string): Promise<QuotaStatus> {
   const svc = createServiceClient();
+  const limit = await getDailyLimit();
   const { data } = await svc
     .from("egs_usage_daily")
     .select("requests")
@@ -145,7 +158,7 @@ export async function getDailyUsage(userId: string): Promise<QuotaStatus> {
     .eq("day", new Date().toISOString().slice(0, 10))
     .maybeSingle<{ requests: number }>();
   const used = data?.requests ?? 0;
-  return { used, limit: DAILY_GENERATION_LIMIT, remaining: Math.max(0, DAILY_GENERATION_LIMIT - used) };
+  return { used, limit, remaining: Math.max(0, limit - used) };
 }
 
 /**
@@ -156,6 +169,7 @@ export async function checkAndConsumeQuota(
   userId: string,
 ): Promise<{ ok: boolean } & QuotaStatus> {
   const svc = createServiceClient();
+  const limit = await getDailyLimit();
   const day = new Date().toISOString().slice(0, 10);
   // ensure a row exists, then increment only if under the cap
   await svc.from("egs_usage_daily").upsert({ user_id: userId, day }, { onConflict: "user_id,day" });
@@ -164,20 +178,20 @@ export async function checkAndConsumeQuota(
     .update({ requests: (await currentRequests(svc, userId, day)) + 1 })
     .eq("user_id", userId)
     .eq("day", day)
-    .lt("requests", DAILY_GENERATION_LIMIT)
+    .lt("requests", limit)
     .select("requests")
     .maybeSingle<{ requests: number }>();
 
   if (!data) {
     // cap reached (the .lt guard matched no row)
     const used = await currentRequests(svc, userId, day);
-    return { ok: false, used, limit: DAILY_GENERATION_LIMIT, remaining: 0 };
+    return { ok: false, used, limit, remaining: 0 };
   }
   return {
     ok: true,
     used: data.requests,
-    limit: DAILY_GENERATION_LIMIT,
-    remaining: Math.max(0, DAILY_GENERATION_LIMIT - data.requests),
+    limit,
+    remaining: Math.max(0, limit - data.requests),
   };
 }
 

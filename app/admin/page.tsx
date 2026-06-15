@@ -16,6 +16,7 @@ interface GenRow {
   duration_ms: number | null;
   outcome: string | null;
   rating: number | null;
+  created_at: string;
 }
 
 export default async function AdminPage() {
@@ -30,9 +31,9 @@ export default async function AdminPage() {
       svc.from("egs_user_settings").select("user_id, llm_provider"),
       svc
         .from("egs_generations")
-        .select("provider, project_id, input_tokens, output_tokens, critic_issues, duration_ms, outcome, rating"),
+        .select("provider, project_id, input_tokens, output_tokens, critic_issues, duration_ms, outcome, rating, created_at"),
       svc.from("egs_provider_config").select("provider, model"),
-      svc.from("egs_app_settings").select("value").eq("key", "default_provider").maybeSingle(),
+      svc.from("egs_app_settings").select("key, value"),
     ]);
   const { data: projectRows } = await svc.from("egs_projects").select("id, name");
   const projectName = new Map((projectRows ?? []).map((p) => [p.id as string, p.name as string]));
@@ -41,7 +42,9 @@ export default async function AdminPage() {
     (pcfg ?? []).map((r) => [r.provider as LlmProvider, r.model as string]),
   );
   const models = LLM_PROVIDERS.map((p) => ({ provider: p, model: modelByProvider.get(p) ?? "" }));
-  const defaultProvider = ((appcfg?.value as LlmProvider) ?? "claude") as LlmProvider;
+  const appSettings = new Map((appcfg ?? []).map((r) => [r.key as string, r.value as string]));
+  const defaultProvider = ((appSettings.get("default_provider") as LlmProvider) ?? "claude") as LlmProvider;
+  const dailyLimit = Number(appSettings.get("daily_limit") ?? 30) || 30;
 
   const armByUser = new Map(
     (settings ?? []).map((s) => [s.user_id as string, s.llm_provider as LlmProvider | null]),
@@ -103,14 +106,30 @@ export default async function AdminPage() {
     avgPerProject: projectCount ? Math.round((totalIn + totalOut) / projectCount) : 0,
   };
 
+  // daily token series (last 14 days) for the line chart
+  const dayMap = new Map<string, number>();
+  for (const r of rows) {
+    const day = (r.created_at ?? "").slice(0, 10);
+    if (!day) continue;
+    dayMap.set(day, (dayMap.get(day) ?? 0) + tok(r));
+  }
+  const daily = [...Array(14)].map((_, i) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - (13 - i));
+    const key = d.toISOString().slice(0, 10);
+    return { day: key.slice(5), tokens: dayMap.get(key) ?? 0 };
+  });
+
   return (
     <AdminPanel
       users={users}
       metrics={metrics}
       models={models}
       defaultProvider={defaultProvider}
+      dailyLimit={dailyLimit}
       summary={summary}
       projects={projects}
+      daily={daily}
     />
   );
 }

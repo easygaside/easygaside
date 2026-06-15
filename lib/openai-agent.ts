@@ -179,9 +179,8 @@ async function runOpenAiCriticGate(
 ): Promise<{ issues: number; inputTokens: number; outputTokens: number }> {
   const { projectId, project, emit } = args;
   try {
-    // Announce the phase before the (multi-second) review so the user sees "done → now checking"
-    // instead of a silent gap that jumps straight to "found N bugs". Same wording as the Claude arm.
-    emit({ type: "text", delta: "\n\n✓ สร้างโค้ดเสร็จแล้ว — กำลังวิเคราะห์เพื่อตรวจสอบความถูกต้อง…" });
+    // Working state in the status bar (not chat) — same as the Claude arm.
+    emit({ type: "status", text: "กำลังตรวจสอบความถูกต้องของโค้ด…" });
     // consistent yardstick: the SAME Claude reviewer for every arm
     const review = await reviewProject(new Anthropic(), project, projectId);
     if (review.issues.length === 0) {
@@ -194,7 +193,7 @@ async function runOpenAiCriticGate(
     const actionable = review.issues.filter((i) => i.severity !== "low");
     if (actionable.length === 0) return { issues: review.issues.length, inputTokens: 0, outputTokens: 0 };
 
-    emit({ type: "text", delta: "\n\nกำลังแก้ให้อัตโนมัติ…\n" });
+    emit({ type: "status", text: "กำลังแก้ตามผลตรวจคุณภาพ…" });
     const repairMsg =
       "ตรวจคุณภาพ (rulebook critic) พบปัญหาต่อไปนี้ แก้ไฟล์ที่เกี่ยวข้องให้เรียบร้อยด้วย edit_file/write_file:\n" +
       actionable.map((i) => `- ${i.file}: ${i.problem} — แนวทาง: ${i.fix}`).join("\n");

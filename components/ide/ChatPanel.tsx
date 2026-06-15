@@ -29,6 +29,7 @@ interface ProjectSpec {
 // mirror of lib/anthropic-agent AgentEvent (defined locally to avoid pulling server-only code)
 type AgentEvent =
   | { type: "text"; delta: string }
+  | { type: "status"; text: string }
   | { type: "tool_call"; name: string; input: unknown }
   | { type: "file_mutation"; op: "write" | "edit" | "delete"; path: string; content?: string }
   | { type: "lint"; messages: string[] }
@@ -188,6 +189,7 @@ export function ChatPanel({
             continue;
           }
           if (ev.type === "text") appendAssistant(ev.delta);
+          else if (ev.type === "status") setStatus(ev.text);
           else if (ev.type === "tool_call") setStatus(`${TOOL_LABEL[ev.name] ?? ev.name}…`);
           else if (ev.type === "file_mutation")
             applyMutation({ op: ev.op, path: ev.path, content: ev.content });

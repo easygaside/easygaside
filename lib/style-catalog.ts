@@ -29,6 +29,16 @@ export const STYLE_CATEGORIES: StyleCategory[] = [
   { id: "data", title: "แสดงข้อมูล", hint: "ตาราง/การ์ดสรุป สำหรับข้อมูลจาก Google Sheet" },
   { id: "thai", title: "เฉพาะธุรกิจไทย", hint: "พร้อมเพย์ · วันที่ พ.ศ. · เบอร์โทร — สิ่งที่ AI ทั่วไปมักทำพลาด" },
   { id: "forms", title: "ฟอร์ม", hint: "รูปแบบฟอร์มกรอกข้อมูล" },
+  { id: "notify", title: "แจ้งเตือน & ส่งข้อความ", hint: "อีเมล · LINE · LIFF — จุดแข็งของ GAS" },
+  { id: "auto", title: "ตั้งเวลา & อัตโนมัติ", hint: "ทำงานเองตามเวลา/เมื่อมีฟอร์มเข้ามา (Triggers)" },
+  { id: "search", title: "ค้นหา & กรอง", hint: "ค้นหา/กรอง/เลือกช่วงวันที่เหนือข้อมูล" },
+  { id: "report", title: "รายงาน & ส่งออก", hint: "กราฟ · export CSV/PDF · สร้างเอกสารจากเทมเพลต" },
+  { id: "media", title: "กล้อง · ไฟล์ · QR", hint: "ถ่ายรูปนิ่ง/สร้าง QR/อัปโหลด Drive — กล้องสดทำบน GAS ไม่ได้" },
+  { id: "map", title: "แผนที่ & ตำแหน่ง", hint: "ฝังแผนที่ ปักหมุด นำทาง" },
+  { id: "workflow", title: "เวิร์กโฟลว์ & สถานะ", hint: "อนุมัติ · ขั้นตอน · มอบหมายงาน" },
+  { id: "admin", title: "ตั้งค่า & แอดมิน", hint: "หน้าตั้งค่า/จัดการผู้ใช้" },
+  { id: "auth", title: "เข้าสู่ระบบ & สิทธิ์", hint: "ล็อกอินปลอดภัย · จำการเข้าสู่ระบบ · หน้าตามสิทธิ์" },
+  { id: "robust", title: "ความทนทาน", hint: "สิ่งที่ AI ทั่วไปข้าม — กันแอปค้าง/พัง/ช้า" },
 ];
 
 const FONT = "font-family:system-ui,'Noto Sans Thai',sans-serif";
@@ -253,6 +263,369 @@ export const STYLE_CATALOG: StyleItem[] = [
         <input type="date" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px 11px;margin:5px 0 14px">
         <button style="width:100%;background:#10b981;color:#fff;border:0;padding:11px;border-radius:10px;font-weight:600">จองเลย</button>
       </div>`,
+    ),
+  },
+  // ── notify ──
+  {
+    id: "notify-email",
+    category: "notify",
+    title: "ส่งอีเมลยืนยัน/แจ้งเตือน",
+    when: "ยืนยันการจอง/สั่งซื้อ หรือแจ้งเตือนทีมงานทางอีเมล",
+    promptSnippet: "ส่งอีเมลยืนยัน/แจ้งเตือนด้วย MailApp (มี try/catch และระวัง quota ส่งเมลต่อวัน)",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;overflow:hidden;max-width:280px">
+        <div style="background:#f1f5f9;padding:8px 12px;font-size:12px;color:#64748b">📧 ถึง: คุณลูกค้า</div>
+        <div style="padding:12px"><div style="font-weight:700">ยืนยันการจองคิว</div><div style="color:#64748b;font-size:13px;margin-top:4px">วันที่ 20 มิ.ย. เวลา 14:00 น. — ขอบคุณค่ะ</div></div>
+      </div>`,
+    ),
+  },
+  {
+    id: "notify-line",
+    category: "notify",
+    title: "แจ้งเตือนเข้า LINE เจ้าของร้าน",
+    when: "มีออเดอร์/จองใหม่ → เด้งเข้า LINE ทันที (ยอดนิยมสุดสำหรับร้านไทย)",
+    promptSnippet: "แจ้งเตือนเจ้าของร้านผ่าน LINE Messaging API push (channel access token เก็บใน PropertiesService) — ไม่ใช้ LINE Notify ที่ปิดบริการแล้ว",
+    previewHtml: doc(
+      `<div style="background:#06c755;padding:14px;border-radius:14px;max-width:260px">
+        <div style="background:#fff;border-radius:10px;padding:10px 12px;font-size:13px">
+          <b>🔔 ออเดอร์ใหม่ #1042</b><br><span style="color:#475569">สมชาย · ฿350 · พร้อมเพย์</span>
+        </div>
+      </div>`,
+    ),
+  },
+  {
+    id: "notify-liff",
+    category: "notify",
+    title: "เปิดหน้าในแอป LINE (LIFF)",
+    when: "ให้ลูกค้าเปิดเว็บแอปจากในแชต LINE ได้เลย รู้ว่าใครเป็นใคร",
+    promptSnippet: "เปิดหน้าเว็บแอปภายในแอป LINE ผ่าน LIFF (ดึงโปรไฟล์ผู้ใช้ LINE มาใช้)",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:18px;background:#fff;max-width:170px;padding:10px;text-align:center">
+        <div style="background:#06c755;color:#fff;border-radius:10px;padding:6px;font-size:12px">LINE</div>
+        <div style="margin-top:8px;font-size:13px;font-weight:700">จองคิว</div>
+        <div style="color:#64748b;font-size:11px;margin:4px 0 8px">สวัสดีคุณ A 👋</div>
+        <button style="width:100%;background:#06c755;color:#fff;border:0;padding:8px;border-radius:8px;font-size:12px">จองเลย</button>
+      </div>`,
+    ),
+  },
+  // ── auto ──
+  {
+    id: "auto-trigger",
+    category: "auto",
+    title: "ทำงานอัตโนมัติตามเวลา",
+    when: "ส่งรายงานทุกเช้า / เตือนนัดล่วงหน้า / สรุปยอดสิ้นวัน โดยไม่ต้องกดเอง",
+    promptSnippet: "ตั้ง time-driven trigger พร้อมฟังก์ชัน installTriggers() ให้กดติดตั้งครั้งเดียว เช่น ส่งรายงาน/เตือนนัดอัตโนมัติตามเวลา",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:14px;max-width:260px">
+        <div style="font-weight:700">⏰ ตั้งเวลาอัตโนมัติ</div>
+        <div style="margin-top:8px;display:flex;justify-content:space-between;font-size:13px;border-top:1px solid #eef2f7;padding-top:8px"><span style="color:#475569">ทุกวัน 08:00</span><span style="color:#16a34a">ส่งรายงานยอดขาย</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;border-top:1px solid #eef2f7;padding-top:8px;margin-top:6px"><span style="color:#475569">ก่อนนัด 1 ชม.</span><span style="color:#16a34a">เตือนลูกค้า</span></div>
+      </div>`,
+    ),
+  },
+  {
+    id: "auto-formsubmit",
+    category: "auto",
+    title: "ทำงานเมื่อมีฟอร์มส่งเข้ามา",
+    when: "มีคนกรอก Google Form → บันทึก/แจ้งเตือน/ออกเลขที่อัตโนมัติทันที",
+    promptSnippet: "ทำงานอัตโนมัติเมื่อมีการส่ง Google Form (onFormSubmit trigger) เช่น บันทึกลงชีต + แจ้งเตือน",
+    previewHtml: doc(
+      `<div style="display:flex;align-items:center;gap:8px;font-size:13px;max-width:300px">
+        <div style="background:#eef2ff;color:#4338ca;border-radius:10px;padding:8px 10px">📝 ฟอร์มส่งเข้ามา</div>
+        <span style="color:#94a3b8">→</span>
+        <div style="background:#dcfce7;color:#16a34a;border-radius:10px;padding:8px 10px">บันทึก + แจ้งเตือน</div>
+      </div>`,
+    ),
+  },
+  // ── search ──
+  {
+    id: "search-filterbar",
+    category: "search",
+    title: "ค้นหา + ตัวกรอง (chips)",
+    when: "ข้อมูลเยอะ อยากกรองตามหมวด/สถานะได้เร็ว",
+    promptSnippet: "มีช่องค้นหา + ตัวกรองแบบ filter chips เหนือรายการ (กรองตามหมวด/สถานะ)",
+    previewHtml: doc(
+      `<input placeholder="🔍 ค้นหา…" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:8px 11px;font-size:13px;max-width:300px">
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <span style="background:#4338ca;color:#fff;border-radius:999px;padding:4px 12px;font-size:12px">ทั้งหมด</span>
+        <span style="background:#eef2ff;color:#4338ca;border-radius:999px;padding:4px 12px;font-size:12px">รอจ่าย</span>
+        <span style="background:#eef2ff;color:#4338ca;border-radius:999px;padding:4px 12px;font-size:12px">เสร็จแล้ว</span>
+      </div>`,
+    ),
+  },
+  {
+    id: "search-daterange",
+    category: "search",
+    title: "เลือกช่วงวันที่",
+    when: "ดูข้อมูล/รายงานเฉพาะช่วงเวลาที่สนใจ",
+    promptSnippet: "มีตัวเลือกช่วงวันที่ (จากวันที่–ถึงวันที่) เพื่อกรองข้อมูล/รายงาน",
+    previewHtml: doc(
+      `<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;max-width:320px">
+        <div><div style="font-size:12px;color:#64748b">จาก</div><input type="date" style="border:1px solid #e2e8f0;border-radius:8px;padding:7px 9px"></div>
+        <div><div style="font-size:12px;color:#64748b">ถึง</div><input type="date" style="border:1px solid #e2e8f0;border-radius:8px;padding:7px 9px"></div>
+        <button style="background:#6366f1;color:#fff;border:0;padding:8px 14px;border-radius:9px;font-weight:600">ดู</button>
+      </div>`,
+    ),
+  },
+  // ── report ──
+  {
+    id: "report-chart",
+    category: "report",
+    title: "กราฟสรุป",
+    when: "เห็นแนวโน้มยอดขาย/จำนวนเป็นภาพ เข้าใจง่ายกว่าตัวเลข",
+    promptSnippet: "แสดงกราฟสรุป (ใช้ Chart.js จาก CDN) เช่นยอดขายรายวัน/สัดส่วนหมวด",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:14px;max-width:280px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:10px">ยอดขาย 7 วัน</div>
+        <div style="display:flex;align-items:end;gap:8px;height:80px">
+          <div style="flex:1;background:#6366f1;height:40%;border-radius:4px 4px 0 0"></div>
+          <div style="flex:1;background:#6366f1;height:65%;border-radius:4px 4px 0 0"></div>
+          <div style="flex:1;background:#6366f1;height:50%;border-radius:4px 4px 0 0"></div>
+          <div style="flex:1;background:#6366f1;height:85%;border-radius:4px 4px 0 0"></div>
+          <div style="flex:1;background:#6366f1;height:70%;border-radius:4px 4px 0 0"></div>
+          <div style="flex:1;background:#818cf8;height:100%;border-radius:4px 4px 0 0"></div>
+          <div style="flex:1;background:#818cf8;height:55%;border-radius:4px 4px 0 0"></div>
+        </div>
+      </div>`,
+    ),
+  },
+  {
+    id: "report-export",
+    category: "report",
+    title: "ส่งออก CSV / PDF",
+    when: "เอาข้อมูลไปใช้ต่อใน Excel หรือพิมพ์เป็นเอกสาร",
+    promptSnippet: "มีปุ่มส่งออกข้อมูลเป็น CSV (และพิมพ์เป็น PDF ผ่านหน้าพิมพ์)",
+    previewHtml: doc(
+      `<div style="display:flex;gap:8px;max-width:280px">
+        <button style="flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:10px;font-weight:600;color:#16a34a">⬇️ CSV</button>
+        <button style="flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:10px;font-weight:600;color:#dc2626">🖨 PDF</button>
+      </div>`,
+    ),
+  },
+  {
+    id: "report-mailmerge",
+    category: "report",
+    title: "สร้างเอกสารจากเทมเพลต (Doc→PDF)",
+    when: "ออกใบรับรอง/ใบเสนอราคา/สัญญา จากเทมเพลตแล้วได้ PDF อัตโนมัติ",
+    promptSnippet: "สร้างเอกสารจากเทมเพลต Google Doc โดยแทนค่าตัวแปร แล้วแปลงเป็น PDF (mail-merge) เช่นใบรับรอง/ใบเสนอราคา",
+    previewHtml: doc(
+      `<div style="display:flex;align-items:center;gap:10px;font-size:13px;max-width:300px">
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center;background:#fff">📄<br><span style="font-size:11px;color:#64748b">เทมเพลต</span></div>
+        <span style="color:#94a3b8">+ ข้อมูล →</span>
+        <div style="border:1px solid #fecaca;border-radius:8px;padding:10px;text-align:center;background:#fff;color:#dc2626">📕<br><span style="font-size:11px">PDF</span></div>
+      </div>`,
+    ),
+  },
+  // ── media ──
+  {
+    id: "media-photo",
+    category: "media",
+    title: "ถ่ายรูปนิ่งจากกล้อง",
+    when: "ถ่ายรูปของส่ง/หลักฐาน/สินค้า แล้วเก็บไว้ (รูปเดี่ยว ไม่ใช่กล้องสด)",
+    promptSnippet: "ถ่ายรูปนิ่งด้วย <input type=file accept=image capture> แล้วอัปโหลดเก็บใน Drive — หมายเหตุ: กล้องสด/สแกนต่อเนื่องทำบน GAS ไม่ได้",
+    previewHtml: doc(
+      `<div style="border:1px dashed #cbd5e1;border-radius:12px;background:#fff;padding:22px;text-align:center;max-width:240px">
+        <div style="font-size:30px">📷</div>
+        <button style="margin-top:8px;background:#0f172a;color:#fff;border:0;padding:9px 16px;border-radius:10px;font-weight:600">ถ่ายรูป</button>
+      </div>`,
+    ),
+  },
+  {
+    id: "media-qrgen",
+    category: "media",
+    title: "สร้าง QR Code",
+    when: "ออก QR ให้ลูกค้าสแกน เช่นลิงก์จอง/เช็คอิน/ติดตามสถานะ",
+    promptSnippet: "สร้าง QR code ฝั่ง client ด้วย qrcode.js (จาก CDN)",
+    previewHtml: doc(
+      `<div style="text-align:center;max-width:200px">
+        <div style="width:104px;height:104px;margin:0 auto;background:repeating-linear-gradient(45deg,#0f172a 0 7px,#fff 7px 14px);border-radius:8px"></div>
+        <div style="font-size:12px;color:#64748b;margin-top:8px">สแกนเพื่อจอง</div>
+      </div>`,
+    ),
+  },
+  {
+    id: "media-upload",
+    category: "media",
+    title: "อัปโหลดไฟล์เข้า Drive",
+    when: "แนบสลิป/เอกสาร/รูป เก็บใน Google Drive ของคุณ",
+    promptSnippet: "อัปโหลดไฟล์/รูปเข้า Google Drive (ขอ scope drive.file เฉพาะไฟล์ที่แอปสร้างเท่านั้น)",
+    previewHtml: doc(
+      `<div style="border:1px dashed #cbd5e1;border-radius:12px;background:#fff;padding:20px;text-align:center;max-width:260px;color:#64748b;font-size:13px">
+        <div style="font-size:26px">📎</div>ลากไฟล์มาวาง หรือกดเลือก<div style="margin-top:6px;font-size:11px;color:#16a34a">เก็บใน Drive ของคุณเอง</div>
+      </div>`,
+    ),
+  },
+  // ── map ──
+  {
+    id: "map-embed",
+    category: "map",
+    title: "แผนที่ + ปุ่มนำทาง",
+    when: "โชว์ที่ตั้งร้าน/จุดนัด แล้วให้กดนำทางด้วย Google Maps",
+    promptSnippet: "ฝังแผนที่ Google Maps ปักหมุดที่อยู่ + ปุ่ม 'นำทาง' เปิด Google Maps directions",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;background:#fff;max-width:280px">
+        <div style="height:96px;background:linear-gradient(135deg,#dbeafe,#bbf7d0);position:relative"><span style="position:absolute;top:34px;left:120px;font-size:24px">📍</span></div>
+        <div style="padding:10px"><div style="font-weight:700;font-size:13px">ร้านตัดผม สาขาสยาม</div><button style="margin-top:6px;width:100%;background:#2563eb;color:#fff;border:0;padding:8px;border-radius:9px;font-weight:600;font-size:13px">🧭 นำทาง</button></div>
+      </div>`,
+    ),
+  },
+  // ── workflow ──
+  {
+    id: "wf-approval",
+    category: "workflow",
+    title: "สถานะอนุมัติ",
+    when: "งานต้องผ่านการอนุมัติ — รออนุมัติ / อนุมัติ / ปฏิเสธ",
+    promptSnippet: "มีสถานะอนุมัติ (รออนุมัติ/อนุมัติ/ปฏิเสธ) เปลี่ยนสถานะได้ + บันทึกผู้อนุมัติ/เวลา",
+    previewHtml: doc(
+      `<div style="display:flex;flex-direction:column;gap:8px;max-width:260px;font-size:13px">
+        <div style="display:flex;justify-content:space-between;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;background:#fff">ใบเบิก #12 <span style="background:#fef9c3;color:#ca8a04;border-radius:999px;padding:2px 10px;font-size:11px">รออนุมัติ</span></div>
+        <div style="display:flex;justify-content:space-between;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;background:#fff">ใบเบิก #11 <span style="background:#dcfce7;color:#16a34a;border-radius:999px;padding:2px 10px;font-size:11px">อนุมัติ</span></div>
+      </div>`,
+    ),
+  },
+  {
+    id: "wf-stepper",
+    category: "workflow",
+    title: "ขั้นตอน (Stepper)",
+    when: "งานมีหลายขั้น อยากให้เห็นว่าถึงไหนแล้ว",
+    promptSnippet: "แสดงขั้นตอนการทำงานแบบ stepper/timeline (ขั้นที่ทำแล้ว/กำลังทำ/ยังไม่ถึง)",
+    previewHtml: doc(
+      `<div style="display:flex;align-items:center;gap:4px;max-width:300px;font-size:11px;color:#64748b">
+        <div style="text-align:center"><div style="width:24px;height:24px;border-radius:50%;background:#16a34a;color:#fff;margin:0 auto;line-height:24px">✓</div>รับเรื่อง</div>
+        <div style="flex:1;height:2px;background:#16a34a"></div>
+        <div style="text-align:center"><div style="width:24px;height:24px;border-radius:50%;background:#6366f1;color:#fff;margin:0 auto;line-height:24px">2</div>ดำเนินการ</div>
+        <div style="flex:1;height:2px;background:#e2e8f0"></div>
+        <div style="text-align:center"><div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;color:#94a3b8;margin:0 auto;line-height:24px">3</div>เสร็จ</div>
+      </div>`,
+    ),
+  },
+  // ── admin ──
+  {
+    id: "admin-settings",
+    category: "admin",
+    title: "หน้าตั้งค่า",
+    when: "ปรับค่าระบบได้เอง เช่น เปิด/ปิดฟีเจอร์ ข้อความ ราคา",
+    promptSnippet: "มีหน้าตั้งค่า อ่าน/เขียนค่าใน config (PropertiesService หรือชีต settings)",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:14px;max-width:260px;font-size:13px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">แจ้งเตือน LINE <span style="width:34px;height:18px;background:#16a34a;border-radius:999px;position:relative"><span style="position:absolute;right:2px;top:2px;width:14px;height:14px;background:#fff;border-radius:50%"></span></span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #eef2f7">รับคิวออนไลน์ <span style="width:34px;height:18px;background:#cbd5e1;border-radius:999px;position:relative"><span style="position:absolute;left:2px;top:2px;width:14px;height:14px;background:#fff;border-radius:50%"></span></span></div>
+      </div>`,
+    ),
+  },
+  {
+    id: "admin-users",
+    category: "admin",
+    title: "จัดการผู้ใช้ & สิทธิ์",
+    when: "มีหลายคนใช้งาน อยากกำหนดว่าใครทำอะไรได้บ้าง",
+    promptSnippet: "หน้าจัดการผู้ใช้และสิทธิ์ (role) — เพิ่ม/ลบผู้ใช้, กำหนด role แอดมิน/พนักงาน",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;overflow:hidden;max-width:280px;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:9px 12px">สมชาย <span style="background:#ede9fe;color:#6d28d9;border-radius:999px;padding:2px 10px;font-size:11px">แอดมิน</span></div>
+        <div style="display:flex;justify-content:space-between;padding:9px 12px;border-top:1px solid #eef2f7">มาลี <span style="background:#f1f5f9;color:#475569;border-radius:999px;padding:2px 10px;font-size:11px">พนักงาน</span></div>
+      </div>`,
+    ),
+  },
+  // ── auth ──
+  {
+    id: "auth-login",
+    category: "auth",
+    title: "เข้าสู่ระบบ (ปลอดภัย)",
+    when: "ผู้ใช้ปลายทางไม่มี/ไม่อยากใช้บัญชี Google — ใช้ user/password ของระบบเอง",
+    promptSnippet: "ระบบเข้าสู่ระบบ username/password เก็บในชีตแบบปลอดภัย (per-user salt + pepper ใน PropertiesService + วน hash หลายพันรอบ ไม่เก็บ plaintext, rate-limit) — ตามกฎ secure-custom-auth",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:16px;max-width:250px">
+        <div style="font-weight:700;text-align:center;margin-bottom:10px">เข้าสู่ระบบ</div>
+        <input placeholder="ชื่อผู้ใช้" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px;margin-bottom:8px">
+        <input type="password" value="••••••" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px;margin-bottom:12px">
+        <button style="width:100%;background:#6366f1;color:#fff;border:0;padding:10px;border-radius:10px;font-weight:600">เข้าสู่ระบบ</button>
+      </div>`,
+    ),
+  },
+  {
+    id: "auth-remember",
+    category: "auth",
+    title: "จำการเข้าสู่ระบบ",
+    when: "ไม่ต้องล็อกอินใหม่ทุกครั้ง — สะดวกแต่ยังปลอดภัย",
+    promptSnippet: "จำการเข้าสู่ระบบด้วย session token แบบสุ่ม (เก็บ hash + วันหมดอายุ + เพิกถอนได้ — ไม่เก็บรหัสผ่านใน localStorage)",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:16px;max-width:250px;font-size:13px">
+        <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked> จดจำฉันไว้</label>
+        <div style="color:#16a34a;font-size:12px;margin-top:8px">✓ ปลอดภัย — เก็บ token ไม่ใช่รหัสผ่าน</div>
+      </div>`,
+    ),
+  },
+  {
+    id: "auth-roleview",
+    category: "auth",
+    title: "หน้าตามสิทธิ์ (SPA)",
+    when: "คนละ role เห็นเมนู/หน้าไม่เหมือนกัน (แอดมินเห็นมากกว่าพนักงาน)",
+    promptSnippet: "ทำเป็นเว็บแอป SPA (Alpine.js) แสดงเมนู/หน้าตาม role สลับหน้าฝั่ง client ใน doGet เดียว",
+    previewHtml: doc(
+      `<div style="max-width:280px;font-size:13px">
+        <div style="margin-bottom:8px">บทบาท:
+          <select id="r" style="border:1px solid #cbd5e1;border-radius:7px;padding:4px 8px"><option value="a">แอดมิน</option><option value="s">พนักงาน</option></select>
+        </div>
+        <div id="m" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+      <script>var menus={a:['สรุป','รายการ','ผู้ใช้','ตั้งค่า'],s:['สรุป','รายการ']};function r(){var v=document.getElementById('r').value;document.getElementById('m').innerHTML=menus[v].map(function(x){return '<span style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:5px 10px">'+x+'</span>';}).join('');}document.getElementById('r').onchange=r;r();</script>`,
+    ),
+  },
+  {
+    id: "auth-single",
+    category: "auth",
+    title: "หน้าเดียว (เรียบง่าย)",
+    when: "งานเล็กๆ ไม่ต้องมีเมนู/หลายหน้า — ฟอร์มหรือแดชบอร์ดหน้าเดียวจบ",
+    promptSnippet: "ทำเป็นเว็บแอปหน้าเดียว (single view) เรียบง่าย ไม่มี routing",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:18px;max-width:240px;text-align:center">
+        <div style="font-weight:700">บันทึกยอดขาย</div>
+        <input placeholder="จำนวนเงิน" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px;margin:10px 0">
+        <button style="width:100%;background:#10b981;color:#fff;border:0;padding:10px;border-radius:10px;font-weight:600">บันทึก</button>
+      </div>`,
+    ),
+  },
+  // ── robust ──
+  {
+    id: "robust-pagination",
+    category: "robust",
+    title: "โหลดข้อมูลทีละหน้า",
+    when: "ข้อมูลในชีตเยอะ (พันแถวขึ้นไป) — กันแอปค้าง/โหลดช้า",
+    promptSnippet: "โหลดข้อมูลตารางแบบทีละหน้า (pagination/lazy-load) ฝั่งเซิร์ฟเวอร์ ไม่ getValues ทั้งหมดรวดเดียว",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:12px;max-width:260px;text-align:center;font-size:13px">
+        <div style="color:#64748b">แสดง 1–20 จาก 1,240 รายการ</div>
+        <div style="margin-top:8px;display:flex;justify-content:center;gap:6px">
+          <span style="border:1px solid #e2e8f0;border-radius:7px;padding:4px 10px">«</span>
+          <span style="background:#6366f1;color:#fff;border-radius:7px;padding:4px 10px">1</span>
+          <span style="border:1px solid #e2e8f0;border-radius:7px;padding:4px 10px">2</span>
+          <span style="border:1px solid #e2e8f0;border-radius:7px;padding:4px 10px">3</span>
+          <span style="border:1px solid #e2e8f0;border-radius:7px;padding:4px 10px">»</span>
+        </div>
+      </div>`,
+    ),
+  },
+  {
+    id: "robust-autosave",
+    category: "robust",
+    title: "บันทึกอัตโนมัติ",
+    when: "ฟอร์มยาว/แก้บ่อย — ไม่อยากให้ผู้ใช้กดบันทึกเองตลอด",
+    promptSnippet: "บันทึกอัตโนมัติแบบ debounced เมื่อผู้ใช้พิมพ์/แก้ (รอหยุดพิมพ์ ~1 วิ แล้วค่อยบันทึก) พร้อมแสดงสถานะ 'บันทึกแล้ว'",
+    previewHtml: doc(
+      `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:14px;max-width:260px">
+        <textarea style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px;resize:none" rows="2">โน้ตลูกค้า…</textarea>
+        <div style="color:#16a34a;font-size:12px;margin-top:6px">✓ บันทึกอัตโนมัติแล้ว</div>
+      </div>`,
+    ),
+  },
+  {
+    id: "robust-offline",
+    category: "robust",
+    title: "แจ้งเตือนเน็ตหลุด",
+    when: "ใช้งานหน้าร้าน/มือถือที่เน็ตไม่เสถียร — กันข้อมูลหายเงียบ",
+    promptSnippet: "ตรวจจับการเชื่อมต่อหลุด (online/offline) แล้วแสดง banner เตือน + กันส่งข้อมูลตอนออฟไลน์",
+    previewHtml: doc(
+      `<div style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:13px;max-width:300px">⚠️ ไม่มีการเชื่อมต่ออินเทอร์เน็ต — ระบบจะบันทึกให้เมื่อกลับมาออนไลน์</div>`,
     ),
   },
 ];

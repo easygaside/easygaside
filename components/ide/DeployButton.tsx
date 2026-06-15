@@ -26,9 +26,11 @@ const ERR_MSG: Record<string, string> = {
 export function DeployButton({
   projectId,
   googleConnected = true,
+  onDeployed,
 }: {
   projectId: string;
   googleConnected?: boolean;
+  onDeployed?: (execUrl: string) => void;
 }) {
   const [res, setRes] = useState<Result>({ kind: "idle" });
 
@@ -44,6 +46,7 @@ export function DeployButton({
           needsTriggerSetup: !!data.needsTriggerSetup,
           scriptEditorUrl: data.scriptEditorUrl,
         });
+        if (data.execUrl) onDeployed?.(data.execUrl); // surface the URL in the persistent bar
       } else if (data.error === "USER_SETTINGS_DISABLED") {
         setRes({ kind: "enable_api", enableUrl: data.enableUrl, message: data.message });
       } else {

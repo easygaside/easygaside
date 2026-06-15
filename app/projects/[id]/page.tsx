@@ -5,7 +5,7 @@ import { listProjectChatImages } from "@/lib/chat-images";
 import { ENERGY_TANK, getProjectEnergyUsed } from "@/lib/energy";
 import { getFiles } from "@/lib/files";
 import { getConnectionStatus } from "@/lib/google-connection";
-import { getCurrentUser, getProject } from "@/lib/projects";
+import { getCurrentUser, getDeployedUrl, getProject } from "@/lib/projects";
 
 export default async function ProjectBuilderPage({
   params,
@@ -23,11 +23,12 @@ export default async function ProjectBuilderPage({
   if (!project) notFound();
 
   // ownership verified above → safe to read files / images via service-role
-  const [files, conn, chatImages, energyUsed] = await Promise.all([
+  const [files, conn, chatImages, energyUsed, deployedUrl] = await Promise.all([
     getFiles(id),
     getConnectionStatus(userId),
     listProjectChatImages(id),
     getProjectEnergyUsed(id),
+    getDeployedUrl(id),
   ]);
 
   // honest hint when the project asked for a capability GAS can't serve yet (web target)
@@ -47,6 +48,7 @@ export default async function ProjectBuilderPage({
       googleConnected={conn.connected && conn.status === "active"}
       energyUsed={energyUsed}
       energyTank={ENERGY_TANK}
+      deployedUrl={deployedUrl}
     />
   );
 }

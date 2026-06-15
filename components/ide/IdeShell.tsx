@@ -16,6 +16,7 @@ import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ChatPanel } from "./ChatPanel";
 import { DeployButton } from "./DeployButton";
+import { DeployedUrlBar } from "./DeployedUrlBar";
 import { EditorPane } from "./EditorPane";
 import { FileTree } from "./FileTree";
 import { PreviewPane } from "./PreviewPane";
@@ -32,6 +33,7 @@ export function IdeShell({
   googleConnected = true,
   energyUsed = 0,
   energyTank,
+  deployedUrl,
 }: {
   projectId: string;
   projectName: string;
@@ -41,9 +43,11 @@ export function IdeShell({
   googleConnected?: boolean;
   energyUsed?: number;
   energyTank?: number;
+  deployedUrl?: string | null;
 }) {
   const setInitial = useProjectStore((s) => s.setInitial);
   const [hintOpen, setHintOpen] = useState(true);
+  const [deployUrl, setDeployUrl] = useState<string | null>(deployedUrl ?? null);
   // mobile-only: show one pane at a time (desktop shows all three side by side)
   const [pane, setPane] = useState<"chat" | "code" | "preview">("chat");
   useEffect(() => {
@@ -85,8 +89,10 @@ export function IdeShell({
         <span className="flex-1" />
         <ReportButton projectId={projectId} />
         <ThemeToggle />
-        <DeployButton projectId={projectId} googleConnected={googleConnected} />
+        <DeployButton projectId={projectId} googleConnected={googleConnected} onDeployed={setDeployUrl} />
       </div>
+
+      {deployUrl && <DeployedUrlBar url={deployUrl} />}
 
       {webHint && webHint.length > 0 && hintOpen && (
         <div className="mx-3 mb-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200">

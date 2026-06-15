@@ -59,6 +59,14 @@ const SUGGESTIONS = [
   "แดชบอร์ดสรุปยอดขาย",
 ];
 
+// shown when the project already has code (reopened/deployed) — guide toward editing, not building anew
+const EDIT_SUGGESTIONS = [
+  "เพิ่มช่องค้นหา",
+  "เพิ่มปุ่มลบรายการ",
+  "ทำให้ใช้ง่ายบนมือถือ",
+  "กดแล้วขึ้น error — ช่วยแก้ให้",
+];
+
 /** Small "energy" gauge = remaining per-project token budget. We never show raw token counts. */
 function EnergyBar({ used, tank }: { used: number; tank: number }) {
   const pct = Math.max(0, Math.min(100, Math.round((1 - used / tank) * 100)));
@@ -320,10 +328,20 @@ export function ChatPanel({
         {messages.length === 0 && (
           <div className="px-1 pt-6">
             <p className="mb-2 text-center text-[12px] text-slate-400 dark:text-slate-500">
-              พิมพ์บอกสิ่งที่อยากได้ · แตะตัวอย่าง · หรือกด <b className="text-emerald-600 dark:text-emerald-400">ผู้ช่วย</b> ด้านบน
+              {hasFiles ? (
+                <>
+                  โปรเจกต์นี้มีโค้ดแล้ว — บอกสิ่งที่อยาก<b className="text-emerald-600 dark:text-emerald-400">เพิ่ม</b> หรือวาง{" "}
+                  <b className="text-emerald-600 dark:text-emerald-400">error</b> ที่เจอ ให้ AI แก้ให้
+                </>
+              ) : (
+                <>
+                  พิมพ์บอกสิ่งที่อยากได้ · แตะตัวอย่าง · หรือกด{" "}
+                  <b className="text-emerald-600 dark:text-emerald-400">ผู้ช่วย</b> ด้านบน
+                </>
+              )}
             </p>
             <div className="grid grid-cols-2 gap-1.5">
-              {SUGGESTIONS.map((s) => (
+              {(hasFiles ? EDIT_SUGGESTIONS : SUGGESTIONS).map((s) => (
                 <button
                   key={s}
                   onClick={() => setInput(s)}
@@ -507,7 +525,11 @@ export function ChatPanel({
                 send();
               }
             }}
-            placeholder="บอกสิ่งที่อยากให้ AI สร้างหรือแก้… แนบรูปอ้างอิงได้&#10;Enter = ส่ง · Shift+Enter = ขึ้นบรรทัดใหม่"
+            placeholder={
+              hasFiles
+                ? "อยากเพิ่มฟีเจอร์ หรือเจอ error? บอกได้เลย เช่น “เพิ่มปุ่มลบ” หรือวางข้อความ error ที่เจอ\nEnter = ส่ง · Shift+Enter = บรรทัดใหม่"
+                : "บอกสิ่งที่อยากให้ AI สร้าง… แนบรูปอ้างอิงได้\nEnter = ส่ง · Shift+Enter = ขึ้นบรรทัดใหม่"
+            }
             disabled={busy}
             rows={3}
             className="min-h-[72px] flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 disabled:opacity-60"

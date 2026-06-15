@@ -87,3 +87,17 @@ export async function getDeployedMap(): Promise<Record<string, string>> {
   }
   return map;
 }
+
+/** Live /exec URL for a single project's deployed web app (null if not deployed yet). RLS-scoped. */
+export async function getDeployedUrl(projectId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("egs_deployments")
+    .select("exec_url")
+    .eq("project_id", projectId)
+    .eq("entry_type", "webapp")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return ((data as { exec_url: string | null } | null)?.exec_url) ?? null;
+}

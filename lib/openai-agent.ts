@@ -44,6 +44,10 @@ async function runOpenAiTurn(
   cfg: ProviderConfig,
   { projectId, project, userMessage, images = [], internal = false, emit }: RunAgentArgs,
 ): Promise<TurnResult> {
+  // The rulebook goes in the FIRST system message and is byte-identical across turns. OpenAI,
+  // DeepSeek and Gemini all auto-cache a stable prompt prefix, so this is what makes caching work
+  // on the non-Claude arms — do NOT prepend dynamic content to `system` (it would bust the cache;
+  // put any per-turn context on the user message instead, like the Claude arm's RAG seam).
   const system = buildCodegenSystemPrompt({ kind: project.kind });
   const history = (await getRawHistory(projectId)) as Msg[];
 

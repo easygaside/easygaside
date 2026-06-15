@@ -9,7 +9,11 @@ import type { EgsProject } from "@/types/db";
  * (dynamic run-and-repair, deferred). The agent loop runs ONE bounded auto-repair from its output.
  */
 
-const MODEL_CRITIC = "claude-sonnet-4-6";
+// The critic is an LLM-as-judge pre-filter against a very prescriptive rubric — Haiku handles it
+// well at a fraction of Sonnet's cost. It runs on EVERY provider arm (the shared Claude yardstick),
+// so this one swap lowers cost for the chatgpt/deepseek/gemini arms too, not just Claude. If critic
+// recall ever drops noticeably, bump back to claude-sonnet-4-6.
+const MODEL_CRITIC = "claude-haiku-4-5-20251001";
 const CRITIC_MAX_TOKENS = 1500;
 const MAX_ISSUES = 12; // bound the repair prompt
 
@@ -88,7 +92,8 @@ export async function reviewProject(
   const msg = await client.messages.create({
     model: MODEL_CRITIC,
     max_tokens: CRITIC_MAX_TOKENS,
-    system: CRITIC_SYSTEM,
+    // cache the constant rubric (it's identical on every review call)
+    system: [{ type: "text", text: CRITIC_SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: `Project kind: ${kind}\n\n${body}` }],
   });
 

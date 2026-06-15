@@ -7,10 +7,10 @@ import { createServiceClient } from "@/lib/supabase/service";
  * wire format (DeepSeek via baseURL override); Claude uses the Anthropic format.
  */
 
-export type LlmProvider = "claude" | "chatgpt" | "deepseek";
+export type LlmProvider = "claude" | "chatgpt" | "deepseek" | "gemini";
 export type LlmFamily = "anthropic" | "openai";
 
-export const LLM_PROVIDERS: LlmProvider[] = ["claude", "chatgpt", "deepseek"];
+export const LLM_PROVIDERS: LlmProvider[] = ["claude", "chatgpt", "deepseek", "gemini"];
 export const DEFAULT_PROVIDER: LlmProvider = "claude";
 
 export interface ProviderConfig {
@@ -40,6 +40,15 @@ export function providerConfig(p: LlmProvider): ProviderConfig {
         model: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
         baseURL: "https://api.deepseek.com",
         apiKey: process.env.DEEPSEEK_API_KEY,
+      };
+    case "gemini":
+      return {
+        provider: "gemini",
+        family: "openai",
+        label: "Gemini",
+        model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+        apiKey: process.env.GEMINI_API_KEY,
       };
     default:
       return {

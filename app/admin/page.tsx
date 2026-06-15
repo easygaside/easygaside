@@ -9,6 +9,7 @@ export const metadata = { title: "Admin — EasyGAS IDE" };
 
 interface GenRow {
   provider: string;
+  project_id: string | null;
   input_tokens: number;
   output_tokens: number;
   critic_issues: number;
@@ -29,10 +30,12 @@ export default async function AdminPage() {
       svc.from("egs_user_settings").select("user_id, llm_provider"),
       svc
         .from("egs_generations")
-        .select("provider, input_tokens, output_tokens, critic_issues, duration_ms, outcome, rating"),
+        .select("provider, project_id, input_tokens, output_tokens, critic_issues, duration_ms, outcome, rating"),
       svc.from("egs_provider_config").select("provider, model"),
       svc.from("egs_app_settings").select("value").eq("key", "default_provider").maybeSingle(),
     ]);
+  const { data: projectRows } = await svc.from("egs_projects").select("id, name");
+  const projectName = new Map((projectRows ?? []).map((p) => [p.id as string, p.name as string]));
 
   const modelByProvider = new Map(
     (pcfg ?? []).map((r) => [r.provider as LlmProvider, r.model as string]),
@@ -49,8 +52,9 @@ export default async function AdminPage() {
     arm: armByUser.get(u.id) ?? "claude",
   }));
 
-  // per-arm aggregates
+  // per-arm aggregates (incl. total tokens by provider)
   const rows = (gens ?? []) as GenRow[];
+  const tok = (r: GenRow) => r.input_tokens + r.output_tokens;
   const metrics: ArmMetric[] = LLM_PROVIDERS.map((p) => {
     const g = rows.filter((r) => r.provider === p);
     const n = g.length || 1;
@@ -59,6 +63,8 @@ export default async function AdminPage() {
       provider: p,
       assigned: users.filter((u) => u.arm === p).length,
       gens: g.length,
+      inTok: sum((r) => r.input_tokens),
+      outTok: sum((r) => r.output_tokens),
       avgInTok: Math.round(sum((r) => r.input_tokens) / n),
       avgOutTok: Math.round(sum((r) => r.output_tokens) / n),
       avgCritic: +(sum((r) => r.critic_issues) / n).toFixed(2),
@@ -69,7 +75,42 @@ export default async function AdminPage() {
     };
   });
 
+  // overall token summary
+  const totalIn = rows.reduce((a, r) => a + r.input_tokens, 0);
+  const totalOut = rows.reduce((a, r) => a + r.output_tokens, 0);
+
+  // per-project tokens (+ average across all projects that generated)
+  const byProject = new Map<string, { tokens: number; gens: number }>();
+  for (const r of rows) {
+    if (!r.project_id) continue;
+    const cur = byProject.get(r.project_id) ?? { tokens: 0, gens: 0 };
+    cur.tokens += tok(r);
+    cur.gens += 1;
+    byProject.set(r.project_id, cur);
+  }
+  const projectCount = byProject.size;
+  const projects = [...byProject.entries()]
+    .map(([id, v]) => ({ name: projectName.get(id) ?? id.slice(0, 8), tokens: v.tokens, gens: v.gens }))
+    .sort((a, b) => b.tokens - a.tokens)
+    .slice(0, 15);
+
+  const summary = {
+    totalTokens: totalIn + totalOut,
+    totalIn,
+    totalOut,
+    gens: rows.length,
+    projectCount,
+    avgPerProject: projectCount ? Math.round((totalIn + totalOut) / projectCount) : 0,
+  };
+
   return (
-    <AdminPanel users={users} metrics={metrics} models={models} defaultProvider={defaultProvider} />
+    <AdminPanel
+      users={users}
+      metrics={metrics}
+      models={models}
+      defaultProvider={defaultProvider}
+      summary={summary}
+      projects={projects}
+    />
   );
 }

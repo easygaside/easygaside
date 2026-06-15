@@ -47,9 +47,9 @@ async function runOpenAiTurn(
   const system = buildCodegenSystemPrompt({ kind: project.kind });
   const history = (await getRawHistory(projectId)) as Msg[];
 
-  // live user turn (images only for vision-capable providers; DeepSeek text-only)
+  // live user turn (images only for vision-capable providers; DeepSeek is text-only)
   const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] | string =
-    images.length && cfg.provider === "chatgpt"
+    images.length && cfg.provider !== "deepseek"
       ? [
           { type: "text", text: userMessage },
           ...images.map((img) => ({

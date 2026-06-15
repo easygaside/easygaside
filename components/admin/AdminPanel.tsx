@@ -21,6 +21,8 @@ export interface ArmMetric {
   provider: LlmProvider;
   assigned: number;
   gens: number;
+  inTok: number;
+  outTok: number;
   avgInTok: number;
   avgOutTok: number;
   avgCritic: number;
@@ -29,12 +31,28 @@ export interface ArmMetric {
   up: number;
   down: number;
 }
+export interface TokenSummary {
+  totalTokens: number;
+  totalIn: number;
+  totalOut: number;
+  gens: number;
+  projectCount: number;
+  avgPerProject: number;
+}
+export interface ProjectTokens {
+  name: string;
+  tokens: number;
+  gens: number;
+}
 
 const ARM_STYLE: Record<LlmProvider, string> = {
   claude: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
   chatgpt: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
   deepseek: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+  gemini: "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
 };
+
+const fmt = (n: number) => n.toLocaleString("en-US");
 
 export interface ProviderModel {
   provider: LlmProvider;
@@ -46,11 +64,15 @@ export function AdminPanel({
   metrics,
   models,
   defaultProvider,
+  summary,
+  projects,
 }: {
   users: AdminUser[];
   metrics: ArmMetric[];
   models: ProviderModel[];
   defaultProvider: LlmProvider;
+  summary: TokenSummary;
+  projects: ProjectTokens[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -108,6 +130,32 @@ export function AdminPanel({
       </Link>
       <h1 className="text-2xl font-bold">Admin — A/B โมเดล</h1>
 
+      {/* token summary */}
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {[
+          { label: "Token รวมทั้งหมด", value: fmt(summary.totalTokens), accent: true },
+          { label: "Token เฉลี่ย/โปรเจกต์", value: fmt(summary.avgPerProject) },
+          { label: "จำนวน generation", value: fmt(summary.gens) },
+          { label: "input รวม", value: fmt(summary.totalIn) },
+          { label: "output รวม", value: fmt(summary.totalOut) },
+          { label: "โปรเจกต์ที่ใช้งาน", value: fmt(summary.projectCount) },
+        ].map((c) => (
+          <div
+            key={c.label}
+            className={`rounded-xl border p-3 ${
+              c.accent
+                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800/60 dark:bg-emerald-950/40"
+                : "border-slate-200 bg-white dark:border-slate-700/60 dark:bg-slate-900"
+            }`}
+          >
+            <div className="text-xs text-slate-500 dark:text-slate-400">{c.label}</div>
+            <div className={`mt-1 text-xl font-bold ${c.accent ? "text-emerald-600 dark:text-emerald-300" : "text-slate-800 dark:text-slate-100"}`}>
+              {c.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* provider config: default + model names */}
       <section className="mt-6 rounded-xl border border-slate-200 p-4 dark:border-slate-700/60">
         <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">ตั้งค่า Provider</h2>
@@ -160,7 +208,7 @@ export function AdminPanel({
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
             <tr>
-              {["provider", "คน", "gen", "in tok", "out tok", "critic/gen", "วินาที", "สำเร็จ%", "👍", "👎"].map((h) => (
+              {["provider", "คน", "gen", "in รวม", "out รวม", "in เฉลี่ย", "out เฉลี่ย", "critic/gen", "วินาที", "สำเร็จ%", "👍", "👎"].map((h) => (
                 <th key={h} className="px-3 py-2 font-medium">{h}</th>
               ))}
             </tr>
@@ -173,6 +221,8 @@ export function AdminPanel({
                 </td>
                 <td className="px-3 py-2">{m.assigned}</td>
                 <td className="px-3 py-2">{m.gens}</td>
+                <td className="px-3 py-2">{fmt(m.inTok)}</td>
+                <td className="px-3 py-2">{fmt(m.outTok)}</td>
                 <td className="px-3 py-2">{m.avgInTok}</td>
                 <td className="px-3 py-2">{m.avgOutTok}</td>
                 <td className="px-3 py-2">{m.avgCritic}</td>
@@ -185,6 +235,29 @@ export function AdminPanel({
           </tbody>
         </table>
       </div>
+
+      {/* tokens per project (top 15) */}
+      <h2 className="mb-2 mt-8 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        Token ต่อโปรเจกต์ (สูงสุด 15) · เฉลี่ย {fmt(summary.avgPerProject)}/โปรเจกต์
+      </h2>
+      {projects.length === 0 ? (
+        <p className="text-xs text-slate-400 dark:text-slate-500">ยังไม่มีข้อมูล</p>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700/60">
+          {projects.map((p, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-2 text-sm first:border-t-0 dark:border-slate-800"
+            >
+              <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-300">{p.name}</span>
+              <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">{p.gens} gen</span>
+              <span className="shrink-0 font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">
+                {fmt(p.tokens)} tok
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* user assignment */}
       <div className="mb-2 mt-8 flex items-center justify-between">

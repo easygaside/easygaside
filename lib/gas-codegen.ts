@@ -149,8 +149,14 @@ const WEBAPP_ADDENDUM = `
         var lock = LockService.getScriptLock();
         lock.waitLock(30000);
         try {
-          sheet = ss.getSheetByName(name) || ss.insertSheet(name); // re-check INSIDE the lock
-          if (sheet.getLastRow() === 0) sheet.appendRow(['id','date','type','category','amount','note']);
+          sheet = ss.getSheetByName(name);                          // re-check INSIDE the lock
+          if (!sheet) {
+            var all = ss.getSheets();
+            // reuse the empty default sheet SpreadsheetApp.create() leaves (locale name like 'Sheet1'/'ชีต1')
+            // instead of leaving a stray empty tab; otherwise add a new one.
+            sheet = (all.length === 1 && all[0].getLastRow() === 0) ? all[0].setName(name) : ss.insertSheet(name);
+            sheet.appendRow(['id','date','type','category','amount','note']);
+          }
           return sheet;
         } finally {
           lock.releaseLock();

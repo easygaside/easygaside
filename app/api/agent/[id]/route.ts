@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { acquireProjectRun, releaseProjectRun } from "@/lib/agent-lock";
 import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
 import { checkAndConsumeQuota, getAccessGate, getOwnApiKey } from "@/lib/beta";
+import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { parseAttachedImages, storeChatImages, type AttachedImage } from "@/lib/chat-images";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
@@ -35,20 +37,12 @@ export async function POST(
       { status: 403 },
     );
 
-  // BYOK: run on the user's own key (and skip the daily cap — their cost). Else the platform key
-  // under a per-user daily generation cap.
-  const apiKey = (await getOwnApiKey(user.id)) ?? undefined;
-  if (!apiKey) {
-    const quota = await checkAndConsumeQuota(user.id);
-    if (!quota.ok)
-      return NextResponse.json(
-        {
-          error: "quota_exceeded",
-          message: `วันนี้ใช้ครบโควตาแล้ว (${quota.limit} ครั้ง/วัน) — ลองใหม่พรุ่งนี้ หรือใส่ Anthropic API key ของคุณเองในหน้า ตั้งค่า เพื่อใช้แบบไม่จำกัด`,
-        },
-        { status: 429 },
-      );
-  }
+  // burst limiter (backstop on top of the daily cap + per-project run lock)
+  if (!(await checkRateLimit(user.id, AGENT_RATE)))
+    return NextResponse.json(
+      { error: "rate_limited", message: "เร็วไปนิดนึง — รอสักครู่แล้วลองใหม่นะครับ" },
+      { status: 429 },
+    );
 
   let message = "";
   let images: AttachedImage[] = [];
@@ -65,6 +59,30 @@ export async function POST(
   // image-only turn → give the model a direction
   if (!message && images.length > 0)
     message = "ดูรูปอ้างอิงที่แนบมา แล้วออกแบบ/ปรับหน้าตาให้ใกล้เคียงรูป";
+
+  // H-2: one agent run per project at a time (prevents interleaved writes + double cost)
+  if (!(await acquireProjectRun(id)))
+    return NextResponse.json(
+      { error: "already_running", message: "โปรเจกต์นี้กำลังประมวลผลอยู่ — รอให้เสร็จก่อนสักครู่นะครับ" },
+      { status: 409 },
+    );
+
+  // BYOK: run on the user's own key (and skip the daily cap — their cost). Else the platform key
+  // under a per-user daily generation cap. (lock acquired → release it on any early exit below.)
+  const apiKey = (await getOwnApiKey(user.id)) ?? undefined;
+  if (!apiKey) {
+    const quota = await checkAndConsumeQuota(user.id);
+    if (!quota.ok) {
+      await releaseProjectRun(id);
+      return NextResponse.json(
+        {
+          error: "quota_exceeded",
+          message: `วันนี้ใช้ครบโควตาแล้ว (${quota.limit} ครั้ง/วัน) — ลองใหม่พรุ่งนี้ หรือใส่ Anthropic API key ของคุณเองในหน้า ตั้งค่า เพื่อใช้แบบไม่จำกัด`,
+        },
+        { status: 429 },
+      );
+    }
+  }
 
   // persist attachments to the project's history bucket (best-effort; never blocks the turn)
   if (images.length > 0) await storeChatImages(id, images);
@@ -83,6 +101,7 @@ export async function POST(
         console.error("[agent] loop error:", e);
         emit({ type: "error", message: "agent_error" });
       } finally {
+        await releaseProjectRun(id); // always free the per-project lock
         closed = true;
         controller.close();
       }

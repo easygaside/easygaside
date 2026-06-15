@@ -11,6 +11,7 @@ const URL_ERR: Record<string, string> = {
   exchange_failed: "แลกเปลี่ยน token กับ Google ไม่สำเร็จ",
   no_refresh_token: "Google ไม่ได้คืน refresh token — ลองใหม่และกดยอมรับสิทธิ์",
   no_id_token: "Google ไม่ได้คืน id token — ลองใหม่",
+  invalid_id_token: "ยืนยัน id token จาก Google ไม่ผ่าน — ลองใหม่",
   store_failed: "บันทึกการเชื่อมต่อไม่สำเร็จ",
   access_denied: "คุณปฏิเสธการให้สิทธิ์",
 };

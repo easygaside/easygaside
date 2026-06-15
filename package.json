@@ -16,6 +16,7 @@
     "@monaco-editor/react": "^4.6.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.0",
+    "jose": "^6.2.3",
     "next": "15.5.19",
     "react": "19.1.0",
     "react-dom": "19.1.0",

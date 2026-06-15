@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
-import { decodeIdToken, exchangeCode } from "@/lib/google-oauth";
+import { exchangeCode, verifyIdToken } from "@/lib/google-oauth";
 import { storeConnection } from "@/lib/google-connection";
 import { createClient } from "@/lib/supabase/server";
 
@@ -41,6 +41,15 @@ export async function GET(request: NextRequest) {
   if (!tokens.refresh_token) return fail("no_refresh_token"); // guarded by prompt=consent
   if (!tokens.id_token) return fail("no_id_token");
 
+  // H-3: verify the id_token signature (Google JWKS) + iss/aud/exp before trusting any claim.
+  let claims: { sub: string; email?: string };
+  try {
+    claims = await verifyIdToken(tokens.id_token);
+  } catch (e) {
+    console.error("[oauth] id_token verify failed:", e);
+    return fail("invalid_id_token");
+  }
+
   const supabase = await createClient();
 
   // Already logged in (email/pw user connecting Google) → keep that identity.
@@ -61,11 +70,10 @@ export async function GET(request: NextRequest) {
     userId = data.user.id;
   }
 
-  const { sub } = decodeIdToken(tokens.id_token);
   try {
     await storeConnection({
       userId,
-      googleSub: sub,
+      googleSub: claims.sub,
       scope: tokens.scope,
       refreshToken: tokens.refresh_token,
     });

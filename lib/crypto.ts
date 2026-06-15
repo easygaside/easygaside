@@ -17,7 +17,11 @@ import {
 const IV_LENGTH = 12; // 96-bit nonce — recommended for GCM
 const KEY_LENGTH = 32; // AES-256
 
+// L-1: parse + validate the key ONCE, then reuse (was parsed on every encrypt/decrypt).
+let cachedKey: Buffer | null = null;
+
 function getKey(): Buffer {
+  if (cachedKey) return cachedKey;
   const raw = process.env.APP_ENCRYPTION_KEY;
   if (!raw) {
     throw new Error(
@@ -34,6 +38,7 @@ function getKey(): Buffer {
       `APP_ENCRYPTION_KEY must decode to ${KEY_LENGTH} bytes (got ${key.length}). Use \`npm run keygen\`.`,
     );
   }
+  cachedKey = key;
   return key;
 }
 

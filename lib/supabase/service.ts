@@ -12,7 +12,8 @@ import { createClient } from "@supabase/supabase-js";
  * because this client does not enforce RLS.
  */
 export function createServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  // M-2: prefer a server-only SUPABASE_URL; fall back to the public one for convenience.
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
     throw new Error(

@@ -1,3 +1,4 @@
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import { NeedsReauthError } from "./errors";
 
 /**
@@ -80,7 +81,9 @@ export async function exchangeCode(code: string): Promise<TokenResponse> {
     }),
   });
   if (!res.ok) {
-    throw new Error(`Token exchange failed (${res.status}): ${await res.text()}`);
+    // L-2: keep the raw Google body server-side only; surface a generic message.
+    console.error(`[oauth] token exchange failed ${res.status}:`, await res.text());
+    throw new Error(`Token exchange failed (${res.status})`);
   }
   return (await res.json()) as TokenResponse;
 }
@@ -105,7 +108,8 @@ export async function refreshAccessToken(
     if (text.includes("invalid_grant")) {
       throw new NeedsReauthError();
     }
-    throw new Error(`Token refresh failed (${res.status}): ${text}`);
+    console.error(`[oauth] token refresh failed ${res.status}:`, text); // server-side only
+    throw new Error(`Token refresh failed (${res.status})`);
   }
   const json = JSON.parse(text) as { access_token: string; expires_in: number };
   return { accessToken: json.access_token, expiresIn: json.expires_in };
@@ -120,12 +124,14 @@ export async function revokeToken(token: string): Promise<void> {
   });
 }
 
-/** Decode the `sub` and `email` claims from an id_token (no verification needed
- *  — it arrived directly from Google's token endpoint over TLS). */
-export function decodeIdToken(idToken: string): { sub: string; email?: string } {
-  const payload = idToken.split(".")[1];
-  const json = JSON.parse(
-    Buffer.from(payload, "base64url").toString("utf8"),
-  ) as { sub: string; email?: string };
-  return { sub: json.sub, email: json.email };
+// H-3: verify the id_token's signature against Google's JWKS (cached) + check iss/aud/exp,
+// instead of blindly decoding. Defense-in-depth even though the token arrives over TLS.
+const GOOGLE_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
+
+export async function verifyIdToken(idToken: string): Promise<{ sub: string; email?: string }> {
+  const { payload } = await jwtVerify(idToken, GOOGLE_JWKS, {
+    issuer: ["https://accounts.google.com", "accounts.google.com"],
+    audience: clientId(),
+  });
+  return { sub: String(payload.sub), email: payload.email as string | undefined };
 }

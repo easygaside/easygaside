@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { mapGoogleError } from "@/lib/api-helpers";
 import { getTarget } from "@/lib/deployment-targets";
 import { getProject } from "@/lib/projects";
+import { DEPLOY_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -18,6 +19,12 @@ export async function POST(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
+
+  if (!(await checkRateLimit(user.id, DEPLOY_RATE)))
+    return NextResponse.json(
+      { error: "rate_limited", message: "deploy ถี่เกินไป — รอสักครู่แล้วลองใหม่" },
+      { status: 429 },
+    );
 
   const project = await getProject(id); // RLS-scoped
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });

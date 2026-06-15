@@ -5,16 +5,19 @@ import { createPortal } from "react-dom";
 import { CheckCircleIcon, MegaphoneIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { submitReportAction } from "@/app/report/actions";
 
-const KINDS = [
+const BASE_KINDS = [
   { value: "bug", label: "บั๊ก / พัง" },
   { value: "idea", label: "ข้อเสนอแนะ" },
   { value: "other", label: "อื่น ๆ" },
 ];
+// "โค้ดพัง แก้ไม่ได้" only makes sense inside a project — it snapshots that project's code for analysis.
+const BROKEN_KIND = { value: "broken", label: "🚨 โค้ดพัง แก้ไม่ได้" };
 
 /** Problem-report button + modal. Auto-attaches project id (if given) + current URL + the user. */
 export function ReportButton({ projectId, className = "" }: { projectId?: string; className?: string }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState("bug");
+  const kinds = projectId ? [BROKEN_KIND, ...BASE_KINDS] : BASE_KINDS;
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -98,13 +101,13 @@ export function ReportButton({ projectId, className = "" }: { projectId?: string
                     </button>
                   </div>
 
-                  <div className="mt-3 flex gap-1.5">
-                    {KINDS.map((k) => (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {kinds.map((k) => (
                       <button
                         key={k.value}
                         type="button"
                         onClick={() => setKind(k.value)}
-                        className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition ${
+                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                           kind === k.value
                             ? "bg-emerald-500 text-white"
                             : "border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700/60 dark:text-slate-400 dark:hover:bg-slate-800/60"
@@ -125,7 +128,10 @@ export function ReportButton({ projectId, className = "" }: { projectId?: string
                   />
 
                   <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">
-                    แนบหน้าที่กำลังใช้{projectId ? " + โปรเจกต์นี้" : ""} ให้อัตโนมัติ — ไม่ต้องพิมพ์เอง
+                    แนบหน้าที่กำลังใช้{projectId ? " + โปรเจกต์นี้" : ""} ให้อัตโนมัติ
+                    {projectId && (kind === "bug" || kind === "broken")
+                      ? " (รวมโค้ดปัจจุบัน เพื่อช่วยเราวิเคราะห์และแก้ให้)"
+                      : ""} — ไม่ต้องพิมพ์เอง
                   </p>
                   {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
 

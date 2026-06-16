@@ -96,12 +96,12 @@ export default function ConnectDonePage() {
                 สำเร็จ! ระบบพร้อมใช้งานจริง
               </p>
               <a
-                href={result.execUrl}
+                href={`https://drive.google.com/open?id=${result.scriptId}`}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-1.5 break-all text-[13px] font-medium text-emerald-700 underline underline-offset-2 dark:text-emerald-300"
               >
-                เปิดเครื่องมือทดสอบของคุณ
+                ดูโปรเจกต์ทดสอบใน Drive ของคุณ
                 <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 shrink-0" />
               </a>
               <p className="text-[12px] leading-relaxed text-emerald-700/70 dark:text-emerald-300/60">

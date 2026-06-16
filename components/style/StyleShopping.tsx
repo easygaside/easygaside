@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeftIcon, CheckIcon, PlusIcon, SparklesIcon } from "@heroicons/react/24/outline";
@@ -24,12 +24,14 @@ export function StyleShopping({
   loggedIn: boolean;
 }) {
   const router = useRouter();
+  const catScrollRef = useRef<HTMLDivElement>(null);
   const [activeCat, setActiveCat] = useState<string>(categories[0]?.id ?? "");
   const [selected, setSelected] = useState<string[]>([]);
   const [purpose, setPurpose] = useState("");
   const [prompt, setPrompt] = useState("");
   const [dirty, setDirty] = useState(false); // user manually edited the prompt
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const selectedItems = useMemo(
     () => selected.map((id) => catalog.find((c) => c.id === id)).filter((x): x is StyleItem => !!x),
@@ -40,6 +42,21 @@ export function StyleShopping({
   useEffect(() => {
     if (!dirty) setPrompt(buildPrompt(purpose, selectedItems));
   }, [purpose, selectedItems, dirty]);
+
+  // a desktop mouse can't scroll a horizontal strip — translate vertical wheel into horizontal scroll.
+  // (native listener with passive:false because React's onWheel is passive and can't preventDefault)
+  useEffect(() => {
+    const el = catScrollRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return; // wrapped (desktop) — nothing to scroll
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // already a horizontal gesture (trackpad)
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   const toggle = (id: string) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -54,11 +71,17 @@ export function StyleShopping({
       return;
     }
     setCreating(true);
+    setCreateError(null);
     try {
       const name = (purpose.trim() || "เครื่องมือจาก Style Lab").slice(0, 70);
-      const id = await newProjectReturnId(name);
+      const res = await newProjectReturnId(name);
+      if ("error" in res) {
+        setCreateError(res.error);
+        setCreating(false);
+        return;
+      }
       sessionStorage.setItem("egs:kickoff", prompt.trim());
-      router.push(`/projects/${id}`);
+      router.push(`/projects/${res.id}`);
     } catch {
       setCreating(false);
     }
@@ -86,7 +109,10 @@ export function StyleShopping({
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* left: categories + cards */}
         <div className="min-w-0">
-          <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div
+            ref={catScrollRef}
+            className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:overflow-x-visible"
+          >
             {categories.map((c) => (
               <button
                 key={c.id}
@@ -204,6 +230,9 @@ export function StyleShopping({
             >
               {creating ? "กำลังสร้าง…" : loggedIn ? "สร้างโปรเจกต์ด้วยสไตล์นี้ →" : "เข้าสู่ระบบเพื่อเริ่มสร้าง"}
             </button>
+            {createError && (
+              <p className="mt-2 text-center text-[12px] font-medium text-red-600 dark:text-red-400">{createError}</p>
+            )}
             {!loggedIn && (
               <p className="mt-2 text-center text-[11px] text-slate-400">เลือกดูได้เลย — เข้าสู่ระบบตอนจะสร้างจริง</p>
             )}

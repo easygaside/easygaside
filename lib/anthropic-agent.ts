@@ -498,7 +498,7 @@ async function runCriticGate(
   } catch (e) {
     // never leave the "กำลังแก้ให้อัตโนมัติ…" line hanging — close it out visibly.
     console.error("[agent] critic gate failed (non-fatal):", e);
-    emit({ type: "text", delta: "\n\n(ข้ามการแก้อัตโนมัติรอบนี้ — โค้ดที่สร้างยังใช้ได้ พิมพ์บอกถ้าอยากให้แก้จุดไหน)" });
+    emit({ type: "text", delta: "\n\n⚠️ ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้งภายหลังได้ครับ" });
     return { issues: 0, inputTokens: 0, outputTokens: 0 };
   }
 }

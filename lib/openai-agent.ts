@@ -259,7 +259,7 @@ async function runOpenAiCriticGate(
     return { issues: review.issues.length, inputTokens: repair.inputTokens, outputTokens: repair.outputTokens };
   } catch (e) {
     console.error("[openai-agent] critic gate failed (non-fatal):", e);
-    emit({ type: "text", delta: "\n\n(ข้ามการแก้อัตโนมัติรอบนี้ — โค้ดที่สร้างยังใช้ได้)" });
+    emit({ type: "text", delta: "\n\n⚠️ ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้งภายหลังได้ครับ" });
     return { issues: 0, inputTokens: 0, outputTokens: 0 };
   }
 }

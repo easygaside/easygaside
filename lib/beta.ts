@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { isSuperAdmin } from "@/lib/admin";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -146,6 +147,45 @@ export interface QuotaStatus {
   used: number;
   limit: number;
   remaining: number;
+}
+
+/**
+ * New-tool plan allowance (docs/MONETIZATION.md §3: Free 2 / Lite 3 / Starter 5 / Pro 15 per month).
+ * Tiers/billing aren't wired yet, so every account is treated as Free — make this plan-based when
+ * billing lands. The unit is "เครื่องมือใหม่/เดือน"; EDITING an existing tool never creates a project
+ * row, so it never counts against this (energy/token tank handles edit cost — §6).
+ */
+export const FREE_MONTHLY_TOOLS = 2;
+
+/** "เหลือสร้างใหม่ N ตัว" — NEW tools (projects) the user created this calendar month vs the plan. */
+export async function getMonthlyToolUsage(userId: string): Promise<QuotaStatus> {
+  const svc = createServiceClient();
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const { count } = await svc
+    .from("egs_projects")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", userId)
+    .gte("created_at", monthStart);
+  const used = count ?? 0;
+  const limit = FREE_MONTHLY_TOOLS;
+  return { used, limit, remaining: Math.max(0, limit - used) };
+}
+
+/**
+ * May this user create a NEW tool right now? BYOK (own key) and superadmins are unlimited;
+ * everyone else is held to the plan's monthly new-tool allowance (Free for now — §3).
+ */
+export async function canCreateNewTool(
+  userId: string,
+  email: string | null | undefined,
+): Promise<{ ok: boolean; usage: QuotaStatus }> {
+  if (isSuperAdmin(email) || (await hasOwnApiKey(userId))) {
+    const inf = Number.POSITIVE_INFINITY;
+    return { ok: true, usage: { used: 0, limit: inf, remaining: inf } };
+  }
+  const usage = await getMonthlyToolUsage(userId);
+  return { ok: usage.remaining > 0, usage };
 }
 
 export async function getDailyUsage(userId: string): Promise<QuotaStatus> {

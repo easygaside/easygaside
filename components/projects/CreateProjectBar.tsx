@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import { ExclamationCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { newProjectAction } from "@/app/projects/actions";
 
 export function CreateProjectBar({ existingNames = [] }: { existingNames?: string[] }) {
   const [name, setName] = useState("");
+  const [state, formAction, pending] = useActionState(newProjectAction, {} as { error?: string });
   const trimmed = name.trim();
   const dup =
     trimmed.length > 0 &&
@@ -13,7 +14,7 @@ export function CreateProjectBar({ existingNames = [] }: { existingNames?: strin
 
   return (
     <form
-      action={newProjectAction}
+      action={formAction}
       className="rounded-3xl border border-white/60 dark:border-slate-700/60 bg-gradient-to-br from-white to-emerald-50/40 dark:from-slate-900 dark:to-emerald-950/30 p-5 shadow-[0_18px_50px_rgba(16,185,129,0.10)] ring-1 ring-emerald-100/70 dark:ring-emerald-800/60"
     >
       <div className="flex flex-wrap items-center gap-3">
@@ -36,12 +37,18 @@ export function CreateProjectBar({ existingNames = [] }: { existingNames?: strin
         />
         <button
           type="submit"
-          className="rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(16,185,129,0.35)] transition hover:bg-emerald-400"
+          disabled={pending}
+          className="rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(16,185,129,0.35)] transition hover:bg-emerald-400 disabled:opacity-50"
         >
-          สร้างโปรเจกต์ →
+          {pending ? "กำลังสร้าง…" : "สร้างโปรเจกต์ →"}
         </button>
       </div>
-      {dup ? (
+      {state?.error ? (
+        <p className="mt-2 flex items-start gap-1.5 pl-1 text-xs font-medium text-red-600 dark:text-red-400">
+          <ExclamationCircleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          {state.error}
+        </p>
+      ) : dup ? (
         <p className="mt-2 flex items-center gap-1.5 pl-1 text-xs font-medium text-amber-600 dark:text-amber-400">
           <ExclamationCircleIcon className="h-4 w-4 shrink-0" />
           มีโปรเจกต์ชื่อ &ldquo;{trimmed}&rdquo; อยู่แล้ว — สร้างต่อได้ จะกลายเป็น &ldquo;{trimmed} (2)&rdquo; หรือเปลี่ยนชื่อก่อน

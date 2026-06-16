@@ -1,3 +1,5 @@
+import { canCreateNewTool } from "@/lib/beta";
+import { MonthlyToolLimitError } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
 import type { EgsProject, ProjectKind } from "@/types/db";
 
@@ -53,6 +55,11 @@ export async function createProject(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("not_authenticated");
+
+  // New-tool monthly cap (docs/MONETIZATION.md §3/§7). BYOK + superadmin are unlimited; editing an
+  // existing tool never reaches here, so it never counts against the allowance.
+  const gate = await canCreateNewTool(user.id, user.email);
+  if (!gate.ok) throw new MonthlyToolLimitError(gate.usage.limit);
 
   // (owner_id, name) is unique — auto-uniquify ("ชื่อ", "ชื่อ (2)", "ชื่อ (3)"…) so a duplicate
   // name never crashes the create. 23505 = Postgres unique-violation.

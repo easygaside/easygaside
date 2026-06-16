@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { acquireProjectRun, releaseProjectRun } from "@/lib/agent-lock";
 import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
-import { checkAndConsumeQuota, getAccessGate, getOwnApiKey } from "@/lib/beta";
+import { getAccessGate, getOwnApiKey } from "@/lib/beta";
+import { getEnergyTank, getProjectEnergyUsed } from "@/lib/energy";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { parseAttachedImages, storeChatImages, type AttachedImage } from "@/lib/chat-images";
 import { resolveProjectProvider, resolveProvider } from "@/lib/llm/provider";
@@ -86,15 +87,18 @@ export async function POST(
     );
   }
 
-  // daily cap applies to the PLATFORM key only (BYOK = own cost → skip).
+  // Platform-key users only (BYOK = own cost → no platform cap). The per-PROJECT energy tank
+  // replaces the old per-day request count: a tool can be edited freely until its tank fills.
   if (!byok) {
-    const quota = await checkAndConsumeQuota(user.id);
-    if (!quota.ok) {
+    const tank = getEnergyTank(user.email);
+    const energyUsed = await getProjectEnergyUsed(id);
+    if (energyUsed >= tank) {
       await releaseProjectRun(id);
       return NextResponse.json(
         {
-          error: "quota_exceeded",
-          message: `วันนี้ใช้ครบโควตาแล้ว (${quota.limit} ครั้ง/วัน) — ลองใหม่พรุ่งนี้ หรือใส่ Anthropic API key ของคุณเองในหน้า ตั้งค่า เพื่อใช้แบบไม่จำกัด`,
+          error: "energy_exhausted",
+          message:
+            "พลังงานของเครื่องมือนี้เต็มแล้ว — สร้างเครื่องมือใหม่ หรือใส่ Anthropic API key ของคุณเองในหน้า ตั้งค่า เพื่อใช้แบบไม่จำกัด",
         },
         { status: 429 },
       );

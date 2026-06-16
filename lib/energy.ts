@@ -1,3 +1,4 @@
+import { isSuperAdmin } from "@/lib/admin";
 import { createServiceClient } from "@/lib/supabase/service";
 
 /**
@@ -8,6 +9,15 @@ import { createServiceClient } from "@/lib/supabase/service";
  * when billing lands.
  */
 export const ENERGY_TANK = 400_000;
+
+/**
+ * The per-project token tank used for ENFORCEMENT (the agent loop blocks once a project passes it).
+ * Superadmins are uncapped (founder testing); plan-based tanks land with billing. The UI bar still
+ * renders against ENERGY_TANK as a friendly reference.
+ */
+export function getEnergyTank(email: string | null | undefined): number {
+  return isSuperAdmin(email) ? Number.POSITIVE_INFINITY : ENERGY_TANK;
+}
 
 /** Sum of input+output tokens logged for a project so far = its consumed energy. */
 export async function getProjectEnergyUsed(projectId: string): Promise<number> {

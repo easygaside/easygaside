@@ -32,10 +32,41 @@ export const runtime = "nodejs";
  */
 
 const SPIKE_CODE_GS = `function doGet() {
-  return HtmlService.createHtmlOutput(
-    '<h1 style="font-family:sans-serif">easygas works \\uD83C\\uDF89</h1>' +
-    '<p style="font-family:sans-serif;color:#555">Deployed via the Apps Script REST API — no clasp.</p>'
-  );
+  var html = \`<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8">
+<title>EasyGAS</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;
+       font-family:-apple-system,"Segoe UI","Sarabun",system-ui,sans-serif;color:#0f172a;
+       background:radial-gradient(1100px 560px at 50% -10%,#ffffff,#eef3fb 42%,#e6ecf7)}
+  .card{width:100%;max-width:440px;background:rgba(255,255,255,.86);
+        border:1px solid rgba(148,163,184,.25);border-radius:28px;padding:40px 32px;text-align:center;
+        box-shadow:0 24px 60px rgba(60,70,110,.14)}
+  .logo{width:62px;height:62px;margin:0 auto 18px;display:grid;place-items:center;border-radius:20px;
+        background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 10px 24px rgba(16,185,129,.4)}
+  .logo svg{width:32px;height:32px}
+  .pill{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:#059669;
+        background:rgba(16,185,129,.12);padding:6px 13px;border-radius:999px;margin-bottom:14px}
+  .dot{width:7px;height:7px;border-radius:999px;background:#10b981;box-shadow:0 0 0 4px rgba(16,185,129,.18)}
+  h1{margin:0 0 10px;font-size:25px;letter-spacing:-.02em}
+  h1 .g{color:#10b981}
+  p{margin:0;color:#64748b;font-size:15px;line-height:1.65}
+  .foot{margin-top:26px;font-size:12px;color:#94a3b8}
+</style></head>
+<body><div class="card">
+  <div class="logo"><svg viewBox="0 0 24 24" fill="none">
+    <path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.55L3 21l1.95-5.6A8.5 8.5 0 1 1 21 11.5Z" fill="#fff"/>
+    <path d="m8.8 12 2.2 2.2 4.2-4.4" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg></div>
+  <div class="pill"><span class="dot"></span>ระบบพร้อมใช้งาน</div>
+  <h1>เชื่อมต่อสำเร็จ · Easy<span class="g">GAS</span></h1>
+  <p>เว็บแอปนี้ deploy เข้าบัญชี Google ของคุณเรียบร้อยแล้ว<br>พร้อมให้ AI สร้างเครื่องมือจริงให้คุณ ✨</p>
+  <div class="foot">สร้างด้วย EasyGAS</div>
+</div></body></html>\`;
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('EasyGAS')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }`;
 
 export async function POST() {

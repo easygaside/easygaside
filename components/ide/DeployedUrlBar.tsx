@@ -21,16 +21,8 @@ export function DeployedUrlBar({ url }: { url: string }) {
   return (
     <div className="mx-3 mt-2 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[13px] dark:border-emerald-800/50 dark:bg-emerald-950/30">
       <RocketLaunchIcon className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-      <span className="shrink-0 font-medium text-emerald-700 dark:text-emerald-300">แอปของคุณ</span>
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        className="min-w-0 flex-1 truncate text-slate-500 hover:underline dark:text-slate-400"
-        title={url}
-      >
-        {url}
-      </a>
+      <span className="font-medium text-emerald-700 dark:text-emerald-300">แอปของคุณออนไลน์แล้ว</span>
+      <span className="min-w-0 flex-1" />
       <button
         onClick={copy}
         className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/40"

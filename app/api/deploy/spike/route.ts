@@ -6,7 +6,8 @@ import {
   ProjectApiDisabledError,
   UserSettingsDisabledError,
 } from "@/lib/errors";
-import { getValidAccessToken } from "@/lib/google-connection";
+import { userSettingsUrl } from "@/lib/api-helpers";
+import { getConnectionStatus, getValidAccessToken } from "@/lib/google-connection";
 import {
   createDeployment,
   createProject,
@@ -100,12 +101,14 @@ export async function POST() {
     return NextResponse.json({ ok: true, scriptId, deploymentId, execUrl: webAppUrl });
   } catch (err) {
     if (err instanceof UserSettingsDisabledError) {
+      const { email } = await getConnectionStatus(user.id);
       return NextResponse.json(
         {
           error: "USER_SETTINGS_DISABLED",
-          message:
-            "ยังไม่ได้เปิด Apps Script API สำหรับบัญชี Google นี้ เปิดที่ script.google.com/home/usersettings แล้วลองใหม่",
-          enableUrl: "https://script.google.com/home/usersettings",
+          message: email
+            ? `ยังไม่ได้เปิด Apps Script API สำหรับบัญชี ${email} (บัญชีที่โค้ดจะ deploy เข้า) — เปิดลิงก์โดยล็อกอินด้วยบัญชีนั้น แล้วลองใหม่`
+            : "ยังไม่ได้เปิด Apps Script API สำหรับบัญชี Google นี้ เปิดที่ script.google.com/home/usersettings แล้วลองใหม่",
+          enableUrl: userSettingsUrl(email),
         },
         { status: 409 },
       );

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { mapGoogleError } from "@/lib/api-helpers";
 import { getTarget } from "@/lib/deployment-targets";
+import { getConnectionStatus } from "@/lib/google-connection";
 import { getProject } from "@/lib/projects";
 import { DEPLOY_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -34,6 +35,6 @@ export async function POST(
     const result = await target.deploy(user.id, project);
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
-    return mapGoogleError(e);
+    return mapGoogleError(e, (await getConnectionStatus(user.id)).email);
   }
 }

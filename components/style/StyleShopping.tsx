@@ -65,7 +65,7 @@ export function StyleShopping({
   }
 
   return (
-    <main className="min-h-screen bg-[#eef2f8] text-slate-800 dark:bg-[#0b0f14] dark:text-slate-100">
+    <main className="min-h-screen bg-gradient-to-b from-[#eef3fb] to-[#e6ecf7] text-slate-800 dark:from-[#0b0f14] dark:to-[#0d1117] dark:text-slate-100">
       <header className="border-b border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
         <div className="mx-auto flex max-w-6xl items-center gap-3">
           <Link
@@ -86,15 +86,15 @@ export function StyleShopping({
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 lg:grid-cols-[1fr_360px]">
         {/* left: categories + cards */}
         <div>
-          <div className="mb-3 flex flex-wrap gap-2">
+          <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {categories.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setActiveCat(c.id)}
-                className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
+                className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
                   activeCat === c.id
-                    ? "bg-emerald-500 text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)]"
-                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700"
+                    ? "bg-emerald-500 text-white shadow-[0_4px_12px_rgba(16,185,129,0.35)]"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800"
                 }`}
               >
                 {c.title}
@@ -111,29 +111,35 @@ export function StyleShopping({
               return (
                 <div
                   key={item.id}
-                  className={`flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition dark:bg-slate-900 ${
+                  className={`group flex flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_6px_20px_rgba(60,70,110,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(60,70,110,0.12)] dark:bg-slate-900 ${
                     on
                       ? "border-emerald-400 ring-2 ring-emerald-400/40"
                       : "border-slate-200/70 dark:border-slate-800"
                   }`}
                 >
+                  {/* mock browser chrome — makes each preview read as a real little screen */}
+                  <div className="flex items-center gap-1.5 border-b border-slate-100 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-800/50">
+                    <span className="h-2.5 w-2.5 rounded-full bg-red-300" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
+                  </div>
                   <iframe
                     title={item.title}
                     sandbox="allow-scripts"
                     srcDoc={item.previewHtml}
-                    className="h-44 w-full border-b border-slate-100 bg-white dark:border-slate-800"
+                    className="h-44 w-full bg-white"
                   />
-                  <div className="flex flex-1 flex-col gap-1.5 p-3">
+                  <div className="flex flex-1 flex-col gap-1.5 p-3.5">
                     <div className="font-semibold">{item.title}</div>
                     <p className="flex-1 text-[12px] leading-relaxed text-slate-500 dark:text-slate-400">
                       {item.when}
                     </p>
                     <button
                       onClick={() => toggle(item.id)}
-                      className={`mt-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-[13px] font-semibold transition ${
+                      className={`mt-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition ${
                         on
-                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300"
-                          : "bg-slate-900 text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900"
+                          ? "bg-emerald-500 text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)]"
+                          : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
                       }`}
                     >
                       {on ? <CheckIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}

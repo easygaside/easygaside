@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import {
   ChatBubbleLeftRightIcon,
   CodeBracketIcon,
@@ -10,6 +9,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+import { AppTopBar } from "@/components/AppTopBar";
 import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ChatPanel } from "./ChatPanel";
@@ -65,26 +65,16 @@ export function IdeShell({
 
   return (
     <main className="flex h-screen flex-col bg-[#eef2f8] text-slate-800 dark:bg-[#0b0f14] dark:text-slate-100">
-      <div className="flex items-center gap-2.5 border-b border-slate-200/70 bg-white/70 px-4 py-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
-        <span className="flex shrink-0 items-center gap-2">
-          <Image
-            src="/icon/android-icon-192x192.png"
-            alt="EasyGAS IDE"
-            width={28}
-            height={28}
-            className="rounded-lg"
-          />
-          <b className="hidden text-sm tracking-tight sm:block">
-            EasyGAS <span className="text-emerald-600">IDE</span>
-          </b>
-        </span>
-        <span className="hidden h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700 sm:block" />
-        <ProjectSwitcher currentId={projectId} currentName={projectName} projects={projects} />
-        <span className="flex-1" />
-        <ReportButton projectId={projectId} />
-        <ThemeToggle />
-        <DeployButton projectId={projectId} googleConnected={googleConnected} onDeployed={setDeployUrl} />
-      </div>
+      <AppTopBar
+        center={<ProjectSwitcher currentId={projectId} currentName={projectName} projects={projects} />}
+        right={
+          <>
+            <ReportButton projectId={projectId} />
+            <ThemeToggle />
+            <DeployButton projectId={projectId} googleConnected={googleConnected} onDeployed={setDeployUrl} />
+          </>
+        }
+      />
 
       {deployUrl && <DeployedUrlBar url={deployUrl} />}
 

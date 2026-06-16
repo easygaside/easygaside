@@ -5,7 +5,7 @@ import { listProjectChatImages } from "@/lib/chat-images";
 import { ENERGY_TANK, getProjectEnergyUsed } from "@/lib/energy";
 import { getFiles } from "@/lib/files";
 import { getConnectionStatus } from "@/lib/google-connection";
-import { getCurrentUser, getDeployedUrl, getProject } from "@/lib/projects";
+import { getCurrentUser, getDeployedMap, getDeployedUrl, getProject, listProjects } from "@/lib/projects";
 
 export default async function ProjectBuilderPage({
   params,
@@ -23,13 +23,20 @@ export default async function ProjectBuilderPage({
   if (!project) notFound();
 
   // ownership verified above → safe to read files / images via service-role
-  const [files, conn, chatImages, energyUsed, deployedUrl] = await Promise.all([
+  const [files, conn, chatImages, energyUsed, deployedUrl, allProjects, deployedMap] = await Promise.all([
     getFiles(id),
     getConnectionStatus(userId),
     listProjectChatImages(id),
     getProjectEnergyUsed(id),
     getDeployedUrl(id),
+    listProjects(),
+    getDeployedMap(),
   ]);
+  const switcherProjects = allProjects.map((p) => ({
+    id: p.id,
+    name: p.name,
+    deployed: !!deployedMap[p.id],
+  }));
 
   // honest hint when the project asked for a capability GAS can't serve yet (web target)
   const spec = (project.spec ?? {}) as { webOnlyReasons?: unknown };
@@ -49,6 +56,7 @@ export default async function ProjectBuilderPage({
       energyUsed={energyUsed}
       energyTank={ENERGY_TANK}
       deployedUrl={deployedUrl}
+      projects={switcherProjects}
     />
   );
 }

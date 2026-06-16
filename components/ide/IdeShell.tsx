@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import {
-  ArrowLeftIcon,
   ChatBubbleLeftRightIcon,
   CodeBracketIcon,
   ExclamationTriangleIcon,
@@ -18,6 +16,7 @@ import { ChatPanel } from "./ChatPanel";
 import { DeployButton } from "./DeployButton";
 import { DeployedUrlBar } from "./DeployedUrlBar";
 import { EditorPane } from "./EditorPane";
+import { ProjectSwitcher, type SwitcherProject } from "./ProjectSwitcher";
 import { FileTree } from "./FileTree";
 import { PreviewPane } from "./PreviewPane";
 
@@ -34,6 +33,7 @@ export function IdeShell({
   energyUsed = 0,
   energyTank,
   deployedUrl,
+  projects = [],
 }: {
   projectId: string;
   projectName: string;
@@ -44,6 +44,7 @@ export function IdeShell({
   energyUsed?: number;
   energyTank?: number;
   deployedUrl?: string | null;
+  projects?: SwitcherProject[];
 }) {
   const setInitial = useProjectStore((s) => s.setInitial);
   const [hintOpen, setHintOpen] = useState(true);
@@ -78,14 +79,7 @@ export function IdeShell({
           </b>
         </span>
         <span className="hidden h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700 sm:block" />
-        <Link
-          href="/projects"
-          title="กลับไปหน้าโปรเจกต์"
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-        </Link>
-        <b className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{projectName}</b>
+        <ProjectSwitcher currentId={projectId} currentName={projectName} projects={projects} />
         <span className="flex-1" />
         <ReportButton projectId={projectId} />
         <ThemeToggle />

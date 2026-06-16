@@ -49,7 +49,16 @@ async function runOpenAiTurn(
   // on the non-Claude arms — do NOT prepend dynamic content to `system` (it would bust the cache;
   // put any per-turn context on the user message instead, like the Claude arm's RAG seam).
   const system = buildCodegenSystemPrompt({ kind: project.kind });
-  const history = (await getRawHistory(projectId)) as Msg[];
+  // Drop blank assistant turns (a prior empty completion with no text and no tool_calls) — some
+  // providers choke when replaying them and just return empty again, snowballing the silence.
+  const history = ((await getRawHistory(projectId)) as Msg[]).filter(
+    (m) =>
+      !(
+        m.role === "assistant" &&
+        (m.content == null || m.content === "") &&
+        !(m as { tool_calls?: unknown[] }).tool_calls?.length
+      ),
+  );
 
   // live user turn (images only for vision-capable providers; DeepSeek is text-only)
   const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] | string =
@@ -68,6 +77,7 @@ async function runOpenAiTurn(
 
   let mutated = false;
   let capped = false;
+  let emittedText = false;
   let inputTokens = 0;
   let outputTokens = 0;
 
@@ -99,6 +109,7 @@ async function runOpenAiTurn(
       const delta = choice.delta;
       if (delta?.content) {
         text += delta.content;
+        emittedText = true;
         emit({ type: "text", delta: delta.content });
       }
       for (const tc of delta?.tool_calls ?? []) {
@@ -175,6 +186,19 @@ async function runOpenAiTurn(
       break;
     }
     if (iter === (internal ? REPAIR_MAX_ITERATIONS : MAX_ITERATIONS) - 1) capped = true;
+  }
+
+  // Guard: a provider (notably Gemini's OpenAI-compat) can return an EMPTY completion — no text, no
+  // tool calls, no file changes. Never leave the chat dead-silent: surface a recoverable nudge and
+  // overwrite the empty assistant turn so the stored history doesn't carry a blank message forward.
+  if (!emittedText && !mutated) {
+    const fallback =
+      "ขออภัย รอบนี้ AI ตอบกลับมาว่าง ๆ (อาจมีจังหวะสะดุด) — ลองพิมพ์สั่งอีกครั้ง ถ้าเพิ่งสรุปสเปคไว้ พิมพ์ “สร้างเลย” เพื่อให้เริ่มเขียนโค้ดได้เลยครับ";
+    emit({ type: "text", delta: fallback });
+    const lastMsg = messages[messages.length - 1] as { role: string; content: unknown };
+    if (lastMsg?.role === "assistant" && (lastMsg.content == null || lastMsg.content === "")) {
+      lastMsg.content = fallback;
+    }
   }
 
   // persist this turn's messages (everything after system+history); store the user turn TEXT-only.

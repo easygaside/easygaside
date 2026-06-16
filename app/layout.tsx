@@ -36,7 +36,9 @@ export default async function RootLayout({
   return (
     <html lang="th" className={prompt.variable} suppressHydrationWarning>
       <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME }} />
+        {/* suppressHydrationWarning: React strips `nonce` from the client tree for security, so the
+            server (with nonce) vs client (without) attribute always "mismatches" — expected, not a bug. */}
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME }} />
       </head>
       <body>{children}</body>
     </html>

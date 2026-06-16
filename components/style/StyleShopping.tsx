@@ -154,10 +154,12 @@ export function StyleShopping({
               ตะกร้าสไตล์ ({selected.length})
             </div>
 
-            <label className="mt-3 block text-[13px] font-medium text-slate-600 dark:text-slate-300">
+            <label htmlFor="egs-purpose" className="mt-3 block text-[13px] font-medium text-slate-600 dark:text-slate-300">
               อยากได้ระบบอะไร?
             </label>
             <input
+              id="egs-purpose"
+              name="purpose"
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
               placeholder="เช่น ระบบจองคิวร้านตัดผม"
@@ -165,7 +167,7 @@ export function StyleShopping({
             />
 
             <div className="mt-3 flex items-center justify-between">
-              <label className="text-[13px] font-medium text-slate-600 dark:text-slate-300">
+              <label htmlFor="egs-prompt" className="text-[13px] font-medium text-slate-600 dark:text-slate-300">
                 คำสั่งที่จะส่งให้ AI (แก้ได้)
               </label>
               {dirty && (
@@ -178,6 +180,8 @@ export function StyleShopping({
               )}
             </div>
             <textarea
+              id="egs-prompt"
+              name="prompt"
               value={prompt}
               onChange={(e) => {
                 setPrompt(e.target.value);

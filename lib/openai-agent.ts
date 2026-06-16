@@ -78,6 +78,7 @@ async function runOpenAiTurn(
   let mutated = false;
   let capped = false;
   let emittedText = false;
+  let forcedToolRetry = false;
   let inputTokens = 0;
   let outputTokens = 0;
 
@@ -87,7 +88,7 @@ async function runOpenAiTurn(
       max_tokens: MAX_TOKENS,
       messages,
       tools: OPENAI_TOOLS,
-      tool_choice: "auto",
+      tool_choice: forcedToolRetry ? "required" : "auto",
       stream: true,
       stream_options: { include_usage: true },
     });
@@ -140,9 +141,17 @@ async function runOpenAiTurn(
     }));
 
     if (calls.length === 0) {
+      // Weak tool-users (Gemini's OpenAI-compat) sometimes "describe" the build as chat text on the
+      // first step instead of calling write_file. If a non-repair turn opens with text/empty and no
+      // tool call, force ONE retry with tool_choice:"required" so files actually get written.
+      if (iter === 0 && !forcedToolRetry && !internal) {
+        forcedToolRetry = true;
+        continue; // re-run this step; any text already streamed stands as a preamble
+      }
       messages.push({ role: "assistant", content: text });
       break;
     }
+    forcedToolRetry = false; // got tool calls → relax back to auto for subsequent steps
 
     // assistant turn that requested tools
     messages.push({

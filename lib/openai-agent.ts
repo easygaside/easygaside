@@ -83,7 +83,9 @@ async function runOpenAiTurn(
     });
 
     let text = "";
-    const toolAcc: Record<number, { id: string; name: string; args: string }> = {};
+    const toolAcc = new Map<string | number, { id: string; name: string; args: string }>();
+    let lastToolKey: string | number | null = null;
+    let toolSeq = 0;
     let finish: string | null = null;
 
     for await (const chunk of stream) {
@@ -100,18 +102,31 @@ async function runOpenAiTurn(
         emit({ type: "text", delta: delta.content });
       }
       for (const tc of delta?.tool_calls ?? []) {
-        const idx = tc.index;
-        toolAcc[idx] ??= { id: "", name: "", args: "" };
-        if (tc.id) toolAcc[idx].id = tc.id;
-        if (tc.function?.name) toolAcc[idx].name = tc.function.name;
-        if (tc.function?.arguments) toolAcc[idx].args += tc.function.arguments;
+        // OpenAI always sends a numeric `index`; Gemini's OpenAI-compat layer often OMITS it (and may
+        // deliver a whole call in one delta). Key by index when present; otherwise start a new entry
+        // on each `id`, and treat an index-less + id-less delta as a continuation of the last call.
+        let key: string | number;
+        if (typeof tc.index === "number") key = tc.index;
+        else if (tc.id) key = `k${toolSeq++}`;
+        else key = lastToolKey ?? `k${toolSeq++}`;
+        lastToolKey = key;
+        let entry = toolAcc.get(key);
+        if (!entry) {
+          entry = { id: "", name: "", args: "" };
+          toolAcc.set(key, entry);
+        }
+        if (tc.id) entry.id = tc.id;
+        if (tc.function?.name) entry.name = tc.function.name;
+        if (tc.function?.arguments) entry.args += tc.function.arguments;
       }
     }
 
-    const calls = Object.keys(toolAcc)
-      .map(Number)
-      .sort((a, b) => a - b)
-      .map((i) => toolAcc[i]);
+    // preserve arrival order; synthesize an id when the provider omits one (Gemini sometimes does) —
+    // the assistant tool_calls AND the matching tool results both need a stable, non-empty id.
+    const calls = Array.from(toolAcc.values()).map((c, i) => ({
+      ...c,
+      id: c.id || `call_${i}`,
+    }));
 
     if (calls.length === 0) {
       messages.push({ role: "assistant", content: text });

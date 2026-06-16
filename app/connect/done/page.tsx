@@ -6,6 +6,8 @@ import Link from "next/link";
 import {
   ArrowTopRightOnSquareIcon,
   CheckCircleIcon,
+  CheckIcon,
+  ClipboardDocumentIcon,
   ExclamationTriangleIcon,
   RocketLaunchIcon,
   ShieldCheckIcon,
@@ -20,6 +22,17 @@ type Result =
 
 export default function ConnectDonePage() {
   const [result, setResult] = useState<Result>({ kind: "idle" });
+  const [copied, setCopied] = useState(false);
+
+  async function copyLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — ignore */
+    }
+  }
 
   async function deploy() {
     setResult({ kind: "busy" });
@@ -95,15 +108,30 @@ export default function ConnectDonePage() {
                 <CheckCircleIcon className="h-5 w-5" />
                 สำเร็จ! ระบบพร้อมใช้งานจริง
               </p>
-              <a
-                href={`https://drive.google.com/open?id=${result.scriptId}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 break-all text-[13px] font-medium text-emerald-700 underline underline-offset-2 dark:text-emerald-300"
-              >
-                ดูโปรเจกต์ทดสอบใน Drive ของคุณ
-                <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 shrink-0" />
-              </a>
+              <p className="text-[13px] leading-relaxed text-emerald-700/80 dark:text-emerald-300/70">
+                นี่คือลิงก์เว็บแอปทดสอบที่ deploy เข้าบัญชี Google ของคุณ — เปิดหรือคัดลอกไปลองใช้ได้เลย
+              </p>
+              <div className="break-all rounded-lg border border-emerald-200/70 bg-white/70 px-3 py-2 text-[12px] text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200">
+                {result.execUrl}
+              </div>
+              <div className="flex gap-2">
+                <a
+                  href={result.execUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-emerald-400"
+                >
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  เปิดลิงก์
+                </a>
+                <button
+                  onClick={() => copyLink(result.execUrl)}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-white/70 px-4 py-2.5 text-[13px] font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-700/60 dark:bg-transparent dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+                >
+                  {copied ? <CheckIcon className="h-4 w-4" /> : <ClipboardDocumentIcon className="h-4 w-4" />}
+                  {copied ? "คัดลอกแล้ว" : "คัดลอกลิงก์"}
+                </button>
+              </div>
               <p className="text-[12px] leading-relaxed text-emerald-700/70 dark:text-emerald-300/60">
                 นี่เป็นโปรเจกต์ทดสอบในบัญชีคุณ — ลบทิ้งเมื่อไหร่ก็ได้ที่ Apps Script
               </p>

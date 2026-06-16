@@ -43,9 +43,8 @@ const SPIKE_CODE_GS = `function doGet() {
   .card{width:100%;max-width:440px;background:rgba(255,255,255,.86);
         border:1px solid rgba(148,163,184,.25);border-radius:28px;padding:40px 32px;text-align:center;
         box-shadow:0 24px 60px rgba(60,70,110,.14)}
-  .logo{width:62px;height:62px;margin:0 auto 18px;display:grid;place-items:center;border-radius:20px;
-        background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 10px 24px rgba(16,185,129,.4)}
-  .logo svg{width:32px;height:32px}
+  .logo{width:64px;height:64px;margin:0 auto 18px;display:block;border-radius:18px;
+        box-shadow:0 10px 24px rgba(16,185,129,.4)}
   .pill{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:#059669;
         background:rgba(16,185,129,.12);padding:6px 13px;border-radius:999px;margin-bottom:14px}
   .dot{width:7px;height:7px;border-radius:999px;background:#10b981;box-shadow:0 0 0 4px rgba(16,185,129,.18)}
@@ -55,10 +54,7 @@ const SPIKE_CODE_GS = `function doGet() {
   .foot{margin-top:26px;font-size:12px;color:#94a3b8}
 </style></head>
 <body><div class="card">
-  <div class="logo"><svg viewBox="0 0 24 24" fill="none">
-    <path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.55L3 21l1.95-5.6A8.5 8.5 0 1 1 21 11.5Z" fill="#fff"/>
-    <path d="m8.8 12 2.2 2.2 4.2-4.4" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg></div>
+  <img class="logo" src="https://fusjcmcskyssryjvzxbf.supabase.co/storage/v1/object/public/icon/apple-icon-120x120.png" alt="EasyGAS" width="64" height="64">
   <div class="pill"><span class="dot"></span>ระบบพร้อมใช้งาน</div>
   <h1>เชื่อมต่อสำเร็จ · Easy<span class="g">GAS</span></h1>
   <p>เว็บแอปนี้ deploy เข้าบัญชี Google ของคุณเรียบร้อยแล้ว<br>พร้อมให้ AI สร้างเครื่องมือจริงให้คุณ ✨</p>

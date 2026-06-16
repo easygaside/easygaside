@@ -1,4 +1,4 @@
-import { GoogleApiError, UserSettingsDisabledError } from "./errors";
+import { GoogleApiError, ProjectApiDisabledError, UserSettingsDisabledError } from "./errors";
 
 /**
  * Thin wrapper over the Google Apps Script REST API (https://script.googleapis.com/v1).
@@ -38,14 +38,21 @@ async function gasFetch<T>(
 
   const text = await res.text();
   if (!res.ok) {
-    // The per-user "Apps Script API not enabled" wall surfaces as 403.
-    if (
-      res.status === 403 &&
-      (text.includes("has not enabled the Apps Script API") ||
-        text.includes("usersettings") ||
-        text.toLowerCase().includes("apps script api"))
-    ) {
-      throw new UserSettingsDisabledError();
+    // Two DISTINCT 403s both mention "Apps Script API" — disambiguate, never conflate them:
+    if (res.status === 403) {
+      const lower = text.toLowerCase();
+      // (A) PROJECT-level: OUR OAuth client's Cloud project hasn't enabled the Apps Script API.
+      //     Google's body carries a console.cloud/developers URL to enable it (config issue, app side).
+      if (lower.includes("service_disabled") || lower.includes("has not been used in project")) {
+        const m = text.match(/https:\/\/console\.(?:developers|cloud)\.google\.com\/[^\s"'\\]+/);
+        throw new ProjectApiDisabledError(
+          m?.[0] ?? "https://console.cloud.google.com/apis/library/script.googleapis.com",
+        );
+      }
+      // (B) PER-USER wall: the END USER must flip the toggle at script.google.com/home/usersettings.
+      if (lower.includes("usersettings") || lower.includes("has not enabled the apps script api")) {
+        throw new UserSettingsDisabledError();
+      }
     }
     throw new GoogleApiError(res.status, text);
   }

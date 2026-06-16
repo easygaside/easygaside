@@ -16,6 +16,35 @@ export class UserSettingsDisabledError extends Error {
   }
 }
 
+/**
+ * Thrown when the Apps Script API returns 403 because OUR OAuth client's Google Cloud
+ * PROJECT has not enabled the Apps Script API (SERVICE_DISABLED / "has not been used in
+ * project N"). This is a CONFIG issue on the app side — NOT something an end user fixes at
+ * usersettings — so it must surface a different message + the Cloud Console enable link.
+ */
+export class ProjectApiDisabledError extends Error {
+  readonly code = "PROJECT_API_DISABLED";
+  constructor(
+    readonly enableUrl: string,
+    message = "Apps Script API is not enabled for this Google Cloud project.",
+  ) {
+    super(message);
+    this.name = "ProjectApiDisabledError";
+  }
+}
+
+/**
+ * Thrown when a non-BYOK, non-superadmin user has reached their plan's monthly NEW-tool
+ * allowance (docs/MONETIZATION.md §3/§7 — Free 2/เดือน). Editing existing tools never trips this.
+ */
+export class MonthlyToolLimitError extends Error {
+  readonly code = "MONTHLY_TOOL_LIMIT";
+  constructor(readonly limit: number) {
+    super(`Monthly new-tool limit reached (${limit}).`);
+    this.name = "MonthlyToolLimitError";
+  }
+}
+
 /** Thrown when the user has not yet connected their Google account. */
 export class NotConnectedError extends Error {
   readonly code = "NOT_CONNECTED";

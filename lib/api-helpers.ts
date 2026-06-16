@@ -3,6 +3,7 @@ import {
   GoogleApiError,
   NeedsReauthError,
   NotConnectedError,
+  ProjectApiDisabledError,
   UserSettingsDisabledError,
 } from "@/lib/errors";
 
@@ -15,6 +16,17 @@ export function mapGoogleError(e: unknown): NextResponse {
         enableUrl: "https://script.google.com/home/usersettings",
         message:
           "ยังไม่ได้เปิด Apps Script API สำหรับบัญชี Google นี้ — เปิดที่ usersettings แล้วลองใหม่",
+      },
+      { status: 409 },
+    );
+  }
+  if (e instanceof ProjectApiDisabledError) {
+    return NextResponse.json(
+      {
+        error: "PROJECT_API_DISABLED",
+        enableUrl: e.enableUrl,
+        message:
+          "ระบบยังเปิด Apps Script API ในโปรเจกต์ Google Cloud ไม่ครบ — เปิดที่ Cloud Console แล้วลองใหม่ (ปกติผู้ใช้ทั่วไปไม่ต้องทำขั้นนี้)",
       },
       { status: 409 },
     );

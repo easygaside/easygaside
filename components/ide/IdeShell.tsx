@@ -34,6 +34,7 @@ export function IdeShell({
   energyTank,
   deployedUrl,
   projects = [],
+  accountMismatch = null,
 }: {
   projectId: string;
   projectName: string;
@@ -45,6 +46,7 @@ export function IdeShell({
   energyTank?: number;
   deployedUrl?: string | null;
   projects?: SwitcherProject[];
+  accountMismatch?: { login: string; connected: string } | null;
 }) {
   const setInitial = useProjectStore((s) => s.setInitial);
   const [hintOpen, setHintOpen] = useState(true);
@@ -94,6 +96,16 @@ export function IdeShell({
           >
             <XMarkIcon className="h-4 w-4" />
           </button>
+        </div>
+      )}
+
+      {accountMismatch && (
+        <div className="mx-3 mb-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200">
+          <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            เข้าสู่ระบบเป็น <b>{accountMismatch.login}</b> แต่ deploy ไปบัญชี{" "}
+            <b>{accountMismatch.connected}</b> — เครื่องมือนี้จะถูก deploy เข้าบัญชีที่เชื่อมนั้น
+          </div>
         </div>
       )}
 

@@ -38,6 +38,13 @@ export default async function ProjectBuilderPage({
     deployed: !!deployedMap[p.id],
   }));
 
+  // login (project owner) vs the connected Google account code deploys to — warn when they diverge
+  const accountMismatch =
+    conn.connected && conn.status === "active" && conn.email && user.email &&
+    conn.email.toLowerCase() !== user.email.toLowerCase()
+      ? { login: user.email, connected: conn.email }
+      : null;
+
   // honest hint when the project asked for a capability GAS can't serve yet (web target)
   const spec = (project.spec ?? {}) as { webOnlyReasons?: unknown };
   const webHint =
@@ -57,6 +64,7 @@ export default async function ProjectBuilderPage({
       energyTank={ENERGY_TANK}
       deployedUrl={deployedUrl}
       projects={switcherProjects}
+      accountMismatch={accountMismatch}
     />
   );
 }

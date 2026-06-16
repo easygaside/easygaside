@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircleIcon, Cog6ToothIcon, FolderIcon, InboxIcon, RocketLaunchIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, Cog6ToothIcon, ExclamationTriangleIcon, FolderIcon, InboxIcon, RocketLaunchIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import { AppTopBar } from "@/components/AppTopBar";
 import { CreateProjectBar } from "@/components/projects/CreateProjectBar";
 import { ProjectCard } from "@/components/projects/ProjectCard";
@@ -25,6 +25,12 @@ export default async function ProjectsPage() {
     getDeployedMap(),
   ]);
   const deployedCount = projects.filter((p) => deployed[p.id]).length;
+  const accountMismatch =
+    conn.connected &&
+    conn.status === "active" &&
+    !!conn.email &&
+    !!user.email &&
+    conn.email.toLowerCase() !== user.email.toLowerCase();
 
   const googlePill =
     conn.connected && conn.status === "active" ? (
@@ -80,6 +86,20 @@ export default async function ProjectsPage() {
           </>
         }
       />
+
+      {accountMismatch && (
+        <div className="relative mx-auto mt-3 max-w-5xl px-6">
+          <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+            <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              เข้าสู่ระบบเป็น <b>{user.email}</b> แต่ deploy ไปบัญชี <b>{conn.email}</b> —{" "}
+              <Link href="/connect" className="font-medium underline underline-offset-2">
+                จัดการการเชื่อมต่อ
+              </Link>
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="relative mx-auto max-w-5xl px-6 py-8">
         <div className="mb-6">

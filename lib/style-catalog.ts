@@ -209,7 +209,7 @@ export const STYLE_CATALOG: StyleItem[] = [
     category: "thai",
     title: "QR พร้อมเพย์ (PromptPay)",
     when: "รับเงินผ่าน QR — ลูกค้าสแกนจ่ายด้วยแอปธนาคาร",
-    promptSnippet: "แสดง QR พร้อมเพย์ (PromptPay) สำหรับรับเงินตามยอด พร้อมปุ่มแนบสลิป",
+    promptSnippet: "แสดง QR พร้อมเพย์ (PromptPay) รับเงินตามยอด โดยสร้าง QR เป็นรูปจาก promptpay.io (<img src='https://promptpay.io/<เบอร์หรือพร้อมเพย์ไอดี>/<ยอด>.png'>) เบอร์/พร้อมเพย์ไอดีเก็บใน PropertiesService พร้อมปุ่มแนบสลิป",
     previewHtml: doc(
       `<div style="border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:16px;max-width:220px;text-align:center">
         <div style="font-weight:700;color:#1d4ed8">พร้อมเพย์</div>

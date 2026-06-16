@@ -136,7 +136,11 @@ export interface DeploymentResult {
 function extractWebAppUrl(deployment: {
   entryPoints?: { webApp?: { url?: string } }[];
 }): string | undefined {
-  return deployment.entryPoints?.find((e) => e.webApp?.url)?.webApp?.url;
+  const url = deployment.entryPoints?.find((e) => e.webApp?.url)?.webApp?.url;
+  // Normalize to the account-AGNOSTIC public form. An account-scoped URL like
+  // .../macros/u/2/s/<id>/exec only opens under that browser account-index and 403s/Drive-errors
+  // for anyone else; the canonical .../macros/s/<id>/exec is the truly public link.
+  return url?.replace(/\/macros\/u\/\d+\/s\//, "/macros/s/");
 }
 
 export async function createDeployment(

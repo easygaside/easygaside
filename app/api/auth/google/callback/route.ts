@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
       googleSub: claims.sub,
       scope: tokens.scope,
       refreshToken: tokens.refresh_token,
+      email: claims.email ?? null,
     });
   } catch {
     return fail("store_failed");

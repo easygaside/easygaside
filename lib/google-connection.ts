@@ -26,6 +26,7 @@ export async function storeConnection(params: {
   googleSub: string;
   scope: string;
   refreshToken: string;
+  email?: string | null;
 }): Promise<void> {
   const secret = encrypt(params.refreshToken);
   const svc = createServiceClient();
@@ -34,6 +35,7 @@ export async function storeConnection(params: {
       user_id: params.userId,
       google_sub: params.googleSub,
       scope: params.scope,
+      email: params.email ?? null,
       refresh_token_enc: secret.enc,
       refresh_token_iv: secret.iv,
       refresh_token_tag: secret.tag,
@@ -85,12 +87,12 @@ export async function getValidAccessToken(userId: string): Promise<string> {
 /** Lightweight status check (no token decryption) for UI gating. */
 export async function getConnectionStatus(
   userId: string,
-): Promise<{ connected: boolean; status: string | null }> {
+): Promise<{ connected: boolean; status: string | null; email: string | null }> {
   const svc = createServiceClient();
   const { data } = await svc
     .from(TABLE)
-    .select("status")
+    .select("status, email")
     .eq("user_id", userId)
-    .maybeSingle<{ status: string }>();
-  return { connected: !!data, status: data?.status ?? null };
+    .maybeSingle<{ status: string; email: string | null }>();
+  return { connected: !!data, status: data?.status ?? null, email: data?.email ?? null };
 }

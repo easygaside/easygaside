@@ -83,9 +83,9 @@ export function StyleShopping({
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 lg:grid-cols-[1fr_360px]">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* left: categories + cards */}
-        <div>
+        <div className="min-w-0">
           <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {categories.map((c) => (
               <button
@@ -153,7 +153,7 @@ export function StyleShopping({
         </div>
 
         {/* right: cart + prompt */}
-        <aside className="lg:sticky lg:top-4 lg:self-start">
+        <aside className="min-w-0 lg:sticky lg:top-4 lg:self-start">
           <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2 font-semibold">
               <SparklesIcon className="h-5 w-5 text-emerald-500" />

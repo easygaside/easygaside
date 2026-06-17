@@ -7,7 +7,6 @@ import {
   BoltIcon,
   CheckIcon,
   ClipboardIcon,
-  RocketLaunchIcon,
 } from "@heroicons/react/24/outline";
 
 /**
@@ -78,10 +77,16 @@ export function DeployedUrlBar({ url, projectId }: { url: string; projectId: str
     "flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition disabled:opacity-50";
 
   return (
-    <div className="mx-3 mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[13px] dark:border-emerald-800/50 dark:bg-emerald-950/30">
-      <RocketLaunchIcon className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-      <span className="font-medium text-emerald-700 dark:text-emerald-300">แอปของคุณออนไลน์แล้ว</span>
-      {note && <span className="text-[11px] text-emerald-700/80 dark:text-emerald-300/70">· {note}</span>}
+    <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-4 py-1.5 text-[13px] dark:border-slate-800 dark:bg-slate-900/60">
+      <span className="flex shrink-0 items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
+        <span className="h-[7px] w-[7px] rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(34,197,94,0.18)]" />
+        ออนไลน์
+      </span>
+      {note ? (
+        <span className="truncate text-[11px] text-slate-500 dark:text-slate-400">· {note}</span>
+      ) : (
+        <span className="truncate text-[12px] text-slate-400 dark:text-slate-500">· …/exec</span>
+      )}
       <span className="min-w-0 flex-1" />
 
       <button

@@ -84,7 +84,7 @@ export default async function Home() {
           </Link>
         </div>
         <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
-          เปิดให้ทดสอบ <b className="text-slate-500 dark:text-slate-400">25 มิ.ย. 2569</b> · รับจำนวนจำกัด หากได้รับเลือกมีอีเมลแจ้ง
+          เปิดให้ทดสอบ <b className="text-slate-500 dark:text-slate-400">26 มิ.ย. 2569</b> · รับจำนวนจำกัด หากได้รับเลือกมีอีเมลแจ้ง
         </p>
       </section>
 

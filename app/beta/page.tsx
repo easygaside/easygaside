@@ -14,7 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { submitBetaApplication } from "./actions";
 
-const LAUNCH = "25 มิถุนายน 2569";
+const LAUNCH = "26 มิถุนายน 2569";
 
 /** Official multicolor Google "G" for the sign-up button. */
 function GoogleG({ className }: { className?: string }) {
@@ -127,8 +127,7 @@ export default function BetaApplyPage() {
             <>
               <h1 className="mt-5 text-[22px] font-bold leading-tight">สมัครเข้าร่วม Closed Beta</h1>
               <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                EasyGAS ให้คุณพิมพ์คุยกับ AI เพื่อสร้างเครื่องมือบน Google Apps Script — ฟอร์มจองคิว ตัดสต๊อก ส่งอีเมล/LINE
-                อัตโนมัติ — แล้ว deploy เข้าบัญชี Google ของคุณเอง ช่วงนี้เปิดทดสอบแบบ<b className="text-slate-700 dark:text-slate-200"> จำกัดจำนวน</b>
+                EasyGAS ช่วงนี้เปิดทดสอบแบบ<b className="text-slate-700 dark:text-slate-200">จำกัดจำนวน</b> หากคุณได้รับเลือกให้เข้าร่วมทดสอบ เราจะส่งรายละเอียดแจ้งคุณอีกครั้ง
               </p>
 
               {/* launch + selection notice */}

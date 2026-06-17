@@ -102,6 +102,8 @@ export function ChatPanel({
   const applyMutation = useProjectStore((s) => s.applyMutation);
   const setWorking = useProjectStore((s) => s.setWorking);
   const hasFiles = useProjectStore((s) => s.order.length > 0);
+  const command = useProjectStore((s) => s.command);
+  const consumeCommand = useProjectStore((s) => s.consumeCommand);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -130,6 +132,17 @@ export function ChatPanel({
       setInput(prompt);
     }
   }, []);
+
+  // cross-pane commands: the editor toolbar / issues panel ask us to run the agent (fix or verify)
+  // so it streams through the chat flow + updates the editor live. Consume immediately to avoid loops.
+  useEffect(() => {
+    if (!command || busy) return;
+    const c = command;
+    consumeCommand();
+    if (c.kind === "verify") verify();
+    else send(c.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [command, busy]);
 
   async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);

@@ -36,6 +36,11 @@ interface ProjectState {
   markSaved: (path: string) => void;
   setIssues: (list: EditorIssue[]) => void;
   clearIssues: () => void;
+  /** cross-pane trigger: the editor toolbar / issues panel ask ChatPanel to run the agent
+   *  (kind "send" = fix-via-chat with `text`, kind "verify" = Gate-2 run-and-repair) */
+  command: { kind: "send" | "verify"; text?: string } | null;
+  runAgent: (kind: "send" | "verify", text?: string) => void;
+  consumeCommand: () => void;
 }
 
 /**
@@ -49,6 +54,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   activePath: null,
   workingPath: null,
   issues: {},
+  command: null,
 
   setInitial: (list) =>
     set(() => {
@@ -111,4 +117,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }),
 
   clearIssues: () => set({ issues: {} }),
+
+  runAgent: (kind, text) => set({ command: { kind, text } }),
+  consumeCommand: () => set({ command: null }),
 }));

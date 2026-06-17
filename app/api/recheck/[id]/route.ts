@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getOwnApiKey } from "@/lib/beta";
-import { reviewProject } from "@/lib/critic";
+import { reviewProject, type CriticIssue } from "@/lib/critic";
+import { getFiles } from "@/lib/files";
+import { validateGasFiles } from "@/lib/gas-codegen";
 import { getProject } from "@/lib/projects";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -10,9 +12,9 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /**
- * POST /api/recheck/[id] — run the Gate-1 rulebook critic on the project's CURRENT files on demand
- * (after the user edits by hand). The client flushes pending autosaves first, so we just read
- * egs_files. Uses the user's own Anthropic key (BYOK) when set, else the platform key.
+ * POST /api/recheck/[id] — re-check the project's CURRENT files on demand (after manual edits):
+ *   Gate 0 = regex/structure lint (free, deterministic)  +  Gate 1 = rulebook critic (LLM-as-judge).
+ * Gate 0 always runs; Gate 1 is best-effort and uses the user's own Anthropic key (BYOK) when set.
  */
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,15 +33,34 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const project = await getProject(id); // RLS-scoped → null if not owned
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  const apiKey = (await getOwnApiKey(user.id)) ?? process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "no_api_key", issues: [] });
+  // Gate 0 — structural lint (no API, never fails the request)
+  const gas = await getFiles(id);
+  const lint = validateGasFiles(
+    gas.map((f) => ({ name: f.path, content: f.content })),
+    { isWebApp: project.kind !== "bound" },
+  );
+  const gate0: CriticIssue[] = [...lint.errors, ...lint.warnings].map((e) => ({
+    file: e.file,
+    severity: e.severity === "error" ? "high" : "medium",
+    problem: e.message,
+    fix: "",
+  }));
 
-  try {
-    const result = await reviewProject(new Anthropic({ apiKey }), project, id);
-    return NextResponse.json({ ok: result.ok, issues: result.issues });
-  } catch (e) {
-    console.error("[recheck] failed:", e);
-    // never surface internals — generic system error, empty issues
-    return NextResponse.json({ error: "system", issues: [] });
+  // Gate 1 — rulebook critic (best-effort; needs an Anthropic key)
+  let gate1: CriticIssue[] = [];
+  let criticError = false;
+  const apiKey = (await getOwnApiKey(user.id)) ?? process.env.ANTHROPIC_API_KEY;
+  if (apiKey) {
+    try {
+      const r = await reviewProject(new Anthropic({ apiKey }), project, id);
+      gate1 = r.issues;
+    } catch (e) {
+      console.error("[recheck] critic failed:", e);
+      criticError = true;
+    }
+  } else {
+    criticError = true;
   }
+
+  return NextResponse.json({ issues: [...gate0, ...gate1], criticError });
 }

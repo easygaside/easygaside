@@ -45,6 +45,12 @@ export default async function Home() {
         </span>
         <span className="flex-1" />
         <Link
+          href="/beta"
+          className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400"
+        >
+          สมัคร Beta
+        </Link>
+        <Link
           href="/login"
           className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-800"
         >
@@ -65,10 +71,10 @@ export default async function Home() {
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <Link
-            href="/login"
+            href="/beta"
             className="rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(16,185,129,0.35)] transition hover:bg-emerald-400"
           >
-            เริ่มใช้ฟรี →
+            สมัครเข้าร่วม Close Beta →
           </Link>
           <Link
             href="/styleshopping"
@@ -77,6 +83,9 @@ export default async function Home() {
             <Squares2X2Icon className="h-4 w-4" /> เลือกสไตล์ให้เว็บคุณ
           </Link>
         </div>
+        <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+          เปิดให้ทดสอบ <b className="text-slate-500 dark:text-slate-400">25 มิ.ย. 2569</b> · รับจำนวนจำกัด หากได้รับเลือกมีอีเมลแจ้ง
+        </p>
       </section>
 
       {/* features */}

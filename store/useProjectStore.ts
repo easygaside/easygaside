@@ -41,6 +41,14 @@ interface ProjectState {
   command: { kind: "send" | "verify"; text?: string } | null;
   runAgent: (kind: "send" | "verify", text?: string) => void;
   consumeCommand: () => void;
+  /** ⌘K command palette open state — set by the top-bar search box or the global hotkey */
+  paletteOpen: boolean;
+  setPaletteOpen: (open: boolean) => void;
+  /** one-shot imperative action dispatched by the palette, consumed by the owning component
+   *  (DeployButton→"deploy", DeployedUrlBar→"openDev"/"redeploy", EditorToolbar→"recheck") */
+  actionRequest: string | null;
+  requestAction: (key: string) => void;
+  clearActionRequest: () => void;
   /** per-project token budget used so far (drives the energy bar). ChatPanel seeds it from the
    *  server value; both a chat/verify turn AND a manual re-check add their tokens live. */
   energy: number;
@@ -60,6 +68,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
   workingPath: null,
   issues: {},
   command: null,
+  paletteOpen: false,
+  actionRequest: null,
   energy: 0,
 
   setInitial: (list) =>
@@ -126,6 +136,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   runAgent: (kind, text) => set({ command: { kind, text } }),
   consumeCommand: () => set({ command: null }),
+
+  setPaletteOpen: (open) => set({ paletteOpen: open }),
+  requestAction: (key) => set({ actionRequest: key }),
+  clearActionRequest: () => set({ actionRequest: null }),
 
   initEnergy: (used) => set({ energy: used }),
   addEnergy: (tokens) => set((s) => ({ energy: s.energy + (tokens || 0) })),

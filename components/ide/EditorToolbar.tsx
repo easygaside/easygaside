@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowPathIcon, BeakerIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
 import { VersionHistory } from "./VersionHistory";
@@ -17,11 +17,21 @@ export function EditorToolbar({ projectId }: { projectId: string }) {
   const setIssues = useProjectStore((s) => s.setIssues);
   const runAgent = useProjectStore((s) => s.runAgent);
   const addEnergy = useProjectStore((s) => s.addEnergy);
+  const actionRequest = useProjectStore((s) => s.actionRequest);
+  const clearActionRequest = useProjectStore((s) => s.clearActionRequest);
   const [checking, setChecking] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
   const hasFiles = order.length > 0;
   const dirty = order.some((p) => files[p]?.dirty);
+
+  // command palette → "ให้ AI ตรวจซ้ำ"
+  useEffect(() => {
+    if (actionRequest !== "recheck" || checking) return;
+    clearActionRequest();
+    recheck();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionRequest]);
 
   async function recheck() {
     if (checking || !hasFiles) return;

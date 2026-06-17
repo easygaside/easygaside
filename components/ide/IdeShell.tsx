@@ -16,6 +16,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ChatPanel } from "./ChatPanel";
+import { CommandPalette } from "./CommandPalette";
 import { DeployButton } from "./DeployButton";
 import { DeployedUrlBar } from "./DeployedUrlBar";
 import { EditorPane } from "./EditorPane";
@@ -55,6 +56,7 @@ export function IdeShell({
 }) {
   const setInitial = useProjectStore((s) => s.setInitial);
   const activePath = useProjectStore((s) => s.activePath);
+  const setPaletteOpen = useProjectStore((s) => s.setPaletteOpen);
   const [hintOpen, setHintOpen] = useState(true);
   const [mismatchOpen, setMismatchOpen] = useState(true);
   const [deployUrl, setDeployUrl] = useState<string | null>(deployedUrl ?? null);
@@ -93,11 +95,16 @@ export function IdeShell({
         <span className="hidden h-[18px] w-px bg-slate-200 dark:bg-slate-700 sm:block" />
         <ProjectSwitcher currentId={projectId} currentName={projectName} projects={projects} />
         <div className="hidden flex-1 justify-center lg:flex">
-          <div className="flex w-[340px] items-center gap-2 rounded-[9px] border border-slate-200 bg-slate-50 px-3.5 py-[7px] text-slate-400 dark:border-slate-700/70 dark:bg-slate-800/60">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            title="ค้นหาไฟล์ หรือสั่งงาน (⌘K)"
+            className="flex w-[340px] items-center gap-2 rounded-[9px] border border-slate-200 bg-slate-50 px-3.5 py-[7px] text-slate-400 transition hover:border-slate-300 hover:bg-white dark:border-slate-700/70 dark:bg-slate-800/60 dark:hover:border-slate-600 dark:hover:bg-slate-800"
+          >
             <MagnifyingGlassIcon className="h-3.5 w-3.5" />
             <span className="text-[12.5px]">ค้นหาไฟล์ หรือสั่งงาน…</span>
             <span className="ml-auto rounded border border-slate-200 px-1.5 font-mono text-[10px] dark:border-slate-700">⌘K</span>
-          </div>
+          </button>
         </div>
         <span className="flex-1 lg:hidden" />
         <ReportButton projectId={projectId} />
@@ -203,6 +210,8 @@ export function IdeShell({
           </button>
         </div>
       </nav>
+
+      <CommandPalette googleConnected={googleConnected} deployed={!!deployUrl} onJumpPane={setPane} />
     </main>
   );
 }

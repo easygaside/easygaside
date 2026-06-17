@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowTopRightOnSquareIcon,
   CheckCircleIcon,
   ClockIcon,
   RocketLaunchIcon,
 } from "@heroicons/react/24/outline";
+import { useProjectStore } from "@/store/useProjectStore";
 
 type Result =
   | { kind: "idle" }
@@ -33,6 +34,16 @@ export function DeployButton({
   onDeployed?: (execUrl: string) => void;
 }) {
   const [res, setRes] = useState<Result>({ kind: "idle" });
+  const actionRequest = useProjectStore((s) => s.actionRequest);
+  const clearActionRequest = useProjectStore((s) => s.clearActionRequest);
+
+  // command palette → "Deploy เข้า Google" (palette only dispatches this when Google is connected)
+  useEffect(() => {
+    if (actionRequest !== "deploy" || res.kind === "busy") return;
+    clearActionRequest();
+    deploy();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionRequest]);
 
   async function deploy() {
     setRes({ kind: "busy" });

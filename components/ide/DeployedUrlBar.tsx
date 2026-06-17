@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
@@ -8,6 +8,7 @@ import {
   CheckIcon,
   ClipboardIcon,
 } from "@heroicons/react/24/outline";
+import { useProjectStore } from "@/store/useProjectStore";
 
 /**
  * Persistent bar for a deployed project: open/copy the live /exec URL, plus quick actions —
@@ -20,6 +21,20 @@ export function DeployedUrlBar({ url, projectId }: { url: string; projectId: str
   const [devBusy, setDevBusy] = useState(false);
   const [deployBusy, setDeployBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const actionRequest = useProjectStore((s) => s.actionRequest);
+  const clearActionRequest = useProjectStore((s) => s.clearActionRequest);
+
+  // command palette → "เปิด /dev" / "deploy ใหม่"
+  useEffect(() => {
+    if (actionRequest === "openDev") {
+      clearActionRequest();
+      openDev();
+    } else if (actionRequest === "redeploy") {
+      clearActionRequest();
+      redeploy();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionRequest]);
 
   async function copy() {
     try {

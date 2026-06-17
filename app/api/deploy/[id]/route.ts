@@ -3,6 +3,7 @@ import { mapGoogleError } from "@/lib/api-helpers";
 import { getTarget } from "@/lib/deployment-targets";
 import { getConnectionStatus } from "@/lib/google-connection";
 import { getProject } from "@/lib/projects";
+import { snapshotProject } from "@/lib/versions";
 import { DEPLOY_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
@@ -33,6 +34,7 @@ export async function POST(
   try {
     const target = getTarget(project.target ?? "gas");
     const result = await target.deploy(user.id, project);
+    await snapshotProject(id, "deploy"); // version the exact code that went live
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     return mapGoogleError(e, (await getConnectionStatus(user.id)).email);

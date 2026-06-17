@@ -10,6 +10,7 @@ import { runOpenAiAgentLoop } from "@/lib/openai-agent";
 import { logGeneration } from "@/lib/metrics";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
+import { snapshotProject } from "@/lib/versions";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // needs Vercel Pro for >60s; fine for local dev
@@ -126,6 +127,7 @@ export async function POST(
                 { projectId: id, project, userMessage: message, images, emit },
                 { ...cfg, apiKey },
               );
+        await snapshotProject(id, "ai"); // version the AI's output (dedupes when nothing changed)
         const genId = await logGeneration({
           projectId: id,
           userId: user.id,

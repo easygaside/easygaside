@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowPathIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+import { VersionHistory } from "./VersionHistory";
 
 /**
  * Toolbar above the editor: live autosave status + the manual "ให้ AI ตรวจซ้ำ" (Gate-1 critic).
@@ -81,6 +82,7 @@ export function EditorToolbar({ projectId }: { projectId: string }) {
           ล้างผลตรวจ
         </button>
       )}
+      <VersionHistory projectId={projectId} />
       <button
         onClick={recheck}
         disabled={checking}

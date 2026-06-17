@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { writeFile } from "@/lib/files";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
+import { snapshotProject } from "@/lib/versions";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,8 @@ export async function PUT(
 
   try {
     await writeFile(id, path, content);
+    // version the manual edit (coalesces a burst of autosaves into one snapshot)
+    await snapshotProject(id, "manual", { throttleSeconds: 120 });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[files] save error:", e);

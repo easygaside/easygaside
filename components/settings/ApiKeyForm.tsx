@@ -36,8 +36,8 @@ export function ApiKeyForm({ hasKey }: { hasKey: boolean }) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800/60 dark:bg-emerald-950/40">
         <span className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-          <CheckCircleIcon className="h-5 w-5" />
-          ใช้ Anthropic key ของคุณเอง — ไม่จำกัดโควตา
+          <CheckCircleIcon className="h-5 w-5 shrink-0" />
+          ใช้คีย์ Claude ของคุณ — สร้าง+ตรวจโค้ด ใช้โควตาคุณเอง ไม่จำกัด
         </span>
         <button
           onClick={remove}
@@ -55,11 +55,11 @@ export function ApiKeyForm({ hasKey }: { hasKey: boolean }) {
     <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700/60 dark:bg-slate-900">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
         <KeyIcon className="h-4 w-4 text-slate-400" />
-        ใช้ Anthropic API key ของคุณเอง (ไม่บังคับ)
+        ใช้ Anthropic (Claude) key ของคุณเอง
       </div>
       <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-        ใส่คีย์แล้วจะใช้ AI ได้ <b>ไม่จำกัดโควตา</b> (คิดค่าใช้จ่ายในบัญชี Anthropic ของคุณเอง) คีย์ถูก
-        <b>เข้ารหัสเก็บไว้</b> และใช้ฝั่งเซิร์ฟเวอร์เท่านั้น · สร้างคีย์ได้ที่ console.anthropic.com
+        ใส่คีย์แล้ว AI จะใช้ <b>Claude ด้วยโควตาคุณเอง</b> ทั้งตอน<b>สร้าง</b>และตอน<b>ตรวจซ้ำ</b> — ไม่จำกัด ไม่พึ่งเครดิตเรา ·
+        คีย์ถูก<b>เข้ารหัส AES-256-GCM</b> เก็บฝั่งเซิร์ฟเวอร์ <b>ไม่ส่งกลับเบราว์เซอร์</b> และลบได้ทุกเมื่อ · สร้างคีย์ที่ console.anthropic.com
       </p>
       <div className="mt-3 flex gap-2">
         <input

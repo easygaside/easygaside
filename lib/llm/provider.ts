@@ -1,3 +1,4 @@
+import { hasOwnApiKey } from "@/lib/beta";
 import { createServiceClient } from "@/lib/supabase/service";
 
 /**
@@ -91,6 +92,9 @@ export async function resolveProvider(p: LlmProvider): Promise<ProviderConfig> {
 
 /** The user's assigned arm, or the system default when unassigned. */
 export async function getUserProvider(userId: string): Promise<LlmProvider> {
+  // BYOK (own Anthropic key) → lock to Claude so EVERYTHING (codegen + critic) runs on the user's
+  // own quota. Their key is Anthropic-only, and the critic is Claude — one key covers it all.
+  if (await hasOwnApiKey(userId)) return "claude";
   const svc = createServiceClient();
   const { data } = await svc
     .from("egs_user_settings")

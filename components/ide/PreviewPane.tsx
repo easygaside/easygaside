@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  CommandLineIcon,
-  ComputerDesktopIcon,
-  DevicePhoneMobileIcon,
-  EyeIcon,
-} from "@heroicons/react/24/outline";
+import { CommandLineIcon, ComputerDesktopIcon, DevicePhoneMobileIcon } from "@heroicons/react/24/outline";
 import { useProjectStore, type FileEntry } from "@/store/useProjectStore";
 
 const MOBILE_WIDTH = 390; // px — iPhone-ish viewport for the mobile preview
@@ -100,11 +95,8 @@ export function PreviewPane() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold">
-        <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
-            <EyeIcon className="h-4 w-4" />
-          </span>
-          พรีวิว <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">(จำลอง)</span>
+        <div className="flex items-center gap-1.5">
+          พรีวิว <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">จำลอง</span>
         </div>
         {srcdoc && (
           <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5">
@@ -166,9 +158,14 @@ export function PreviewPane() {
       </p>
 
       <div className="mt-2 h-28 overflow-auto rounded-xl bg-slate-900 p-2 font-mono text-[10.5px] leading-relaxed">
-        <div className="mb-1 flex items-center gap-1 text-slate-500">
+        <div className="mb-1 flex items-center gap-1.5 text-slate-500">
           <CommandLineIcon className="h-3.5 w-3.5" />
           Console
+          {logs.some((l) => l.level === "error") && (
+            <span className="rounded bg-red-500/20 px-1.5 text-[10px] font-semibold text-red-400">
+              {logs.filter((l) => l.level === "error").length}
+            </span>
+          )}
         </div>
         {logs.length === 0 ? (
           <div className="text-slate-600">— ยังไม่มี log — (จะโชว์ error และการเรียก server จากตัวอย่าง)</div>

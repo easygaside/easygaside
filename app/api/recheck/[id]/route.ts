@@ -4,6 +4,7 @@ import { getOwnApiKey } from "@/lib/beta";
 import { reviewProject, type CriticIssue } from "@/lib/critic";
 import { getFiles } from "@/lib/files";
 import { validateGasFiles } from "@/lib/gas-codegen";
+import { logGeneration } from "@/lib/metrics";
 import { getProject } from "@/lib/projects";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -49,11 +50,26 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   // Gate 1 — rulebook critic (best-effort; needs an Anthropic key)
   let gate1: CriticIssue[] = [];
   let criticError = false;
+  let tokens = 0;
   const apiKey = (await getOwnApiKey(user.id)) ?? process.env.ANTHROPIC_API_KEY;
   if (apiKey) {
+    const startedAt = Date.now();
     try {
       const r = await reviewProject(new Anthropic({ apiKey }), project, id);
       gate1 = r.issues;
+      tokens = r.inputTokens + r.outputTokens;
+      // meter it: count toward the per-project energy budget (same as a generation)
+      await logGeneration({
+        projectId: id,
+        userId: user.id,
+        provider: "claude",
+        model: "claude-haiku-4-5-20251001",
+        inputTokens: r.inputTokens,
+        outputTokens: r.outputTokens,
+        criticIssues: gate1.length,
+        durationMs: Date.now() - startedAt,
+        outcome: "ok",
+      }).catch(() => {});
     } catch (e) {
       console.error("[recheck] critic failed:", e);
       criticError = true;
@@ -62,5 +78,5 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     criticError = true;
   }
 
-  return NextResponse.json({ issues: [...gate0, ...gate1], criticError });
+  return NextResponse.json({ issues: [...gate0, ...gate1], criticError, tokens });
 }

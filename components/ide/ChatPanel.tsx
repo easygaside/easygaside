@@ -108,7 +108,10 @@ export function ChatPanel({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
-  const [energy, setEnergy] = useState(energyUsed); // tokens consumed by this project so far
+  // energy lives in the store so a manual "ตรวจซ้ำ" (EditorToolbar) deducts from the same bar
+  const energy = useProjectStore((s) => s.energy);
+  const initEnergy = useProjectStore((s) => s.initEnergy);
+  const addEnergy = useProjectStore((s) => s.addEnergy);
   const [pendingSpec, setPendingSpec] = useState<ProjectSpec | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [images, setImages] = useState<CompressedImage[]>([]);
@@ -121,6 +124,11 @@ export function ChatPanel({
   useEffect(() => {
     bodyRef.current?.scrollTo(0, bodyRef.current.scrollHeight);
   }, [messages, status, images]);
+
+  // seed the energy bar from the server-computed usage (store is shared with the editor toolbar)
+  useEffect(() => {
+    initEnergy(energyUsed);
+  }, [energyUsed, initEnergy]);
 
   // Style Lab hand-off: a bundled prompt stashed in sessionStorage right before navigating here.
   // Prefill the composer (don't auto-send) so the user can still review/tweak before generating.
@@ -217,7 +225,7 @@ export function ChatPanel({
         else if (ev.type === "generation") setGenId(ev.id);
         else if (ev.type === "error") appendAssistant(`\n\n[ผิดพลาด: ${ev.message}]`);
         else if (ev.type === "done") {
-          if (ev.tokens) setEnergy((e) => e + ev.tokens!);
+          if (ev.tokens) addEnergy(ev.tokens);
           setStatus("");
           setWorking(null);
         }

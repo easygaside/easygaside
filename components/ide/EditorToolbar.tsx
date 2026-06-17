@@ -16,6 +16,7 @@ export function EditorToolbar({ projectId }: { projectId: string }) {
   const markSaved = useProjectStore((s) => s.markSaved);
   const setIssues = useProjectStore((s) => s.setIssues);
   const runAgent = useProjectStore((s) => s.runAgent);
+  const addEnergy = useProjectStore((s) => s.addEnergy);
   const [checking, setChecking] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
@@ -49,6 +50,7 @@ export function EditorToolbar({ projectId }: { projectId: string }) {
       }
       const list = data.issues ?? [];
       setIssues(list);
+      addEnergy(data.tokens ?? 0); // the re-check (critic) spends energy too — deduct from the bar
       if (data.criticError) {
         setNote(
           list.length

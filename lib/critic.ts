@@ -31,6 +31,8 @@ export interface CriticIssue {
 export interface CriticResult {
   ok: boolean;
   issues: CriticIssue[];
+  inputTokens: number;
+  outputTokens: number;
 }
 
 const CRITIC_SYSTEM = `You are a senior Google Apps Script (GAS) reviewer. Review the project files for
@@ -89,7 +91,7 @@ export async function reviewProject(
   projectId: string,
 ): Promise<CriticResult> {
   const files = await getFiles(projectId);
-  if (files.length === 0) return { ok: true, issues: [] };
+  if (files.length === 0) return { ok: true, issues: [], inputTokens: 0, outputTokens: 0 };
 
   // number every line so the model can cite a 1-based `line` we map to an editor marker
   const body = files
@@ -120,5 +122,10 @@ export async function reviewProject(
     .join("");
 
   const issues = parseIssues(text);
-  return { ok: issues.length === 0, issues };
+  return {
+    ok: issues.length === 0,
+    issues,
+    inputTokens: msg.usage?.input_tokens ?? 0,
+    outputTokens: msg.usage?.output_tokens ?? 0,
+  };
 }

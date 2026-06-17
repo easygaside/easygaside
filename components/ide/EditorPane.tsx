@@ -40,13 +40,58 @@ function langOf(path: string): string {
   return "plaintext";
 }
 
+const MARKER_OWNER = "egs-critic";
+
 export function EditorPane({ projectId }: { projectId: string }) {
   const activePath = useProjectStore((s) => s.activePath);
   const files = useProjectStore((s) => s.files);
+  const issues = useProjectStore((s) => s.issues);
   const update = useProjectStore((s) => s.updateActiveContent);
+  const markSaved = useProjectStore((s) => s.markSaved);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // refs to the live monaco instance so we can paint critic findings as gutter markers
+  const editorRef = useRef<unknown>(null);
+  const monacoRef = useRef<{ editor: { getModels: () => unknown[]; setModelMarkers: (...a: unknown[]) => void }; MarkerSeverity: { Error: number; Warning: number } } | null>(null);
 
   useEffect(silenceMonacoCanceled, []);
+
+  // paint critic findings (one marker per file/line) across every open model — best-effort
+  useEffect(() => {
+    const monaco = monacoRef.current as unknown as {
+      editor: {
+        getModels: () => {
+          uri?: { path?: string };
+          getLineCount: () => number;
+          getLineMaxColumn: (n: number) => number;
+        }[];
+        setModelMarkers: (model: unknown, owner: string, markers: unknown[]) => void;
+      };
+      MarkerSeverity: { Error: number; Warning: number };
+    } | null;
+    if (!monaco) return;
+    try {
+      for (const model of monaco.editor.getModels()) {
+        const path = String(model.uri?.path ?? "").replace(/^\/+/, "");
+        const list = issues[path] ?? [];
+        const markers = list
+          .filter((i) => typeof i.line === "number")
+          .map((i) => {
+            const line = Math.min(Math.max(1, i.line as number), model.getLineCount());
+            return {
+              startLineNumber: line,
+              startColumn: 1,
+              endLineNumber: line,
+              endColumn: model.getLineMaxColumn(line),
+              message: `ขัดกับกฎระบบ: ${i.problem}\nวิธีแก้: ${i.fix}`,
+              severity: i.severity === "high" ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
+            };
+          });
+        monaco.editor.setModelMarkers(model, MARKER_OWNER, markers);
+      }
+    } catch {
+      /* marker placement is best-effort — never break the editor */
+    }
+  }, [issues, activePath]);
 
   function onChange(v: string | undefined) {
     const content = v ?? "";
@@ -60,7 +105,11 @@ export function EditorPane({ projectId }: { projectId: string }) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path, content }),
-      }).catch(() => {});
+      })
+        .then((r) => {
+          if (r.ok) markSaved(path);
+        })
+        .catch(() => {});
     }, 800);
   }
 
@@ -90,6 +139,10 @@ export function EditorPane({ projectId }: { projectId: string }) {
       language={langOf(activePath)}
       value={files[activePath]?.content ?? ""}
       onChange={onChange}
+      onMount={(editor, monaco) => {
+        editorRef.current = editor;
+        monacoRef.current = monaco as never;
+      }}
       options={{
         minimap: { enabled: false },
         fontSize: 13,

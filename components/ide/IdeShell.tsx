@@ -16,6 +16,8 @@ import { ChatPanel } from "./ChatPanel";
 import { DeployButton } from "./DeployButton";
 import { DeployedUrlBar } from "./DeployedUrlBar";
 import { EditorPane } from "./EditorPane";
+import { EditorToolbar } from "./EditorToolbar";
+import { IssuesPanel } from "./IssuesPanel";
 import { ProjectSwitcher, type SwitcherProject } from "./ProjectSwitcher";
 import { FileTree } from "./FileTree";
 import { PreviewPane } from "./PreviewPane";
@@ -127,9 +129,11 @@ export function IdeShell({
         </section>
         <section className={`${CARD} ${hideOnMobile("code")}`}>
           <FileTree />
+          <EditorToolbar projectId={projectId} />
           <div className="min-h-0 flex-1">
             <EditorPane projectId={projectId} />
           </div>
+          <IssuesPanel />
         </section>
         <section className={`${CARD} p-3 ${hideOnMobile("preview")}`}>
           <PreviewPane />

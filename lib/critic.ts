@@ -21,6 +21,8 @@ export type CriticSeverity = "high" | "medium" | "low";
 
 export interface CriticIssue {
   file: string;
+  /** 1-based line in `file` where the problem is (for editor highlighting); undefined if unknown. */
+  line?: number;
   severity: CriticSeverity;
   problem: string;
   fix: string;
@@ -43,8 +45,10 @@ correctness / best-practice problems that a regex linter CANNOT catch. Look spec
 - concurrent writes to a Sheet without LockService
 - container-bound script missing onOpen() menu, or automation implied but no installTriggers() setup function
 Only report REAL problems — do not invent issues or nitpick style. If the code is sound, return an empty list.
+Each file's content is shown with a "N: " line-number prefix. For every issue include "line": the 1-based
+line number (the N) where the problem is — pick the single most relevant line; omit only if truly file-wide.
 Reply with ONLY a JSON object, no prose, no markdown fences:
-{"issues":[{"file":"Code.gs","severity":"high|medium|low","problem":"<short>","fix":"<short actionable fix>"}]}`;
+{"issues":[{"file":"Code.gs","line":42,"severity":"high|medium|low","problem":"<short>","fix":"<short actionable fix>"}]}`;
 
 function normalizeSeverity(s: unknown): CriticSeverity {
   return s === "high" || s === "low" ? s : "medium";
@@ -58,12 +62,16 @@ function parseIssues(text: string): CriticIssue[] {
     if (!Array.isArray(obj.issues)) return [];
     return obj.issues
       .filter((i): i is Record<string, unknown> => !!i && typeof i === "object")
-      .map((i) => ({
-        file: String(i.file ?? "").trim() || "(unknown)",
-        severity: normalizeSeverity(i.severity),
-        problem: String(i.problem ?? "").trim(),
-        fix: String(i.fix ?? "").trim(),
-      }))
+      .map((i) => {
+        const n = Math.trunc(Number(i.line));
+        return {
+          file: String(i.file ?? "").trim() || "(unknown)",
+          line: Number.isFinite(n) && n > 0 ? n : undefined,
+          severity: normalizeSeverity(i.severity),
+          problem: String(i.problem ?? "").trim(),
+          fix: String(i.fix ?? "").trim(),
+        };
+      })
       .filter((i) => i.problem.length > 0)
       .slice(0, MAX_ISSUES);
   } catch {
@@ -83,7 +91,16 @@ export async function reviewProject(
   const files = await getFiles(projectId);
   if (files.length === 0) return { ok: true, issues: [] };
 
-  const body = files.map((f) => `=== ${f.path} ===\n${f.content}`).join("\n\n");
+  // number every line so the model can cite a 1-based `line` we map to an editor marker
+  const body = files
+    .map((f) => {
+      const numbered = f.content
+        .split("\n")
+        .map((ln, i) => `${i + 1}: ${ln}`)
+        .join("\n");
+      return `=== ${f.path} ===\n${numbered}`;
+    })
+    .join("\n\n");
   const kind =
     project.kind === "bound"
       ? "container-bound script (bound to a Google Sheet, uses onOpen menu)"

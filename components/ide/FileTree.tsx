@@ -13,6 +13,7 @@ export function FileTree() {
   const order = useProjectStore((s) => s.order);
   const active = useProjectStore((s) => s.activePath);
   const working = useProjectStore((s) => s.workingPath);
+  const issues = useProjectStore((s) => s.issues);
   const setActive = useProjectStore((s) => s.setActive);
 
   return (
@@ -40,6 +41,15 @@ export function FileTree() {
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: dotColor(p) }} />
             </span>
             {p}
+            {(issues[p]?.length ?? 0) > 0 && (
+              <span
+                className={`grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold leading-none text-white ${
+                  issues[p].some((i) => i.severity === "high") ? "bg-red-500" : "bg-amber-500"
+                }`}
+              >
+                {issues[p].length}
+              </span>
+            )}
           </button>
         ))
       )}

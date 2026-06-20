@@ -64,11 +64,14 @@ export interface TokenSummary {
   gens: number;
   projectCount: number;
   avgPerProject: number;
+  totalCriticIssues: number;
+  avgCriticPerGen: number;
 }
 export interface ProjectTokens {
   name: string;
   tokens: number;
   gens: number;
+  criticIssues: number;
 }
 
 const ARM_STYLE: Record<LlmProvider, string> = {
@@ -286,6 +289,7 @@ export function AdminPanel({
               { label: "Token รวมทั้งหมด", value: fmt(summary.totalTokens), accent: true },
               { label: "Token เฉลี่ย/โปรเจกต์", value: fmt(summary.avgPerProject) },
               { label: "จำนวน generation", value: fmt(summary.gens) },
+              { label: "Critic เฉลี่ย/gen", value: String(summary.avgCriticPerGen) },
               { label: "input รวม", value: fmt(summary.totalIn) },
               { label: "output รวม", value: fmt(summary.totalOut) },
               { label: "โปรเจกต์ที่ใช้งาน", value: fmt(summary.projectCount) },
@@ -321,6 +325,7 @@ export function AdminPanel({
               <Bars title="จำนวน generation" items={metrics.map((m) => ({ label: m.provider, value: m.gens, color: ARM_COLOR[m.provider] }))} />
               <Bars title="เวลาเฉลี่ย/gen (วินาที)" items={metrics.map((m) => ({ label: m.provider, value: m.avgSec, color: ARM_COLOR[m.provider] }))} unit="s" />
               <Bars title="👍 ถูกใจ" items={metrics.map((m) => ({ label: m.provider, value: m.up, color: ARM_COLOR[m.provider] }))} />
+              <Bars title="🔍 critic issues เฉลี่ย/gen" items={metrics.map((m) => ({ label: m.provider, value: m.avgCritic, color: ARM_COLOR[m.provider] }))} />
             </div>
           </div>
 
@@ -336,6 +341,15 @@ export function AdminPanel({
               <Bars title="" items={projects.map((p) => ({ label: p.name, value: p.tokens, color: "#94a3b8" }))} unit=" tok" />
             )}
           </div>
+
+          {projects.length > 0 && (
+            <div>
+              <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                🔍 Critic issues ต่อโปรเจกต์ · รวม {fmt(summary.totalCriticIssues)} จุด
+              </h2>
+              <Bars title="" items={projects.map((p) => ({ label: p.name, value: p.criticIssues, color: "#f59e0b" }))} unit=" จุด" />
+            </div>
+          )}
         </div>
       )}
 

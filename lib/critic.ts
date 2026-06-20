@@ -99,6 +99,10 @@ correctness / best-practice problems that a regex linter CANNOT catch. Look spec
 - missing try/catch on server entry points, or google.script.run without a .withFailureHandler
 - concurrent writes to a Sheet without LockService
 - container-bound script missing onOpen() menu, or automation implied but no installTriggers() setup function
+- a multi-step write that touches more than one sheet/range (e.g. mark a transaction "returned" AND add the stock back) that can leave a HALF-DONE state on partial failure: step 1 commits, step 2 fails, no rollback. Order the writes so the riskier one runs first, and/or wrap the whole read-modify-write in ONE LockService section so it's atomic = high
+- a google.script.run call whose .withFailureHandler is EMPTY or a no-op (swallows the error) — it MUST surface the failure to the user (toast/inline message), not fail silently = medium
+- client-side validation of a date/number that is too loose (e.g. only isNaN() after split('/'), so spaces or partial input pass) — validate the real format + range; and the SERVER entry point must re-validate too (client checks are bypassable) = medium
+- a free-text field written to a Sheet with NO length bound (no maxlength on the <input>/<textarea> and no server-side length cap) — cap it so one row can't store runaway/abusive data = low
 Only report REAL problems — do not invent issues or nitpick style. If the code is sound, return an empty list.
 Each file's content is shown with a "N: " line-number prefix. For every issue include "line": the 1-based
 line number (the N) where the problem is — pick the single most relevant line; omit only if truly file-wide.
@@ -181,14 +185,18 @@ async function reviewWithAnthropic(userPrompt: string, model: string): Promise<C
  * json_object mode keeps the reply parseable. Non-streaming — it's a short one-shot JSON verdict. */
 async function reviewWithDeepSeek(userPrompt: string, model: string): Promise<CriticResult> {
   const client = new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: DEEPSEEK_BASE_URL });
+  // V4 Pro / reasoner are thinking models: they reject response_format(json_object) and spend output
+  // tokens on the chain-of-thought first, so give them headroom and parse the JSON out of the text
+  // (parseIssues already extracts the {...} block, so we don't need the json_object guarantee).
+  const reasoning = /v4-pro|reasoner/i.test(model);
   const res = await client.chat.completions.create({
     model,
-    max_tokens: CRITIC_MAX_TOKENS,
+    max_tokens: reasoning ? 8000 : CRITIC_MAX_TOKENS,
     messages: [
       { role: "system", content: CRITIC_SYSTEM },
       { role: "user", content: userPrompt },
     ],
-    response_format: { type: "json_object" },
+    ...(reasoning ? {} : { response_format: { type: "json_object" as const } }),
   });
   const text = res.choices[0]?.message?.content ?? "";
   const u = res.usage;

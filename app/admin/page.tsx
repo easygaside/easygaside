@@ -187,20 +187,27 @@ export default async function AdminPage() {
   const totalOut = rows.reduce((a, r) => a + r.output_tokens, 0);
 
   // per-project tokens (+ average across all projects that generated)
-  const byProject = new Map<string, { tokens: number; gens: number }>();
+  const byProject = new Map<string, { tokens: number; gens: number; critic: number }>();
   for (const r of rows) {
     if (!r.project_id) continue;
-    const cur = byProject.get(r.project_id) ?? { tokens: 0, gens: 0 };
+    const cur = byProject.get(r.project_id) ?? { tokens: 0, gens: 0, critic: 0 };
     cur.tokens += tok(r);
     cur.gens += 1;
+    cur.critic += r.critic_issues;
     byProject.set(r.project_id, cur);
   }
   const projectCount = byProject.size;
   const projects = [...byProject.entries()]
-    .map(([id, v]) => ({ name: projectName.get(id) ?? id.slice(0, 8), tokens: v.tokens, gens: v.gens }))
+    .map(([id, v]) => ({
+      name: projectName.get(id) ?? id.slice(0, 8),
+      tokens: v.tokens,
+      gens: v.gens,
+      criticIssues: v.critic,
+    }))
     .sort((a, b) => b.tokens - a.tokens)
     .slice(0, 15);
 
+  const totalCriticIssues = rows.reduce((a, r) => a + r.critic_issues, 0);
   const summary = {
     totalTokens: totalIn + totalOut,
     totalIn,
@@ -208,6 +215,8 @@ export default async function AdminPage() {
     gens: rows.length,
     projectCount,
     avgPerProject: projectCount ? Math.round((totalIn + totalOut) / projectCount) : 0,
+    totalCriticIssues,
+    avgCriticPerGen: rows.length ? +(totalCriticIssues / rows.length).toFixed(2) : 0,
   };
 
   // daily token series (last 14 days) for the line chart

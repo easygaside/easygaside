@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeftIcon,
+  BanknotesIcon,
   ChartBarIcon,
   Cog6ToothIcon,
   FlagIcon,
   InboxStackIcon,
+  TrashIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
 import {
@@ -23,6 +25,9 @@ import {
   setProviderTankAction,
   setUserArmAction,
   setVisionProviderAction,
+  addPaymentAction,
+  deletePaymentAction,
+  setFxRateAction,
 } from "@/app/admin/actions";
 import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/catalog";
 import { AllowlistManager, type AllowlistEntry } from "./AllowlistManager";
@@ -72,6 +77,16 @@ export interface ProjectTokens {
   tokens: number;
   gens: number;
   criticIssues: number;
+}
+export interface FinanceData {
+  fxRate: number;
+  monthLabel: string;
+  revenueTotalThb: number;
+  revenueMonthThb: number;
+  expenseTotalUsd: number;
+  expenseMonthUsd: number;
+  byProvider: { provider: string; totalUsd: number; monthUsd: number }[];
+  payments: { id: string; amountThb: number; note: string | null; paidAt: string }[];
 }
 
 const ARM_STYLE: Record<LlmProvider, string> = {
@@ -171,7 +186,7 @@ export interface ProviderModel {
   energyTank: number;
 }
 
-type Tab = "overview" | "providers" | "users" | "beta" | "reports";
+type Tab = "overview" | "finance" | "providers" | "users" | "beta" | "reports";
 
 export function AdminPanel({
   users,
@@ -193,6 +208,7 @@ export function AdminPanel({
   reports,
   applications,
   userMetrics,
+  finance,
   providerKeys,
 }: {
   users: AdminUser[];
@@ -214,6 +230,7 @@ export function AdminPanel({
   reports: FailureReport[];
   applications: BetaApplication[];
   userMetrics: UserMetric[];
+  finance: FinanceData;
   providerKeys: Record<LlmProvider, boolean>;
 }) {
   const router = useRouter();
@@ -230,6 +247,9 @@ export function AdminPanel({
   const [tankDefaultDraft, setTankDefaultDraft] = useState(String(energyTankDefault));
   const [criticProviderDraft, setCriticProviderDraft] = useState<"claude" | "deepseek">(criticProvider);
   const [criticModelDraft, setCriticModelDraft] = useState(criticModel);
+  const [payAmount, setPayAmount] = useState("");
+  const [payNote, setPayNote] = useState("");
+  const [fxDraft, setFxDraft] = useState(String(finance.fxRate));
 
   const pendingApps = applications.filter((a) => a.status === "pending").length;
   const openReports = reports.filter((r) => r.status !== "done").length;
@@ -257,6 +277,17 @@ export function AdminPanel({
   const setDefault = (p: LlmProvider) => run(() => setDefaultProviderAction(p));
   const setArm = (userId: string, arm: LlmProvider) => run(() => setUserArmAction(userId, arm));
   const setVision = (p: "gemini" | "chatgpt" | "claude") => run(() => setVisionProviderAction(p));
+  const addPayment = () =>
+    run(async () => {
+      await addPaymentAction(Number(payAmount), payNote);
+      setPayAmount("");
+      setPayNote("");
+    });
+  const delPayment = (id: string) => run(() => deletePaymentAction(id));
+  const saveFx = () => run(() => setFxRateAction(Number(fxDraft)));
+  const baht = (n: number) => `฿${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  const usd = (n: number) => `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  const toThb = (u: number) => u * finance.fxRate;
   function balance() {
     if (!confirm("แบ่งผู้ใช้ทั้งหมดเป็นกลุ่มเท่า ๆ กัน (เขียนทับ arm เดิม)?")) return;
     run(() => autoBalanceArmsAction());
@@ -264,6 +295,7 @@ export function AdminPanel({
 
   const TABS: { id: Tab; label: string; icon: typeof ChartBarIcon; badge?: number }[] = [
     { id: "overview", label: "ภาพรวม", icon: ChartBarIcon },
+    { id: "finance", label: "การเงิน", icon: BanknotesIcon },
     { id: "providers", label: "Provider", icon: Cog6ToothIcon },
     { id: "users", label: "ผู้ใช้", icon: UsersIcon },
     { id: "beta", label: "Beta", icon: InboxStackIcon, badge: pendingApps },
@@ -350,6 +382,133 @@ export function AdminPanel({
               <Bars title="" items={projects.map((p) => ({ label: p.name, value: p.criticIssues, color: "#f59e0b" }))} unit=" จุด" />
             </div>
           )}
+        </div>
+      )}
+
+      {/* ───────── การเงิน ───────── */}
+      {tab === "finance" && (
+        <div className="mt-5 space-y-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {[
+              { label: `รายรับเดือนนี้ (${finance.monthLabel})`, value: baht(finance.revenueMonthThb), tone: "rev" as const },
+              { label: "รายรับรวมทั้งหมด", value: baht(finance.revenueTotalThb), tone: "rev" as const },
+              { label: "กำไรเดือนนี้", value: baht(finance.revenueMonthThb - toThb(finance.expenseMonthUsd)), tone: "net" as const },
+              { label: "รายจ่ายเดือนนี้", value: baht(toThb(finance.expenseMonthUsd)), sub: usd(finance.expenseMonthUsd), tone: "exp" as const },
+              { label: "รายจ่ายรวมทั้งหมด", value: baht(toThb(finance.expenseTotalUsd)), sub: usd(finance.expenseTotalUsd), tone: "exp" as const },
+              { label: "กำไรรวมทั้งหมด", value: baht(finance.revenueTotalThb - toThb(finance.expenseTotalUsd)), tone: "net" as const },
+            ].map((c) => (
+              <div key={c.label} className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700/60 dark:bg-slate-900">
+                <div className="text-xs text-slate-500 dark:text-slate-400">{c.label}</div>
+                <div
+                  className={`mt-1 text-lg font-bold sm:text-xl ${
+                    c.tone === "rev"
+                      ? "text-emerald-600 dark:text-emerald-300"
+                      : c.tone === "exp"
+                        ? "text-rose-600 dark:text-rose-300"
+                        : "text-slate-800 dark:text-slate-100"
+                  }`}
+                >
+                  {c.value}
+                </div>
+                {c.sub && <div className="text-[11px] text-slate-400 dark:text-slate-500">({c.sub})</div>}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-700/60">
+            <span className="text-slate-500 dark:text-slate-400">เรตแปลง USD → บาท:</span>
+            <input
+              value={fxDraft}
+              onChange={(e) => setFxDraft(e.target.value)}
+              type="number"
+              step="0.1"
+              className="w-24 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-mono dark:border-slate-700/60 dark:bg-slate-800"
+            />
+            <span className="text-slate-400 dark:text-slate-500">฿/$</span>
+            <button onClick={saveFx} disabled={busy} className="rounded-lg bg-emerald-500 px-3 py-1 font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50">
+              บันทึก
+            </button>
+          </div>
+
+          <section>
+            <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">รายจ่ายแยกตาม Provider (แปลงเป็นบาท)</h2>
+            {finance.byProvider.length === 0 ? (
+              <p className="text-xs text-slate-400 dark:text-slate-500">ยังไม่มีรายจ่าย (เริ่มนับจาก generation ใหม่)</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700/60">
+                <table className="w-full min-w-[360px] text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-slate-400 dark:border-slate-800 dark:text-slate-500">
+                      <th className="px-3 py-2 font-medium">Provider</th>
+                      <th className="px-3 py-2 text-right font-medium">เดือนนี้</th>
+                      <th className="px-3 py-2 text-right font-medium">รวมทั้งหมด</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {finance.byProvider.map((p) => (
+                      <tr key={p.provider} className="border-t border-slate-100 first:border-t-0 dark:border-slate-800">
+                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{p.provider}</td>
+                        <td className="px-3 py-2 text-right font-mono text-slate-600 dark:text-slate-300">
+                          {baht(toThb(p.monthUsd))} <span className="text-[10px] text-slate-400">({usd(p.monthUsd)})</span>
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-slate-600 dark:text-slate-300">
+                          {baht(toThb(p.totalUsd))} <span className="text-[10px] text-slate-400">({usd(p.totalUsd)})</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">
+              * ประมาณการจาก token × ราคา (DeepSeek = ราคาทางการ, อื่น ๆ = ราคา list โดยประมาณ — แก้ได้ที่ lib/pricing.ts)
+            </p>
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">บันทึกรายรับ (PromptPay — กรอกเอง)</h2>
+            <div className="flex flex-wrap gap-2">
+              <input
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                type="number"
+                placeholder="จำนวนเงิน (บาท)"
+                className="w-32 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+              />
+              <input
+                value={payNote}
+                onChange={(e) => setPayNote(e.target.value)}
+                placeholder="หมายเหตุ (เช่น อีเมลผู้จ่าย / แพ็กเกจ)"
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+              />
+              <button
+                onClick={addPayment}
+                disabled={busy || !payAmount.trim()}
+                className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
+              >
+                เพิ่มรายรับ
+              </button>
+            </div>
+            {finance.payments.length > 0 && (
+              <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700/60">
+                {finance.payments.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 border-t border-slate-100 px-3 py-2 text-xs first:border-t-0 dark:border-slate-800">
+                    <span className="shrink-0 font-mono font-semibold text-emerald-600 dark:text-emerald-400">{baht(p.amountThb)}</span>
+                    <span className="shrink-0 text-slate-400 dark:text-slate-500">{p.paidAt}</span>
+                    <span className="min-w-0 flex-1 truncate text-slate-500 dark:text-slate-400">{p.note ?? ""}</span>
+                    <button
+                      onClick={() => delPayment(p.id)}
+                      disabled={busy}
+                      title="ลบรายการ"
+                      className="shrink-0 rounded-lg p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:hover:bg-red-950/40"
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       )}
 

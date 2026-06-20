@@ -3,7 +3,8 @@ import { isSuperAdmin } from "@/lib/admin";
 import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/provider";
 import { getCurrentUser } from "@/lib/projects";
 import { createServiceClient } from "@/lib/supabase/service";
-import { AdminPanel, type AdminUser, type ArmMetric, type UserMetric } from "@/components/admin/AdminPanel";
+import { DEFAULT_USD_THB, genCostUsd } from "@/lib/pricing";
+import { AdminPanel, type AdminUser, type ArmMetric, type FinanceData, type UserMetric } from "@/components/admin/AdminPanel";
 import type { AllowlistEntry } from "@/components/admin/AllowlistManager";
 import type { BetaApplication } from "@/components/admin/BetaApplicationsViewer";
 import type { FailureReport } from "@/components/admin/ReportsViewer";
@@ -12,10 +13,13 @@ export const metadata = { title: "Admin — EasyGAS IDE" };
 
 interface GenRow {
   provider: string;
+  model: string | null;
   project_id: string | null;
   user_id: string | null;
   input_tokens: number;
   output_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
   critic_issues: number;
   duration_ms: number | null;
   outcome: string | null;
@@ -35,12 +39,19 @@ export default async function AdminPage() {
       svc.from("egs_user_settings").select("user_id, llm_provider"),
       svc
         .from("egs_generations")
-        .select("provider, project_id, user_id, input_tokens, output_tokens, critic_issues, duration_ms, outcome, rating, created_at"),
+        .select(
+          "provider, model, project_id, user_id, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, critic_issues, duration_ms, outcome, rating, created_at",
+        ),
       svc.from("egs_provider_config").select("provider, model, energy_tank"),
       svc.from("egs_app_settings").select("key, value"),
     ]);
-  const [{ data: projectRows }, { data: allowRows }, { data: reportRows }, { data: appRows }] =
-    await Promise.all([
+  const [
+    { data: projectRows },
+    { data: allowRows },
+    { data: reportRows },
+    { data: appRows },
+    { data: payRows },
+  ] = await Promise.all([
       svc.from("egs_projects").select("id, name"),
       svc.from("egs_beta_allowlist").select("email, note, created_at").order("created_at", { ascending: true }),
       svc
@@ -55,6 +66,7 @@ export default async function AdminPage() {
         )
         .order("created_at", { ascending: false })
         .limit(200),
+      svc.from("egs_payments").select("id, amount_thb, note, paid_at").order("paid_at", { ascending: false }),
     ]);
   const projectName = new Map((projectRows ?? []).map((p) => [p.id as string, p.name as string]));
 
@@ -219,6 +231,44 @@ export default async function AdminPage() {
     avgCriticPerGen: rows.length ? +(totalCriticIssues / rows.length).toFixed(2) : 0,
   };
 
+  // ── finance: revenue (manual payments) + provider COGS (token cost × pricing), this-month + total ──
+  const fxRaw = Number(appSettings.get("usd_thb_rate"));
+  const fxRate = Number.isFinite(fxRaw) && fxRaw > 0 ? fxRaw : DEFAULT_USD_THB;
+  const monthKey = new Date().toISOString().slice(0, 7); // YYYY-MM (UTC)
+  const payments = ((payRows ?? []) as { id: string; amount_thb: number; note: string | null; paid_at: string }[]).map(
+    (p) => ({ id: p.id, amountThb: Number(p.amount_thb) || 0, note: p.note, paidAt: p.paid_at }),
+  );
+  const revenueTotalThb = payments.reduce((a, p) => a + p.amountThb, 0);
+  const revenueMonthThb = payments
+    .filter((p) => (p.paidAt ?? "").slice(0, 7) === monthKey)
+    .reduce((a, p) => a + p.amountThb, 0);
+
+  const expenseByProvider = new Map<string, { total: number; month: number }>();
+  let expenseTotalUsd = 0;
+  let expenseMonthUsd = 0;
+  for (const r of rows) {
+    const usd = genCostUsd(r);
+    const inMonth = (r.created_at ?? "").slice(0, 7) === monthKey;
+    expenseTotalUsd += usd;
+    if (inMonth) expenseMonthUsd += usd;
+    const cur = expenseByProvider.get(r.provider) ?? { total: 0, month: 0 };
+    cur.total += usd;
+    if (inMonth) cur.month += usd;
+    expenseByProvider.set(r.provider, cur);
+  }
+  const finance: FinanceData = {
+    fxRate,
+    monthLabel: monthKey,
+    revenueTotalThb,
+    revenueMonthThb,
+    expenseTotalUsd,
+    expenseMonthUsd,
+    byProvider: [...expenseByProvider.entries()]
+      .map(([provider, v]) => ({ provider, totalUsd: v.total, monthUsd: v.month }))
+      .sort((a, b) => b.totalUsd - a.totalUsd),
+    payments: payments.slice(0, 50),
+  };
+
   // daily token series (last 14 days) for the line chart
   const dayMap = new Map<string, number>();
   for (const r of rows) {
@@ -254,6 +304,7 @@ export default async function AdminPage() {
       reports={reports}
       applications={applications}
       userMetrics={userMetrics}
+      finance={finance}
       providerKeys={providerKeys}
     />
   );

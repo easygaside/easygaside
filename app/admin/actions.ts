@@ -121,6 +121,37 @@ export async function setVisionProviderAction(provider: string): Promise<void> {
   revalidatePath("/admin");
 }
 
+/** Finance: record a received payment (THB). Payment is manual (PromptPay), so admin enters it. */
+export async function addPaymentAction(amountThb: number, note: string, paidAt?: string): Promise<void> {
+  await requireSuperAdmin();
+  const amt = Number(amountThb);
+  if (!Number.isFinite(amt) || amt < 0 || amt > 100_000_000) throw new Error("bad_amount");
+  const svc = createServiceClient();
+  const row: Record<string, unknown> = { amount_thb: amt, note: note.trim() || null };
+  if (paidAt && /^\d{4}-\d{2}-\d{2}$/.test(paidAt)) row.paid_at = paidAt;
+  const { error } = await svc.from("egs_payments").insert(row);
+  if (error) throw new Error(`addPayment: ${error.message}`);
+  revalidatePath("/admin");
+}
+
+/** Finance: delete a payment row. */
+export async function deletePaymentAction(id: string): Promise<void> {
+  await requireSuperAdmin();
+  const svc = createServiceClient();
+  const { error } = await svc.from("egs_payments").delete().eq("id", id);
+  if (error) throw new Error(`deletePayment: ${error.message}`);
+  revalidatePath("/admin");
+}
+
+/** Finance: USD→THB rate used to convert provider COGS to baht (egs_app_settings.usd_thb_rate). */
+export async function setFxRateAction(rate: number): Promise<void> {
+  await requireSuperAdmin();
+  const r = Number(rate);
+  if (!Number.isFinite(r) || r <= 0 || r > 1000) throw new Error("bad_rate");
+  await setAppSetting("usd_thb_rate", String(r));
+  revalidatePath("/admin");
+}
+
 /** Beta allowlist: add an email (who can use the closed beta). Idempotent. */
 export async function addAllowlistEmailAction(email: string): Promise<void> {
   await requireSuperAdmin();

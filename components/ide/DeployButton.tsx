@@ -97,14 +97,21 @@ export function DeployButton({
           <button
             onClick={deploy}
             disabled={res.kind === "busy" || deployed}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+            aria-label={deployed ? "Deploy แล้ว" : undefined}
+            className={`flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 ${
+              deployed ? "px-2.5" : "px-3"
+            }`}
           >
             {res.kind === "busy" ? (
-              "กำลัง deploy…"
+              <>
+                <span className="hidden sm:inline">กำลัง deploy…</span>
+                <span className="sm:hidden">กำลัง…</span>
+              </>
             ) : deployed ? (
               <>
                 <CheckCircleIcon className="h-4 w-4 shrink-0" />
-                Deploy แล้ว
+                {/* mobile: just the check; desktop: full label */}
+                <span className="hidden sm:inline">Deploy แล้ว</span>
               </>
             ) : (
               <>

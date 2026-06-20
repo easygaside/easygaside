@@ -130,7 +130,7 @@ export function IdeShell({
   return (
     <main className="flex h-screen flex-col bg-[#fafafa] text-slate-800 dark:bg-[#0d0f12] dark:text-slate-100">
       {/* TOP BAR */}
-      <header className="flex h-[54px] flex-none items-center gap-3 border-b border-slate-200 bg-white px-3 dark:border-slate-800 dark:bg-slate-900 sm:px-4">
+      <header className="flex h-[54px] flex-none items-center gap-2 border-b border-slate-200 bg-white px-3 dark:border-slate-800 dark:bg-slate-900 sm:gap-3 sm:px-4">
         <div className="flex shrink-0 items-center gap-2.5">
           <Image src="/icon/android-icon-192x192.png" alt="EasyGAS" width={26} height={26} className="rounded-[7px]" />
           <span className="hidden text-[15px] font-bold tracking-tight sm:block">
@@ -138,7 +138,13 @@ export function IdeShell({
           </span>
         </div>
         <span className="hidden h-[18px] w-px bg-slate-200 dark:bg-slate-700 sm:block" />
-        <ProjectSwitcher currentId={projectId} currentName={projectName} projects={projects} />
+        {/* project name owns the flexible space on mobile so it truncates instead of crowding out the actions */}
+        <ProjectSwitcher
+          currentId={projectId}
+          currentName={projectName}
+          projects={projects}
+          className="min-w-0 flex-1 lg:flex-none"
+        />
         <div className="hidden flex-1 justify-center lg:flex">
           <button
             type="button"
@@ -150,10 +156,12 @@ export function IdeShell({
             <span className="ml-auto rounded border border-slate-200 px-1.5 font-mono text-[10px] dark:border-slate-700">⌘K</span>
           </button>
         </div>
-        <span className="flex-1 lg:hidden" />
-        <ReportButton projectId={projectId} />
-        <ThemeToggle />
-        <DeployButton projectId={projectId} googleConnected={googleConnected} deployed={!!deployUrl} onDeployed={setDeployUrl} />
+        {/* actions cluster — shrink-0 so a long project name can never push these off-screen */}
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <ReportButton projectId={projectId} />
+          <ThemeToggle />
+          <DeployButton projectId={projectId} googleConnected={googleConnected} deployed={!!deployUrl} onDeployed={setDeployUrl} />
+        </div>
       </header>
 
       {/* STATUS STRIP — live /exec URL + actions (flush, full-width) */}

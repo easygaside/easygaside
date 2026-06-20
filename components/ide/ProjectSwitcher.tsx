@@ -16,10 +16,12 @@ export function ProjectSwitcher({
   currentId,
   currentName,
   projects,
+  className = "",
 }: {
   currentId: string;
   currentName: string;
   projects: SwitcherProject[];
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -35,10 +37,10 @@ export function ProjectSwitcher({
   const others = projects.filter((p) => p.id !== currentId);
 
   return (
-    <div className="relative min-w-0" ref={ref}>
+    <div className={`relative min-w-0 ${className}`} ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex min-w-0 items-center gap-1.5 rounded-xl px-2 py-1 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+        className="flex w-full min-w-0 items-center gap-1.5 rounded-xl px-2 py-1 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
       >
         <FolderIcon className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
         <span className="truncate">{currentName}</span>

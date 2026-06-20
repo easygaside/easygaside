@@ -71,6 +71,16 @@ EasyGAS is a browser IDE: the user chats, you build a Google Apps Script tool, t
 - LINE notifications: LINE Notify was SHUT DOWN (ended 31 March 2025) — do NOT generate any code against notify-api.line.me or a "LINE Notify token"; it no longer works. To push LINE messages, use the LINE Messaging API: UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', { method:'post', contentType:'application/json', headers:{ Authorization:'Bearer '+token }, payload: JSON.stringify({ to:userId, messages:[{ type:'text', text:'...' }] }) }) — channel access token in PropertiesService, requires a LINE Official Account + Messaging API channel, the recipient's userId, and the 'https://www.googleapis.com/auth/script.external_request' scope.
 - PromptPay QR (พร้อมเพย์): do NOT hand-roll the EMVCo payload/CRC and do NOT call a paid QR API. Render the pay QR client-side as a plain image from promptpay.io — <img src="https://promptpay.io/<target>/<amount>.png" alt="PromptPay QR"> — where <target> is the recipient's phone (e.g. 0812345678) or 13-digit national/tax id (or 15-digit e-wallet id), and <amount> is OPTIONAL: include it for a fixed amount (.../350.png or .../350.25.png), OMIT it (https://promptpay.io/0812345678.png) to let the payer type any amount. Keep the target in PropertiesService (or a settings Sheet) — never hardcode someone's number in the source. It is a normal <img> on the client → NO UrlFetchApp, NO server call, NO extra OAuth scope.
 
+## ข้อจำกัดความสามารถของเว็บแอป GAS — อย่าเสนอ/สัญญาสิ่งที่ทำไม่ได้ (สำคัญมากตอน propose_spec)
+เว็บแอปที่ deploy รันอยู่ใน iframe ของ Google ที่ปิดสิทธิ์อุปกรณ์เกือบทั้งหมดไว้ (Permissions-Policy) และใน Preview ยิ่ง sandbox แน่นกว่า. ห้ามออกแบบฟีเจอร์ที่พึ่งสิ่งเหล่านี้:
+- กล้อง/ไมโครโฟน + สแกน QR/บาร์โค้ด "สด": ❌ เว็บแอป GAS เปิดกล้องไม่ได้ "ทุกช่องทาง" — ทั้ง getUserMedia/WebRTC และ <input type="file" capture> ก็เปิดกล้องไม่ได้ เพราะรันใน iframe ของ Google ที่ปิดสิทธิ์กล้องไว้. ห้ามเสนอฟีเจอร์ "สแกนด้วยกล้องสด" เด็ดขาด. ทางที่ทำได้ใน GAS: (1) ให้พิมพ์รหัสเอง (default), หรือ (2) อัปโหลด "รูป QR ที่ถ่ายเก็บไว้แล้ว" ผ่าน <input type="file" accept="image/*"> (ไม่มี capture = ไม่เปิดกล้อง เป็นแค่เลือกไฟล์รูปนิ่ง) แล้วถอดรหัสจากรูปด้วย jsQR (CDN) ฝั่ง client. การสแกนด้วยกล้องสดจริง ๆ ต้องโฮสต์หน้าเว็บ "นอก GAS" (GitHub Pages / โฮสต์อื่น) — เป็น deployment target แบบ web/static ในเฟสถัดไป ยังไม่รองรับตอนนี้. (การ "สร้าง/แสดง" QR เป็นรูปทำได้ปกติ)
+- GPS/ตำแหน่ง, browser push notification, Bluetooth/USB/NFC: ❌ ต้องสิทธิ์อุปกรณ์ที่ iframe ปิดไว้ — อย่าเสนอ.
+- เรียลไทม์/push จากเซิร์ฟเวอร์ (websocket/SSE): ❌ ไม่มี — ใช้ poll เป็นช่วง ๆ หรือ time-driven trigger แทน.
+- งานเบื้องหลัง/ตั้งเวลา: ได้แค่ trigger แบบ time-driven (ละเอียดสุดระดับนาที ไม่ใช่วินาที) และโค้ดรันต่อครั้งจำกัด ~6 นาที — งานหนักต้องแบ่ง batch.
+- ไม่มีฐานข้อมูล/ไฟล์ระบบจริง — เก็บข้อมูลใน Google Sheet / PropertiesService / Drive เท่านั้น.
+- ส่งอีเมลใช้ MailApp/GmailApp ได้; ส่ง SMS/LINE ต้องผ่าน API ภายนอกด้วย UrlFetchApp + ผู้ให้บริการ (มีค่าใช้จ่าย/ต้องตั้งค่าเพิ่ม).
+ตอนสรุปสเปค (propose_spec) อย่าใส่ฟีเจอร์ในข้อห้ามนี้. ถ้าผู้ใช้ขอสิ่งที่ทำไม่ได้ ให้เสนอ "ทางที่ทำได้จริง" แทน พร้อมบอกข้อจำกัดสั้น ๆ 1 บรรทัด (เช่น ระบบยืม-คืน: สแกนด้วยกล้องสดไม่ได้ → ใช้ "อัปโหลด/ถ่ายรูป QR" หรือ "พิมพ์รหัสครุภัณฑ์" แทน).
+
 ## Clarify before generating (only when needed)
 - If the project stores data but the storage is unclear, ask ONE short question first, then WAIT for the reply: store in a NEW auto-created Sheet (default), or an EXISTING Sheet the user already has?
 - If the user says they have an EXISTING Sheet, ask them to paste the Google Sheet link. Extract the spreadsheet id from the URL (the part between /d/ and /edit) and use SpreadsheetApp.openById(thatId) — seed it into PropertiesService 'DATA_SS_ID' so the app reads/writes their Sheet.
@@ -256,6 +266,17 @@ const FORBIDDEN: { rule: string; re: RegExp; message: (f: string) => string }[] 
   { rule: "no-export", re: /\bexport\s+(default|function|class|const|let|var)/, message: (f) => `${f}: ใช้ ES module export ไม่ได้ใน GAS` },
   { rule: "no-fetch", re: /\bfetch\s*\(/, message: (f) => `${f}: ใช้ fetch() ไม่ได้ — ใช้ UrlFetchApp.fetch()` },
   { rule: "no-process-env", re: /\bprocess\.env\b/, message: (f) => `${f}: ใช้ process.env ไม่ได้ — ใช้ PropertiesService` },
+  // Camera/mic can't work in a deployed GAS web app: it's served inside Google's iframe whose
+  // Permissions-Policy blocks the camera through EVERY channel (getUserMedia AND <input capture>),
+  // and the Tier-1 preview sandbox blocks it too. Live QR/barcode scanning therefore never works —
+  // the only in-GAS paths are manual entry or uploading an already-taken still image; true live
+  // scanning needs the frontend hosted OUTSIDE GAS (a future web/static deployment target).
+  {
+    rule: "no-getusermedia",
+    re: /\bgetUserMedia\s*\(|navigator\.mediaDevices/,
+    message: (f) =>
+      `${f}: ใช้กล้อง/ไมค์ (getUserMedia) ไม่ได้ — เว็บแอป GAS เปิดกล้องไม่ได้ทุกช่องทาง (รันใน iframe ที่ปิดสิทธิ์กล้อง) ใช้ "พิมพ์รหัสเอง" หรือ "อัปโหลดรูป QR ที่ถ่ายไว้แล้ว (input type=file ไม่มี capture) + jsQR" แทน; สแกนด้วยกล้องสดต้องโฮสต์นอก GAS (เฟสหน้า)`,
+  },
 ];
 
 /**
@@ -314,6 +335,44 @@ export function validateGasFiles(
       file: writer.name,
       rule: "require-lockservice",
       message: `${writer.name}: เขียนชีต (appendRow/setValue) โดยไม่มี LockService — ผู้ใช้กดพร้อมกันอาจเขียนทับกัน ครอบส่วนที่เขียนด้วย LockService.getScriptLock() แล้ว waitLock()/releaseLock()`,
+      severity: "warning",
+    });
+  }
+
+  // Project-wide: every include('X') must have a matching X.html partial, else the deployed page
+  // throws at render ("No HTML file named X"). A truncated generation that stops before writing an
+  // included partial (e.g. Script.html) leaves this dangling — mechanically certain, so gate it here
+  // (LLM critics miss it) and feed it back so the loop writes the missing file.
+  const htmlBaseNames = new Set(
+    names.filter((n) => n.endsWith(".html")).map((n) => n.replace(/\.html$/, "")),
+  );
+  const INCLUDE_RE = /include\(\s*['"]([^'"]+)['"]\s*\)/g;
+  const missingIncludes = new Set<string>();
+  for (const f of files) {
+    for (const m of f.content.matchAll(INCLUDE_RE)) {
+      const inc = m[1].trim().replace(/\.html$/i, "");
+      if (inc && !htmlBaseNames.has(inc.toLowerCase())) missingIncludes.add(inc);
+    }
+  }
+  for (const inc of missingIncludes) {
+    errors.push({
+      file: `${inc}.html`,
+      rule: "missing-include-file",
+      message: `เรียก include('${inc}') แต่ไม่มีไฟล์ ${inc}.html ในโปรเจกต์ — หน้าเว็บจะ error ตอนแสดงผล ต้องสร้าง ${inc}.html ให้ครบ (มักเกิดจากไฟล์ถูกตัดตอนเขียนไม่จบ)`,
+      severity: "error",
+    });
+  }
+
+  // <input ... capture> also tries to open the device camera, which the GAS iframe blocks just like
+  // getUserMedia — it silently degrades to a plain file picker, so a "scan with camera" feature built
+  // on it never works as promised. Warn so the model drops the live-camera framing (manual entry or
+  // uploading an already-taken still image are the only in-GAS paths).
+  const captureFile = files.find((f) => /<input\b[^>]*\bcapture\b/i.test(f.content));
+  if (captureFile) {
+    warnings.push({
+      file: captureFile.name,
+      rule: "no-input-capture",
+      message: `${captureFile.name}: <input capture> เปิดกล้องใน GAS ไม่ได้ (iframe ปิดสิทธิ์กล้อง) — เอา capture ออก ใช้แค่เลือกรูป QR ที่ถ่ายไว้แล้ว หรือให้พิมพ์รหัสเอง; สแกนด้วยกล้องสดต้องโฮสต์นอก GAS (เฟสหน้า)`,
       severity: "warning",
     });
   }

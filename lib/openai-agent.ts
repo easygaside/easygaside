@@ -22,7 +22,8 @@ import type { ProviderConfig } from "@/lib/llm/provider";
 
 const MAX_ITERATIONS = 8;
 const REPAIR_MAX_ITERATIONS = 6;
-const MAX_TOKENS = 16000;
+const MAX_TOKENS_FALLBACK = 16000; // used when an arm has no explicit maxOutputTokens (≈ gpt-4o ceiling)
+const AUTO_CONTINUE_MAX = 2; // auto-fire "ทำต่อ" this many times when a build caps mid-way
 
 type Msg = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -87,7 +88,7 @@ async function runOpenAiTurn(
   for (let iter = 0; iter < (internal ? REPAIR_MAX_ITERATIONS : MAX_ITERATIONS); iter++) {
     const stream = await client.chat.completions.create({
       model: cfg.model,
-      max_tokens: MAX_TOKENS,
+      max_tokens: cfg.maxOutputTokens ?? MAX_TOKENS_FALLBACK,
       messages,
       tools: OPENAI_TOOLS,
       tool_choice: forcedToolRetry ? "required" : "auto",
@@ -307,7 +308,26 @@ export async function runOpenAiAgentLoop(
   let cacheReadTokens = main.cacheReadTokens;
   let cacheCreationTokens = main.cacheCreationTokens;
   let criticIssues = 0;
-  if ((args.turn ?? "codegen") === "codegen" && main.mutated && !args.skipCritic) {
+  const isCodegen = (args.turn ?? "codegen") === "codegen";
+
+  // Auto-continue a build that capped mid-way (parity with the Claude loop): fire "ทำต่อ" ourselves a
+  // couple of times so big apps finish without the user re-prompting. Each round streams live status.
+  let mutated = main.mutated;
+  let capped = main.capped;
+  for (let round = 1; isCodegen && capped && mutated && round <= AUTO_CONTINUE_MAX; round++) {
+    args.emit({ type: "status", text: `เนื้อหายาว — กำลังเขียนต่อให้อัตโนมัติ (${round}/${AUTO_CONTINUE_MAX})…` });
+    const cont = await runOpenAiTurn(client, cfg, { ...args, userMessage: "ทำต่อ" });
+    inputTokens += cont.inputTokens;
+    outputTokens += cont.outputTokens;
+    cacheReadTokens += cont.cacheReadTokens;
+    cacheCreationTokens += cont.cacheCreationTokens;
+    mutated = mutated || cont.mutated;
+    capped = cont.capped;
+  }
+
+  // Skip the critic when the build is still incomplete (changed nothing, or still capped after auto-
+  // continue) — reviewing it would emit a misleading "✓ ผ่าน". The user already saw the "ทำต่อ" nudge.
+  if (isCodegen && mutated && !capped && !args.skipCritic) {
     const c = await runOpenAiCriticGate(client, cfg, args);
     criticIssues = c.issues;
     inputTokens += c.inputTokens;

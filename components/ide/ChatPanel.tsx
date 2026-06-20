@@ -226,7 +226,15 @@ export function ChatPanel({
         }
         if (ev.type === "text") appendAssistant(ev.delta);
         else if (ev.type === "status") setStatus(ev.text);
-        else if (ev.type === "tool_call") setStatus(`${TOOL_LABEL[ev.name] ?? ev.name}…`);
+        else if (ev.type === "tool_call") {
+          // real-time: show WHICH file the AI is touching (the tool input carries the path), and move
+          // the editor's "working" highlight to it before its content even streams in.
+          const path =
+            ev.input && typeof ev.input === "object" ? (ev.input as { path?: string }).path : undefined;
+          const label = TOOL_LABEL[ev.name] ?? ev.name;
+          setStatus(path ? `${label} ${path}…` : `${label}…`);
+          if (path && (ev.name === "write_file" || ev.name === "edit_file")) setWorking(path);
+        }
         else if (ev.type === "file_mutation")
           applyMutation({ op: ev.op, path: ev.path, content: ev.content });
         else if (ev.type === "lint") setStatus(ev.messages.join(" · "));

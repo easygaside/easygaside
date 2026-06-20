@@ -23,7 +23,8 @@ function pickModel(turn: "codegen" | "plan"): string {
 
 const MAX_ITERATIONS = 8;
 const REPAIR_MAX_ITERATIONS = 6; // critic auto-repair — enough for a server+client multi-file fix, still bounded
-const MAX_TOKENS = 16000; // higher cap → a big file rarely gets truncated mid-tool_use (would poison history)
+const MAX_TOKENS = 32000; // claude (sonnet-4-6) handles ≥64K output; high cap → big files rarely truncate mid-tool_use
+const AUTO_CONTINUE_MAX = 2; // when a turn caps mid-build, auto-fire "ทำต่อ" this many times before handing back
 
 // Prompt-cache control. 1h TTL so the rulebook + conversation prefix survive the gap between turns —
 // the default 5m expires between turns at low traffic, so each turn re-paid the cache WRITE instead of
@@ -294,10 +295,29 @@ export async function runAgentLoop(args: RunAgentArgs): Promise<AgentRunResult> 
   let cacheReadTokens = main.cacheReadTokens;
   let cacheCreationTokens = main.cacheCreationTokens;
   let criticIssues = 0;
-  // Gate 1 — rulebook critic + one bounded auto-repair. Only when this turn actually changed files:
-  // a pure Q&A turn ("ปกติไหม?") writes nothing, so re-reviewing the whole project there is wasted
-  // cost + noise (and makes it look like it's checking on a loop). Skip plan turns too.
-  if ((args.turn ?? "codegen") === "codegen" && main.mutated && !args.skipCritic) {
+  const isCodegen = (args.turn ?? "codegen") === "codegen";
+
+  // Auto-continue: a big build can hit the per-turn token/iteration cap mid-way (a file left half- or
+  // un-written). Instead of waiting for the user to type "ทำต่อ", fire it ourselves a couple of times.
+  // Each round streams its own tool_call/file_mutation events, so the chat status keeps showing live
+  // progress ("กำลังเขียนไฟล์ …"). Tokens accumulate → the energy tank + metrics stay accurate.
+  let mutated = main.mutated;
+  let capped = main.capped;
+  for (let round = 1; isCodegen && capped && mutated && round <= AUTO_CONTINUE_MAX; round++) {
+    args.emit({ type: "status", text: `เนื้อหายาว — กำลังเขียนต่อให้อัตโนมัติ (${round}/${AUTO_CONTINUE_MAX})…` });
+    const cont = await runTurn(client, { ...args, userMessage: "ทำต่อ" });
+    inputTokens += cont.inputTokens;
+    outputTokens += cont.outputTokens;
+    cacheReadTokens += cont.cacheReadTokens;
+    cacheCreationTokens += cont.cacheCreationTokens;
+    mutated = mutated || cont.mutated;
+    capped = cont.capped;
+  }
+
+  // Gate 1 — rulebook critic + one bounded auto-repair. Only when the build actually changed files
+  // AND finished (not still capped after auto-continue): a pure Q&A turn writes nothing, and a still-
+  // incomplete build would get a misleading "✓ ผ่าน" — the user already saw the "พิมพ์ทำต่อ" nudge.
+  if (isCodegen && mutated && !capped && !args.skipCritic) {
     const c = await runCriticGate(client, args);
     criticIssues = c.issues;
     inputTokens += c.inputTokens;

@@ -59,11 +59,15 @@ export function IdeShell({
   const setInitial = useProjectStore((s) => s.setInitial);
   const activePath = useProjectStore((s) => s.activePath);
   const setPaletteOpen = useProjectStore((s) => s.setPaletteOpen);
+  // the file the agent is writing right now (null when idle) — drives the mobile code-tab attention pulse
+  const workingPath = useProjectStore((s) => s.workingPath);
   const [hintOpen, setHintOpen] = useState(true);
   const [mismatchOpen, setMismatchOpen] = useState(true);
   const [deployUrl, setDeployUrl] = useState<string | null>(deployedUrl ?? null);
   // mobile-only: show one pane at a time (desktop shows all three side by side)
   const [pane, setPane] = useState<"chat" | "code" | "preview">("chat");
+  // pulse the mobile โค้ด tab when the AI is writing a file and the user isn't already on the code pane
+  const codeBusy = !!workingPath && pane !== "code";
   // width (px) of the preview pane — dragged via the splitter between code and preview (desktop only)
   const [previewW, setPreviewW] = useState(392);
   const [resizing, setResizing] = useState(false);
@@ -257,9 +261,23 @@ export function IdeShell({
             <ChatBubbleLeftRightIcon className="h-4 w-4 shrink-0" />
             แชต
           </button>
-          <button type="button" onClick={() => setPane("code")} className={TAB(pane === "code")}>
-            <CodeBracketIcon className="h-4 w-4 shrink-0" />
+          <button
+            type="button"
+            onClick={() => setPane("code")}
+            className={
+              codeBusy
+                ? "relative flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold text-emerald-600 bg-emerald-50 ring-1 ring-emerald-300 transition dark:bg-emerald-950/40 dark:text-emerald-400"
+                : `relative ${TAB(pane === "code")}`
+            }
+          >
+            <CodeBracketIcon className={`h-4 w-4 shrink-0 ${codeBusy ? "animate-pulse" : ""}`} />
             โค้ด
+            {codeBusy && (
+              <span className="absolute right-3 top-1 flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+            )}
           </button>
           <button type="button" onClick={() => setPane("preview")} className={TAB(pane === "preview")}>
             <EyeIcon className="h-4 w-4 shrink-0" />

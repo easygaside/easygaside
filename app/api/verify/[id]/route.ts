@@ -103,7 +103,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           emit({ type: "status", text: "กำลังเปิดแอปเพื่อทดสอบการรันจริง…" });
           const probe = await probeExec(url);
           if (probe.ok) {
-            emit({ type: "text", delta: "\n\n✅ ทดสอบรันจริงผ่าน — แอปเปิดและทำงานได้ที่ลิงก์ของคุณ" });
+            emit({ type: "verdict", ok: true, text: "ทดสอบรันจริงผ่าน — แอปเปิดและทำงานได้ที่ลิงก์ของคุณ" });
             verified = true;
             break;
           }

@@ -80,12 +80,13 @@ export interface ProjectTokens {
 }
 export interface FinanceData {
   fxRate: number;
-  monthLabel: string;
+  currentMonth: string;
+  months: string[]; // YYYY-MM, desc — for the month picker
+  revenueByMonth: Record<string, number>; // month → THB
+  expenseByMonth: Record<string, Record<string, number>>; // month → (provider → USD)
   revenueTotalThb: number;
-  revenueMonthThb: number;
-  expenseTotalUsd: number;
-  expenseMonthUsd: number;
-  byProvider: { provider: string; totalUsd: number; monthUsd: number }[];
+  expenseByProviderTotal: Record<string, number>; // provider → USD (all time)
+  providers: string[]; // all providers with spend, desc by total — table rows
   payments: { id: string; amountThb: number; note: string | null; paidAt: string }[];
 }
 
@@ -250,6 +251,7 @@ export function AdminPanel({
   const [payAmount, setPayAmount] = useState("");
   const [payNote, setPayNote] = useState("");
   const [fxDraft, setFxDraft] = useState(String(finance.fxRate));
+  const [selMonth, setSelMonth] = useState(finance.currentMonth);
 
   const pendingApps = applications.filter((a) => a.status === "pending").length;
   const openReports = reports.filter((r) => r.status !== "done").length;
@@ -288,6 +290,10 @@ export function AdminPanel({
   const baht = (n: number) => `฿${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   const usd = (n: number) => `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   const toThb = (u: number) => u * finance.fxRate;
+  const monthExp = finance.expenseByMonth[selMonth] ?? {};
+  const revenueMonthThb = finance.revenueByMonth[selMonth] ?? 0;
+  const expenseMonthUsd = Object.values(monthExp).reduce((a, b) => a + b, 0);
+  const expenseTotalUsd = Object.values(finance.expenseByProviderTotal).reduce((a, b) => a + b, 0);
   function balance() {
     if (!confirm("แบ่งผู้ใช้ทั้งหมดเป็นกลุ่มเท่า ๆ กัน (เขียนทับ arm เดิม)?")) return;
     run(() => autoBalanceArmsAction());
@@ -388,14 +394,31 @@ export function AdminPanel({
       {/* ───────── การเงิน ───────── */}
       {tab === "finance" && (
         <div className="mt-5 space-y-6">
+          {/* month picker — defaults to the current month, lists every month that has data */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-500 dark:text-slate-400">ดูข้อมูลของเดือน:</span>
+            <select
+              value={selMonth}
+              onChange={(e) => setSelMonth(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+            >
+              {finance.months.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                  {m === finance.currentMonth ? " (เดือนนี้)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {[
-              { label: `รายรับเดือนนี้ (${finance.monthLabel})`, value: baht(finance.revenueMonthThb), tone: "rev" as const },
+              { label: `รายรับ ${selMonth}`, value: baht(revenueMonthThb), tone: "rev" as const },
               { label: "รายรับรวมทั้งหมด", value: baht(finance.revenueTotalThb), tone: "rev" as const },
-              { label: "กำไรเดือนนี้", value: baht(finance.revenueMonthThb - toThb(finance.expenseMonthUsd)), tone: "net" as const },
-              { label: "รายจ่ายเดือนนี้", value: baht(toThb(finance.expenseMonthUsd)), sub: usd(finance.expenseMonthUsd), tone: "exp" as const },
-              { label: "รายจ่ายรวมทั้งหมด", value: baht(toThb(finance.expenseTotalUsd)), sub: usd(finance.expenseTotalUsd), tone: "exp" as const },
-              { label: "กำไรรวมทั้งหมด", value: baht(finance.revenueTotalThb - toThb(finance.expenseTotalUsd)), tone: "net" as const },
+              { label: `กำไร ${selMonth}`, value: baht(revenueMonthThb - toThb(expenseMonthUsd)), tone: "net" as const },
+              { label: `รายจ่าย ${selMonth}`, value: baht(toThb(expenseMonthUsd)), sub: usd(expenseMonthUsd), tone: "exp" as const },
+              { label: "รายจ่ายรวมทั้งหมด", value: baht(toThb(expenseTotalUsd)), sub: usd(expenseTotalUsd), tone: "exp" as const },
+              { label: "กำไรรวมทั้งหมด", value: baht(finance.revenueTotalThb - toThb(expenseTotalUsd)), tone: "net" as const },
             ].map((c) => (
               <div key={c.label} className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700/60 dark:bg-slate-900">
                 <div className="text-xs text-slate-500 dark:text-slate-400">{c.label}</div>
@@ -432,7 +455,7 @@ export function AdminPanel({
 
           <section>
             <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">รายจ่ายแยกตาม Provider (แปลงเป็นบาท)</h2>
-            {finance.byProvider.length === 0 ? (
+            {finance.providers.length === 0 ? (
               <p className="text-xs text-slate-400 dark:text-slate-500">ยังไม่มีรายจ่าย (เริ่มนับจาก generation ใหม่)</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700/60">
@@ -440,22 +463,26 @@ export function AdminPanel({
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-slate-400 dark:border-slate-800 dark:text-slate-500">
                       <th className="px-3 py-2 font-medium">Provider</th>
-                      <th className="px-3 py-2 text-right font-medium">เดือนนี้</th>
+                      <th className="px-3 py-2 text-right font-medium">{selMonth}</th>
                       <th className="px-3 py-2 text-right font-medium">รวมทั้งหมด</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {finance.byProvider.map((p) => (
-                      <tr key={p.provider} className="border-t border-slate-100 first:border-t-0 dark:border-slate-800">
-                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{p.provider}</td>
-                        <td className="px-3 py-2 text-right font-mono text-slate-600 dark:text-slate-300">
-                          {baht(toThb(p.monthUsd))} <span className="text-[10px] text-slate-400">({usd(p.monthUsd)})</span>
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono text-slate-600 dark:text-slate-300">
-                          {baht(toThb(p.totalUsd))} <span className="text-[10px] text-slate-400">({usd(p.totalUsd)})</span>
-                        </td>
-                      </tr>
-                    ))}
+                    {finance.providers.map((p) => {
+                      const monthUsd = monthExp[p] ?? 0;
+                      const totalUsd = finance.expenseByProviderTotal[p] ?? 0;
+                      return (
+                        <tr key={p} className="border-t border-slate-100 first:border-t-0 dark:border-slate-800">
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{p}</td>
+                          <td className="px-3 py-2 text-right font-mono text-slate-600 dark:text-slate-300">
+                            {baht(toThb(monthUsd))} <span className="text-[10px] text-slate-400">({usd(monthUsd)})</span>
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-slate-600 dark:text-slate-300">
+                            {baht(toThb(totalUsd))} <span className="text-[10px] text-slate-400">({usd(totalUsd)})</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

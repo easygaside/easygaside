@@ -74,6 +74,7 @@ export type AgentEvent =
   | { type: "spec"; spec: ProjectSpec }
   | { type: "generation"; id: string }
   | { type: "done"; tokens?: number } // tokens = this turn's input+output, for the energy bar
+  | { type: "verdict"; ok: boolean; text: string } // Gate-2 run-and-repair result, rendered as an icon card
   | { type: "error"; message: string };
 
 export type Emit = (ev: AgentEvent) => void;

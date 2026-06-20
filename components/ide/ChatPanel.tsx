@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   BoltIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
   HandThumbDownIcon,
   HandThumbUpIcon,
   PaperAirplaneIcon,
@@ -38,6 +40,7 @@ type AgentEvent =
   | { type: "spec"; spec: ProjectSpec }
   | { type: "generation"; id: string }
   | { type: "done"; tokens?: number }
+  | { type: "verdict"; ok: boolean; text: string }
   | { type: "error"; message: string };
 
 interface ChatMsg {
@@ -120,6 +123,8 @@ export function ChatPanel({
   const initEnergy = useProjectStore((s) => s.initEnergy);
   const addEnergy = useProjectStore((s) => s.addEnergy);
   const [pendingSpec, setPendingSpec] = useState<ProjectSpec | null>(null);
+  // Gate-2 ("ทดสอบรันจริง") result, rendered as an icon card instead of an emoji in the text stream
+  const [verdict, setVerdict] = useState<{ ok: boolean; text: string } | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   // which segmented action is selected (visual active state) — ผู้ช่วย is the default
   const [activeAction, setActiveAction] = useState<"assistant" | "explain" | "fix">("assistant");
@@ -240,6 +245,7 @@ export function ChatPanel({
         else if (ev.type === "lint") setStatus(ev.messages.join(" · "));
         else if (ev.type === "spec") setPendingSpec(ev.spec);
         else if (ev.type === "generation") setGenId(ev.id);
+        else if (ev.type === "verdict") setVerdict({ ok: ev.ok, text: ev.text });
         else if (ev.type === "error") appendAssistant(`\n\n[ผิดพลาด: ${ev.message}]`);
         else if (ev.type === "done") {
           if (ev.tokens) addEnergy(ev.tokens);
@@ -262,6 +268,7 @@ export function ChatPanel({
     setBusy(true);
     setStatus("");
     setPendingSpec(null);
+    setVerdict(null);
     setGenId(null);
     setRated(null);
     setMessages((m) => [
@@ -307,6 +314,7 @@ export function ChatPanel({
     if (busy) return;
     setBusy(true);
     setStatus("");
+    setVerdict(null);
     setGenId(null);
     setRated(null);
     setMessages((m) => [...m, { role: "assistant", text: "" }]);
@@ -482,6 +490,23 @@ export function ChatPanel({
             </div>
           </div>
         ))}
+
+        {verdict && (
+          <div
+            className={`flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-[13px] font-semibold ${
+              verdict.ok
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+                : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300"
+            }`}
+          >
+            {verdict.ok ? (
+              <CheckCircleIcon className="h-5 w-5 shrink-0" />
+            ) : (
+              <ExclamationTriangleIcon className="h-5 w-5 shrink-0" />
+            )}
+            <span>{verdict.text}</span>
+          </div>
+        )}
 
         {genId && !busy && (
           <div className="flex items-center gap-2 px-1 text-[11px] text-slate-400 dark:text-slate-500">

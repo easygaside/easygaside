@@ -231,41 +231,47 @@ export default async function AdminPage() {
     avgCriticPerGen: rows.length ? +(totalCriticIssues / rows.length).toFixed(2) : 0,
   };
 
-  // ── finance: revenue (manual payments) + provider COGS (token cost × pricing), this-month + total ──
+  // ── finance: revenue (manual payments) + provider COGS (token × pricing), bucketed BY MONTH so the
+  //    admin can pick any past month; the client switches instantly without a reload ──
   const fxRaw = Number(appSettings.get("usd_thb_rate"));
   const fxRate = Number.isFinite(fxRaw) && fxRaw > 0 ? fxRaw : DEFAULT_USD_THB;
-  const monthKey = new Date().toISOString().slice(0, 7); // YYYY-MM (UTC)
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM (UTC)
   const payments = ((payRows ?? []) as { id: string; amount_thb: number; note: string | null; paid_at: string }[]).map(
     (p) => ({ id: p.id, amountThb: Number(p.amount_thb) || 0, note: p.note, paidAt: p.paid_at }),
   );
+  const revenueByMonth: Record<string, number> = {};
+  for (const p of payments) {
+    const m = (p.paidAt ?? "").slice(0, 7);
+    if (m) revenueByMonth[m] = (revenueByMonth[m] ?? 0) + p.amountThb;
+  }
   const revenueTotalThb = payments.reduce((a, p) => a + p.amountThb, 0);
-  const revenueMonthThb = payments
-    .filter((p) => (p.paidAt ?? "").slice(0, 7) === monthKey)
-    .reduce((a, p) => a + p.amountThb, 0);
 
-  const expenseByProvider = new Map<string, { total: number; month: number }>();
-  let expenseTotalUsd = 0;
-  let expenseMonthUsd = 0;
+  const expenseByMonth: Record<string, Record<string, number>> = {};
+  const expenseByProviderTotal: Record<string, number> = {};
   for (const r of rows) {
     const usd = genCostUsd(r);
-    const inMonth = (r.created_at ?? "").slice(0, 7) === monthKey;
-    expenseTotalUsd += usd;
-    if (inMonth) expenseMonthUsd += usd;
-    const cur = expenseByProvider.get(r.provider) ?? { total: 0, month: 0 };
-    cur.total += usd;
-    if (inMonth) cur.month += usd;
-    expenseByProvider.set(r.provider, cur);
+    expenseByProviderTotal[r.provider] = (expenseByProviderTotal[r.provider] ?? 0) + usd;
+    const m = (r.created_at ?? "").slice(0, 7);
+    if (m) {
+      const bucket = (expenseByMonth[m] ??= {});
+      bucket[r.provider] = (bucket[r.provider] ?? 0) + usd;
+    }
   }
+  const months = [...new Set([currentMonth, ...Object.keys(revenueByMonth), ...Object.keys(expenseByMonth)])]
+    .filter(Boolean)
+    .sort()
+    .reverse();
   const finance: FinanceData = {
     fxRate,
-    monthLabel: monthKey,
+    currentMonth,
+    months,
+    revenueByMonth,
+    expenseByMonth,
     revenueTotalThb,
-    revenueMonthThb,
-    expenseTotalUsd,
-    expenseMonthUsd,
-    byProvider: [...expenseByProvider.entries()]
-      .map(([provider, v]) => ({ provider, totalUsd: v.total, monthUsd: v.month }))
-      .sort((a, b) => b.totalUsd - a.totalUsd),
+    expenseByProviderTotal,
+    providers: Object.entries(expenseByProviderTotal)
+      .sort((a, b) => b[1] - a[1])
+      .map(([p]) => p),
     payments: payments.slice(0, 50),
   };
 

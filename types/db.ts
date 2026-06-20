@@ -20,6 +20,8 @@ export interface EgsProject {
   scratch_script_id: string | null;
   token_spend_input: number;
   token_spend_output: number;
+  /** Arm the project is locked to (set on first generation); null until then. */
+  llm_provider: string | null;
   created_at: string;
   updated_at: string;
 }

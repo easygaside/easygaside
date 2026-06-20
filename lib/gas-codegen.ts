@@ -301,6 +301,23 @@ export function validateGasFiles(
     }
   }
 
+  // Project-wide: Sheet writes with NO LockService anywhere = lost updates when two users submit at
+  // once. Both LLM critics (Haiku + DeepSeek) miss this ~80–100% of the time (measured), but it's
+  // mechanically certain — so gate it deterministically here. Project-wide (not per-file) so a lock
+  // living in a shared helper still counts → near-zero false positives.
+  const gsFiles = files.filter((f) => /\.gs$/i.test(f.name));
+  const WRITE_RE = /\.(appendRow|setValue|setValues)\s*\(/;
+  const LOCK_RE = /\b(getScriptLock|getDocumentLock|getUserLock)\s*\(/;
+  const writer = gsFiles.find((f) => WRITE_RE.test(f.content));
+  if (writer && !gsFiles.some((f) => LOCK_RE.test(f.content))) {
+    warnings.push({
+      file: writer.name,
+      rule: "require-lockservice",
+      message: `${writer.name}: เขียนชีต (appendRow/setValue) โดยไม่มี LockService — ผู้ใช้กดพร้อมกันอาจเขียนทับกัน ครอบส่วนที่เขียนด้วย LockService.getScriptLock() แล้ว waitLock()/releaseLock()`,
+      severity: "warning",
+    });
+  }
+
   return { errors, warnings };
 }
 

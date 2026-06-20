@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { IdeShell } from "@/components/ide/IdeShell";
 import { getAccessGate } from "@/lib/beta";
 import { listProjectChatImages } from "@/lib/chat-images";
-import { ENERGY_TANK, getProjectEnergyUsed } from "@/lib/energy";
+import { energyTankFor, getProjectEnergyUsed } from "@/lib/energy";
 import { getFiles } from "@/lib/files";
 import { getConnectionStatus } from "@/lib/google-connection";
 import { getCurrentUser, getDeployedMap, getDeployedUrl, getProject, listProjects } from "@/lib/projects";
@@ -23,15 +23,17 @@ export default async function ProjectBuilderPage({
   if (!project) notFound();
 
   // ownership verified above → safe to read files / images via service-role
-  const [files, conn, chatImages, energyUsed, deployedUrl, allProjects, deployedMap] = await Promise.all([
-    getFiles(id),
-    getConnectionStatus(userId),
-    listProjectChatImages(id),
-    getProjectEnergyUsed(id),
-    getDeployedUrl(id),
-    listProjects(),
-    getDeployedMap(),
-  ]);
+  const [files, conn, chatImages, energyUsed, energyTank, deployedUrl, allProjects, deployedMap] =
+    await Promise.all([
+      getFiles(id),
+      getConnectionStatus(userId),
+      listProjectChatImages(id),
+      getProjectEnergyUsed(id),
+      energyTankFor(project.llm_provider),
+      getDeployedUrl(id),
+      listProjects(),
+      getDeployedMap(),
+    ]);
   const switcherProjects = allProjects.map((p) => ({
     id: p.id,
     name: p.name,
@@ -61,7 +63,7 @@ export default async function ProjectBuilderPage({
       webHint={webHint}
       googleConnected={conn.connected && conn.status === "active"}
       energyUsed={energyUsed}
-      energyTank={ENERGY_TANK}
+      energyTank={energyTank}
       deployedUrl={deployedUrl}
       projects={switcherProjects}
       accountMismatch={accountMismatch}

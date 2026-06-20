@@ -1,8 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { acquireProjectRun, releaseProjectRun } from "@/lib/agent-lock";
 import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
-import { getAccessGate } from "@/lib/beta";
+import { runOpenAiAgentLoop } from "@/lib/openai-agent";
+import { resolveProjectProvider, resolveProvider } from "@/lib/llm/provider";
+import { getAccessGate, getOwnApiKey } from "@/lib/beta";
 import { deployProject } from "@/lib/deploy";
+import { ENERGY_EXHAUSTED_MSG, getEnergyTank, getProjectEnergyUsed } from "@/lib/energy";
 import { probeExec } from "@/lib/gas-verify";
 import { logGeneration } from "@/lib/metrics";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
@@ -20,8 +23,9 @@ const repairPrompt = (error: string) =>
 
 /**
  * POST /api/verify/[id] — Gate 2 (run-and-repair), the on-demand "ทดสอบรันจริง / ซ่อมให้" button.
- * Probes the live /exec; if it failed at runtime, repairs (Claude, no rulebook critic — execution is
- * the stronger oracle) and re-deploys (same URL), looping up to MAX_REPAIRS. Streams SSE like /api/agent.
+ * Probes the live /exec; if it failed at runtime, repairs on the project's own arm (no rulebook
+ * critic — the live run is the stronger oracle) and re-deploys (same URL), looping up to MAX_REPAIRS.
+ * Streams SSE like /api/agent.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,12 +46,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!(await checkRateLimit(user.id, AGENT_RATE)))
     return NextResponse.json({ error: "rate_limited", message: "เร็วไปนิดนึง — รอสักครู่นะครับ" }, { status: 429 });
 
+  // per-project energy tank — platform-key users are capped; BYOK (own key) bypasses (own cost)
+  if (!(await getOwnApiKey(user.id))) {
+    const used = await getProjectEnergyUsed(id);
+    if (used >= (await getEnergyTank(user.email, project.llm_provider)))
+      return NextResponse.json({ error: "energy_exhausted", message: ENERGY_EXHAUSTED_MSG }, { status: 429 });
+  }
+
   // share the per-project run lock with the agent (no overlapping writes/deploys)
   if (!(await acquireProjectRun(id)))
     return NextResponse.json(
       { error: "already_running", message: "โปรเจกต์นี้กำลังประมวลผลอยู่ — รอให้เสร็จก่อนนะครับ" },
       { status: 409 },
     );
+
+  // Route the repair to the project's OWN arm (same as /api/agent) — a DeepSeek project repairs on
+  // DeepSeek, a Claude project on Claude. The live /exec run is the oracle either way; this keeps
+  // verify cost on the arm the user is actually testing instead of silently billing Claude.
+  const provider = await resolveProjectProvider(id, user.id);
+  const cfg = await resolveProvider(provider);
+  const byok = provider === "claude" ? (await getOwnApiKey(user.id)) ?? undefined : undefined;
+  const repairKey = byok ?? cfg.apiKey;
+  if (!repairKey) {
+    await releaseProjectRun(id);
+    return NextResponse.json(
+      { error: "provider_not_configured", message: `ยังไม่ได้ตั้งค่า API key ของ ${cfg.label} ในระบบ` },
+      { status: 400 },
+    );
+  }
 
   const startedAt = Date.now();
   const encoder = new TextEncoder();
@@ -59,6 +85,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       };
       let inputTokens = 0;
       let outputTokens = 0;
+      let cacheReadTokens = 0;
+      let cacheCreationTokens = 0;
       let verified = false;
       try {
         let url = await getDeployedUrl(id);
@@ -97,18 +125,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             break;
           }
           emit({ type: "status", text: "กำลังแก้แล้ว deploy ใหม่ (ลิงก์เดิม)…" });
-          // repair with Claude, skip the rulebook critic — the live run is the real oracle here.
-          const r = await runAgentLoop({
+          // repair on the project's arm, skip the rulebook critic — the live run is the real oracle.
+          const repairArgs = {
             projectId: id,
             project,
             userMessage: repairPrompt(probe.error ?? "เปิดแอปแล้วไม่ทำงาน"),
-            turn: "codegen",
+            turn: "codegen" as const,
             internal: true,
             skipCritic: true,
             emit,
-          });
+          };
+          const r =
+            provider === "claude"
+              ? await runAgentLoop({ ...repairArgs, apiKey: repairKey })
+              : await runOpenAiAgentLoop(repairArgs, { ...cfg, apiKey: repairKey });
           inputTokens += r.inputTokens;
           outputTokens += r.outputTokens;
+          cacheReadTokens += r.cacheReadTokens ?? 0;
+          cacheCreationTokens += r.cacheCreationTokens ?? 0;
           const dep = await deployProject(user.id, project); // same deployment → same /exec URL
           url = dep.execUrl ?? url;
         }
@@ -116,10 +150,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         await logGeneration({
           projectId: id,
           userId: user.id,
-          provider: "claude",
-          model: "claude-sonnet-4-6",
+          provider,
+          model: cfg.model,
           inputTokens,
           outputTokens,
+          cacheReadTokens,
+          cacheCreationTokens,
           criticIssues: 0,
           durationMs: Date.now() - startedAt,
           outcome: verified ? "ok" : "error",

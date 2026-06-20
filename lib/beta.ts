@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { isSuperAdmin } from "@/lib/admin";
 import { decrypt, encrypt } from "@/lib/crypto";
+import { getBoolSetting, getNumberSetting } from "@/lib/settings";
 import { createServiceClient } from "@/lib/supabase/service";
 
 /**
@@ -13,20 +14,19 @@ import { createServiceClient } from "@/lib/supabase/service";
  *    their own key and bypass the daily cap (they pay their own cost) and the allowlist.
  */
 
-// Beta gating is ON unless BETA_MODE is explicitly "off". Owner is seeded in the allowlist.
-export const BETA_ENFORCED = process.env.BETA_MODE !== "off";
+// Beta gating defaults ON unless BETA_MODE is "off"; the live value is admin-editable
+// (egs_app_settings.beta_enforced) and only falls back to env when the row is absent.
+const BETA_ENFORCED_FALLBACK = process.env.BETA_MODE !== "off";
 const FALLBACK_DAILY_LIMIT = Number(process.env.EASYGAS_DAILY_LIMIT ?? 30);
+
+/** Is closed beta enforced? Superadmin-set in egs_app_settings ('beta_enforced'); env fallback. */
+export async function isBetaEnforced(): Promise<boolean> {
+  return getBoolSetting("beta_enforced", BETA_ENFORCED_FALLBACK);
+}
 
 /** Per-user daily generation cap — superadmin-set in egs_app_settings ('daily_limit'); env fallback. */
 export async function getDailyLimit(): Promise<number> {
-  const svc = createServiceClient();
-  const { data } = await svc
-    .from("egs_app_settings")
-    .select("value")
-    .eq("key", "daily_limit")
-    .maybeSingle<{ value: string }>();
-  const n = Number(data?.value);
-  return Number.isFinite(n) && n > 0 ? n : FALLBACK_DAILY_LIMIT;
+  return getNumberSetting("daily_limit", FALLBACK_DAILY_LIMIT);
 }
 
 export interface AccessGate {
@@ -36,7 +36,7 @@ export interface AccessGate {
 
 /** Is this email allowed in the closed beta? (Always true when beta is not enforced.) */
 export async function isBetaAllowed(email: string | null | undefined): Promise<boolean> {
-  if (!BETA_ENFORCED) return true;
+  if (!(await isBetaEnforced())) return true;
   if (!email) return false;
   const svc = createServiceClient();
   const { data } = await svc
@@ -55,7 +55,7 @@ export async function getAccessGate(
   userId: string,
   email: string | null | undefined,
 ): Promise<AccessGate> {
-  if (!BETA_ENFORCED) return { allowed: true, reason: "ok" };
+  if (!(await isBetaEnforced())) return { allowed: true, reason: "ok" };
   if (await hasOwnApiKey(userId)) return { allowed: true, reason: "ok" };
   return (await isBetaAllowed(email))
     ? { allowed: true, reason: "ok" }
@@ -151,11 +151,17 @@ export interface QuotaStatus {
 
 /**
  * New-tool plan allowance (docs/MONETIZATION.md §3: Free 2 / Lite 3 / Starter 5 / Pro 15 per month).
- * Tiers/billing aren't wired yet, so every account is treated as Free — make this plan-based when
- * billing lands. The unit is "เครื่องมือใหม่/เดือน"; EDITING an existing tool never creates a project
- * row, so it never counts against this (energy/token tank handles edit cost — §6).
+ * Tiers/billing aren't wired yet, so every account shares one superadmin-editable cap
+ * (egs_app_settings.monthly_tool_limit) — make it plan-based when billing lands. The unit is
+ * "เครื่องมือใหม่/เดือน"; EDITING an existing tool never creates a project row, so it never counts
+ * against this (energy/token tank handles edit cost — §6).
  */
-export const FREE_MONTHLY_TOOLS = 2;
+export const FREE_MONTHLY_TOOLS_FALLBACK = 2;
+
+/** Monthly NEW-tool allowance (admin-editable; falls back to the Free default). */
+export async function getMonthlyToolLimit(): Promise<number> {
+  return getNumberSetting("monthly_tool_limit", FREE_MONTHLY_TOOLS_FALLBACK);
+}
 
 /** "เหลือสร้างใหม่ N ตัว" — NEW tools (projects) the user created this calendar month vs the plan. */
 export async function getMonthlyToolUsage(userId: string): Promise<QuotaStatus> {
@@ -168,7 +174,7 @@ export async function getMonthlyToolUsage(userId: string): Promise<QuotaStatus> 
     .eq("owner_id", userId)
     .gte("created_at", monthStart);
   const used = count ?? 0;
-  const limit = FREE_MONTHLY_TOOLS;
+  const limit = await getMonthlyToolLimit();
   return { used, limit, remaining: Math.max(0, limit - used) };
 }
 

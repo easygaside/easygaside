@@ -8,6 +8,7 @@ import {
   RocketLaunchIcon,
 } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 type Result =
   | { kind: "idle" }
@@ -27,10 +28,12 @@ const ERR_MSG: Record<string, string> = {
 export function DeployButton({
   projectId,
   googleConnected = true,
+  deployed = false,
   onDeployed,
 }: {
   projectId: string;
   googleConnected?: boolean;
+  deployed?: boolean;
   onDeployed?: (execUrl: string) => void;
 }) {
   const [res, setRes] = useState<Result>({ kind: "idle" });
@@ -71,31 +74,47 @@ export function DeployButton({
   return (
     <>
       {!googleConnected ? (
-        <a
-          href="/connect"
-          title="ต้องเชื่อมบัญชี Google ก่อนถึงจะ deploy ได้"
-          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 transition hover:bg-amber-100 sm:px-4"
-        >
-          <RocketLaunchIcon className="h-4 w-4 shrink-0" />
-          <span className="sm:hidden">เชื่อม Google</span>
-          <span className="hidden sm:inline">เชื่อม Google ก่อน Deploy</span>
-        </a>
+        <Tooltip label="ต้องเชื่อมบัญชี Google ก่อนถึงจะ deploy ได้" placement="bottom" className="shrink-0">
+          <a
+            href="/connect"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 transition hover:bg-amber-100 sm:px-4"
+          >
+            <RocketLaunchIcon className="h-4 w-4 shrink-0" />
+            <span className="sm:hidden">เชื่อม Google</span>
+            <span className="hidden sm:inline">เชื่อม Google ก่อน Deploy</span>
+          </a>
+        </Tooltip>
       ) : (
-        <button
-          onClick={deploy}
-          disabled={res.kind === "busy"}
-          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:opacity-50 sm:px-4"
+        <Tooltip
+          label={
+            deployed
+              ? "โปรเจกต์นี้ deploy แล้ว — แก้โค้ดแล้วกด “deploy ใหม่” ในแถบสถานะด้านล่างเพื่ออัปเดตลิงก์เดิม"
+              : undefined
+          }
+          placement="bottom"
+          className="shrink-0"
         >
-          {res.kind === "busy" ? (
-            "กำลัง deploy…"
-          ) : (
-            <>
-              <RocketLaunchIcon className="h-4 w-4 shrink-0" />
-              <span className="sm:hidden">Deploy</span>
-              <span className="hidden sm:inline">Deploy เข้า Google</span>
-            </>
-          )}
-        </button>
+          <button
+            onClick={deploy}
+            disabled={res.kind === "busy" || deployed}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+          >
+            {res.kind === "busy" ? (
+              "กำลัง deploy…"
+            ) : deployed ? (
+              <>
+                <CheckCircleIcon className="h-4 w-4 shrink-0" />
+                Deploy แล้ว
+              </>
+            ) : (
+              <>
+                <RocketLaunchIcon className="h-4 w-4 shrink-0" />
+                <span className="sm:hidden">Deploy</span>
+                <span className="hidden sm:inline">Deploy เข้า Google</span>
+              </>
+            )}
+          </button>
+        </Tooltip>
       )}
 
       {res.kind !== "idle" && res.kind !== "busy" && (

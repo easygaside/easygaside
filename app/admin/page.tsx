@@ -34,7 +34,7 @@ export default async function AdminPage() {
       svc
         .from("egs_generations")
         .select("provider, project_id, input_tokens, output_tokens, critic_issues, duration_ms, outcome, rating, created_at"),
-      svc.from("egs_provider_config").select("provider, model"),
+      svc.from("egs_provider_config").select("provider, model, energy_tank"),
       svc.from("egs_app_settings").select("key, value"),
     ]);
   const [{ data: projectRows }, { data: allowRows }, { data: reportRows }] = await Promise.all([
@@ -63,16 +63,38 @@ export default async function AdminPage() {
     claude: !!process.env.ANTHROPIC_API_KEY,
     chatgpt: !!process.env.OPENAI_API_KEY,
     deepseek: !!process.env.DEEPSEEK_API_KEY,
+    "deepseek-pro": !!process.env.DEEPSEEK_API_KEY,
     gemini: !!process.env.GEMINI_API_KEY,
+    zai: !!process.env.ZAI_API_KEY,
   };
 
-  const modelByProvider = new Map(
-    (pcfg ?? []).map((r) => [r.provider as LlmProvider, r.model as string]),
+  const cfgByProvider = new Map(
+    (pcfg ?? []).map((r) => [r.provider as LlmProvider, r as { model: string; energy_tank: number | null }]),
   );
-  const models = LLM_PROVIDERS.map((p) => ({ provider: p, model: modelByProvider.get(p) ?? "" }));
+  const models = LLM_PROVIDERS.map((p) => ({
+    provider: p,
+    model: cfgByProvider.get(p)?.model ?? "",
+    energyTank: Number(cfgByProvider.get(p)?.energy_tank ?? 0) || 0,
+  }));
   const appSettings = new Map((appcfg ?? []).map((r) => [r.key as string, r.value as string]));
   const defaultProvider = ((appSettings.get("default_provider") as LlmProvider) ?? "claude") as LlmProvider;
   const dailyLimit = Number(appSettings.get("daily_limit") ?? 30) || 30;
+  const monthlyToolLimit = Number(appSettings.get("monthly_tool_limit") ?? 2) || 2;
+  const energyTankDefault = Number(appSettings.get("energy_tank_default") ?? 400000) || 400000;
+  const betaEnforced =
+    (appSettings.get("beta_enforced") ?? (process.env.BETA_MODE !== "off" ? "on" : "off")) !== "off";
+
+  // shared rulebook critic (gate 1) — backend + model, with env fallback for the provider
+  const criticProvider =
+    (appSettings.get("critic_provider") ?? process.env.CRITIC_PROVIDER ?? "deepseek") === "claude"
+      ? "claude"
+      : "deepseek";
+  const criticModel =
+    appSettings.get("critic_model") ||
+    process.env.CRITIC_MODEL ||
+    (criticProvider === "claude" ? "claude-haiku-4-5-20251001" : "deepseek-chat");
+  const criticKeyReady =
+    criticProvider === "claude" ? !!process.env.ANTHROPIC_API_KEY : !!process.env.DEEPSEEK_API_KEY;
 
   const armByUser = new Map(
     (settings ?? []).map((s) => [s.user_id as string, s.llm_provider as LlmProvider | null]),
@@ -155,6 +177,12 @@ export default async function AdminPage() {
       models={models}
       defaultProvider={defaultProvider}
       dailyLimit={dailyLimit}
+      monthlyToolLimit={monthlyToolLimit}
+      energyTankDefault={energyTankDefault}
+      betaEnforced={betaEnforced}
+      criticProvider={criticProvider}
+      criticModel={criticModel}
+      criticKeyReady={criticKeyReady}
       summary={summary}
       projects={projects}
       daily={daily}

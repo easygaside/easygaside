@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { acquireProjectRun, releaseProjectRun } from "@/lib/agent-lock";
 import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
 import { getAccessGate, getOwnApiKey } from "@/lib/beta";
-import { getEnergyTank, getProjectEnergyUsed } from "@/lib/energy";
+import { ENERGY_EXHAUSTED_MSG, getEnergyTank, getProjectEnergyUsed } from "@/lib/energy";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { parseAttachedImages, storeChatImages, type AttachedImage } from "@/lib/chat-images";
 import { resolveProjectProvider, resolveProvider } from "@/lib/llm/provider";
@@ -91,16 +91,12 @@ export async function POST(
   // Platform-key users only (BYOK = own cost → no platform cap). The per-PROJECT energy tank
   // replaces the old per-day request count: a tool can be edited freely until its tank fills.
   if (!byok) {
-    const tank = getEnergyTank(user.email);
+    const tank = await getEnergyTank(user.email, provider);
     const energyUsed = await getProjectEnergyUsed(id);
     if (energyUsed >= tank) {
       await releaseProjectRun(id);
       return NextResponse.json(
-        {
-          error: "energy_exhausted",
-          message:
-            "พลังงานของเครื่องมือนี้เต็มแล้ว — สร้างเครื่องมือใหม่ หรือใส่ Anthropic API key ของคุณเองในหน้า ตั้งค่า เพื่อใช้แบบไม่จำกัด",
-        },
+        { error: "energy_exhausted", message: ENERGY_EXHAUSTED_MSG },
         { status: 429 },
       );
     }
@@ -135,6 +131,8 @@ export async function POST(
           model,
           inputTokens: r.inputTokens,
           outputTokens: r.outputTokens,
+          cacheReadTokens: r.cacheReadTokens,
+          cacheCreationTokens: r.cacheCreationTokens,
           criticIssues: r.criticIssues,
           durationMs: Date.now() - startedAt,
           outcome: "ok",

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { getOwnApiKey } from "@/lib/beta";
-import { reviewProject, type CriticIssue } from "@/lib/critic";
+import { ENERGY_EXHAUSTED_MSG, getEnergyTank, getProjectEnergyUsed } from "@/lib/energy";
+import { reviewProject, getCriticInfo, type CriticIssue } from "@/lib/critic";
 import { getFiles } from "@/lib/files";
 import { validateGasFiles } from "@/lib/gas-codegen";
 import { logGeneration } from "@/lib/metrics";
@@ -34,6 +34,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const project = await getProject(id); // RLS-scoped → null if not owned
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
+  // per-project energy tank — platform-key users are capped; BYOK (own key) bypasses (own cost)
+  if (!(await getOwnApiKey(user.id))) {
+    const used = await getProjectEnergyUsed(id);
+    if (used >= (await getEnergyTank(user.email, project.llm_provider)))
+      return NextResponse.json(
+        { error: "energy_exhausted", issues: [], message: ENERGY_EXHAUSTED_MSG },
+        { status: 429 },
+      );
+  }
+
   // Gate 0 — structural lint (no API, never fails the request)
   const gas = await getFiles(id);
   const lint = validateGasFiles(
@@ -47,25 +57,27 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     fix: "",
   }));
 
-  // Gate 1 — rulebook critic (best-effort; needs an Anthropic key)
+  // Gate 1 — shared rulebook critic (best-effort; runs on whatever critic backend is wired to)
+  const critic = await getCriticInfo();
   let gate1: CriticIssue[] = [];
   let criticError = false;
   let tokens = 0;
-  const apiKey = (await getOwnApiKey(user.id)) ?? process.env.ANTHROPIC_API_KEY;
-  if (apiKey) {
+  if (critic.configured) {
     const startedAt = Date.now();
     try {
-      const r = await reviewProject(new Anthropic({ apiKey }), project, id);
+      const r = await reviewProject(project, id);
       gate1 = r.issues;
       tokens = r.inputTokens + r.outputTokens;
       // meter it: count toward the per-project energy budget (same as a generation)
       await logGeneration({
         projectId: id,
         userId: user.id,
-        provider: "claude",
-        model: "claude-haiku-4-5-20251001",
+        provider: critic.provider,
+        model: critic.model,
         inputTokens: r.inputTokens,
         outputTokens: r.outputTokens,
+        cacheReadTokens: r.cacheReadTokens,
+        cacheCreationTokens: r.cacheCreationTokens,
         criticIssues: gate1.length,
         durationMs: Date.now() - startedAt,
         outcome: "ok",

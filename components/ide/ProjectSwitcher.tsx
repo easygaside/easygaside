@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronUpDownIcon, FolderIcon, PlusIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 export interface SwitcherProject {
   id: string;
@@ -38,7 +39,6 @@ export function ProjectSwitcher({
       <button
         onClick={() => setOpen((o) => !o)}
         className="flex min-w-0 items-center gap-1.5 rounded-xl px-2 py-1 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-        title="สลับโปรเจกต์"
       >
         <FolderIcon className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
         <span className="truncate">{currentName}</span>
@@ -61,7 +61,9 @@ export function ProjectSwitcher({
                 >
                   <span className="min-w-0 flex-1 truncate">{p.name}</span>
                   {p.deployed && (
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title="deploy แล้ว" />
+                    <Tooltip label="deploy แล้ว" placement="left">
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                    </Tooltip>
                   )}
                 </Link>
               ))}

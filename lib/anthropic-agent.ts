@@ -25,6 +25,34 @@ const MAX_ITERATIONS = 8;
 const REPAIR_MAX_ITERATIONS = 6; // critic auto-repair — enough for a server+client multi-file fix, still bounded
 const MAX_TOKENS = 16000; // higher cap → a big file rarely gets truncated mid-tool_use (would poison history)
 
+// Prompt-cache control. 1h TTL so the rulebook + conversation prefix survive the gap between turns —
+// the default 5m expires between turns at low traffic, so each turn re-paid the cache WRITE instead of
+// a cheap read (real console data: 343K of 5m cache-writes). `ttl` is GA on the API but untyped in this
+// SDK version → cast. If a request ever 400s on `ttl`, drop it to `{ type: "ephemeral" }` (5m) — the
+// breakpoints still work, just shorter-lived.
+const CACHE_CTRL = { type: "ephemeral", ttl: "1h" } as Anthropic.CacheControlEphemeral;
+
+/**
+ * Per-request copy of `messages` with a cache breakpoint on the last block of the last message, so the
+ * whole conversation prefix is read from cache (0.1×) instead of re-billed in full on every iteration
+ * /turn (was the 460K "no-cache" input in the real bill). NEVER mutates the input — the originals are
+ * persisted to history WITHOUT cache_control.
+ */
+function withPrefixCache(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  if (messages.length === 0) return messages;
+  const last = messages[messages.length - 1];
+  const blocks: Anthropic.ContentBlockParam[] =
+    typeof last.content === "string" ? [{ type: "text", text: last.content }] : last.content.slice();
+  if (blocks.length === 0) return messages;
+  blocks[blocks.length - 1] = {
+    ...blocks[blocks.length - 1],
+    cache_control: CACHE_CTRL,
+  } as Anthropic.ContentBlockParam;
+  const out = messages.slice();
+  out[out.length - 1] = { ...last, content: blocks };
+  return out;
+}
+
 // ── project spec (Guided UX §5 — proposed before generating, confirmed by the user) ──
 export interface ProjectSpec {
   title: string;
@@ -252,6 +280,9 @@ export interface RunAgentArgs {
 export interface AgentRunResult {
   inputTokens: number;
   outputTokens: number;
+  /** Anthropic cache token split (true COGS). Optional — the OpenAI-format loop omits it (logged as 0). */
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
   criticIssues: number;
 }
 
@@ -260,6 +291,8 @@ export async function runAgentLoop(args: RunAgentArgs): Promise<AgentRunResult> 
   const main = await runTurn(client, args);
   let inputTokens = main.inputTokens;
   let outputTokens = main.outputTokens;
+  let cacheReadTokens = main.cacheReadTokens;
+  let cacheCreationTokens = main.cacheCreationTokens;
   let criticIssues = 0;
   // Gate 1 — rulebook critic + one bounded auto-repair. Only when this turn actually changed files:
   // a pure Q&A turn ("ปกติไหม?") writes nothing, so re-reviewing the whole project there is wasted
@@ -269,9 +302,11 @@ export async function runAgentLoop(args: RunAgentArgs): Promise<AgentRunResult> 
     criticIssues = c.issues;
     inputTokens += c.inputTokens;
     outputTokens += c.outputTokens;
+    cacheReadTokens += c.cacheReadTokens;
+    cacheCreationTokens += c.cacheCreationTokens;
   }
   // NOTE: the route emits `generation` (with the logged id) then `done`.
-  return { inputTokens, outputTokens, criticIssues };
+  return { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, criticIssues };
 }
 
 /**
@@ -290,7 +325,14 @@ async function runTurn(
     internal = false,
     emit,
   }: RunAgentArgs,
-): Promise<{ mutated: boolean; capped: boolean; inputTokens: number; outputTokens: number }> {
+): Promise<{
+  mutated: boolean;
+  capped: boolean;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+}> {
   const history = await getHistory(projectId);
 
   // RAG seam (lib/retrieval.ts) — empty today. Prepended to the user message so the cached
@@ -329,7 +371,7 @@ async function runTurn(
     {
       type: "text",
       text: buildCodegenSystemPrompt({ kind: project.kind }),
-      cache_control: { type: "ephemeral" },
+      cache_control: CACHE_CTRL,
     },
   ];
 
@@ -337,19 +379,23 @@ async function runTurn(
   let capped = false; // did the turn stop early (iteration cap / truncation) with work pending?
   let inputTokens = 0;
   let outputTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheCreationTokens = 0;
   for (let iter = 0; iter < maxIterations; iter++) {
     const stream = client.messages.stream({
       model: pickModel(turn),
       max_tokens: MAX_TOKENS,
       system,
       tools: EGS_TOOLS,
-      messages,
+      messages: withPrefixCache(messages),
     });
     stream.on("text", (delta: string) => emit({ type: "text", delta }));
 
     const final = await stream.finalMessage();
     inputTokens += final.usage?.input_tokens ?? 0;
     outputTokens += final.usage?.output_tokens ?? 0;
+    cacheReadTokens += final.usage?.cache_read_input_tokens ?? 0;
+    cacheCreationTokens += final.usage?.cache_creation_input_tokens ?? 0;
 
     // Truncated mid-tool_use (e.g. stop_reason "max_tokens" while emitting a large write_file):
     // the assistant message carries a tool_use we can't resolve. Persisting it poisons history
@@ -445,7 +491,7 @@ async function runTurn(
     persisted[0] = { role: "user", content: userMessage + note };
   }
   await appendMessages(projectId, persisted, turn);
-  return { mutated, capped, inputTokens, outputTokens };
+  return { mutated, capped, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens };
 }
 
 /**
@@ -457,16 +503,39 @@ async function runTurn(
 async function runCriticGate(
   client: Anthropic,
   args: RunAgentArgs,
-): Promise<{ issues: number; inputTokens: number; outputTokens: number }> {
+): Promise<{
+  issues: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+}> {
   const { projectId, project, emit } = args;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheCreationTokens = 0;
+  const acc = (t: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
+  }) => {
+    inputTokens += t.inputTokens;
+    outputTokens += t.outputTokens;
+    cacheReadTokens += t.cacheReadTokens ?? 0;
+    cacheCreationTokens += t.cacheCreationTokens ?? 0;
+  };
+  const totals = (issues: number) => ({ issues, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens });
   try {
     // Show the working state in the status bar (like "เขียนไฟล์…" during codegen), not as a chat
     // bubble — keeps transient progress out of the conversation. Persistent results stay in chat.
     emit({ type: "status", text: "กำลังตรวจสอบความถูกต้องของโค้ด…" });
-    const review = await reviewProject(client, project, projectId);
+    const review = await reviewProject(project, projectId);
+    acc(review); // the review costs tokens even when it passes — always count it (was dropped to 0 before)
     if (review.issues.length === 0) {
       emit({ type: "text", delta: "\n\n✓ ตรวจคุณภาพ (rulebook critic) — ผ่าน" });
-      return { issues: 0, inputTokens: 0, outputTokens: 0 };
+      return totals(0);
     }
 
     const lines = review.issues.map(
@@ -475,7 +544,7 @@ async function runCriticGate(
     emit({ type: "text", delta: `\n\n🔍 ตรวจคุณภาพพบ ${review.issues.length} จุด:\n${lines.join("\n")}` });
 
     const actionable = review.issues.filter((i) => i.severity !== "low");
-    if (actionable.length === 0) return { issues: review.issues.length, inputTokens: 0, outputTokens: 0 };
+    if (actionable.length === 0) return totals(review.issues.length);
 
     emit({ type: "status", text: "กำลังแก้ตามผลตรวจคุณภาพ…" });
     const repairMsg =
@@ -488,17 +557,18 @@ async function runCriticGate(
       maxIterations: REPAIR_MAX_ITERATIONS,
       internal: true,
     });
+    acc(repair);
     emit({
       type: "text",
       delta: repair.capped
         ? '\n\n✓ แก้ตามผลตรวจคุณภาพบางส่วนแล้ว — ถ้ายังมีจุดค้าง พิมพ์ "แก้ต่อ" ได้ครับ'
         : "\n\n✓ แก้ตามผลตรวจคุณภาพแล้ว",
     });
-    return { issues: review.issues.length, inputTokens: repair.inputTokens, outputTokens: repair.outputTokens };
+    return totals(review.issues.length);
   } catch (e) {
     // never leave the "กำลังแก้ให้อัตโนมัติ…" line hanging — close it out visibly.
     console.error("[agent] critic gate failed (non-fatal):", e);
     emit({ type: "text", delta: "\n\n⚠️ ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้งภายหลังได้ครับ" });
-    return { issues: 0, inputTokens: 0, outputTokens: 0 };
+    return totals(0);
   }
 }

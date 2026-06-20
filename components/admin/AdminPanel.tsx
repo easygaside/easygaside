@@ -6,12 +6,17 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import {
   autoBalanceArmsAction,
+  setBetaEnforcedAction,
+  setCriticAction,
   setDailyLimitAction,
   setDefaultProviderAction,
+  setEnergyTankDefaultAction,
+  setMonthlyToolLimitAction,
   setProviderModelAction,
+  setProviderTankAction,
   setUserArmAction,
 } from "@/app/admin/actions";
-import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/provider";
+import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/catalog";
 import { AllowlistManager, type AllowlistEntry } from "./AllowlistManager";
 import { ReportsViewer, type FailureReport } from "./ReportsViewer";
 
@@ -52,7 +57,9 @@ const ARM_STYLE: Record<LlmProvider, string> = {
   claude: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
   chatgpt: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
   deepseek: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+  "deepseek-pro": "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300",
   gemini: "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+  zai: "bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300",
 };
 
 export interface DailyPoint {
@@ -66,7 +73,9 @@ const ARM_COLOR: Record<LlmProvider, string> = {
   claude: "#fb923c",
   chatgpt: "#34d399",
   deepseek: "#60a5fa",
+  "deepseek-pro": "#818cf8",
   gemini: "#a78bfa",
+  zai: "#2dd4bf",
 };
 
 function Bars({
@@ -138,6 +147,7 @@ function LineChart({ data }: { data: DailyPoint[] }) {
 export interface ProviderModel {
   provider: LlmProvider;
   model: string;
+  energyTank: number;
 }
 
 export function AdminPanel({
@@ -146,6 +156,12 @@ export function AdminPanel({
   models,
   defaultProvider,
   dailyLimit,
+  monthlyToolLimit,
+  energyTankDefault,
+  betaEnforced,
+  criticProvider,
+  criticModel,
+  criticKeyReady,
   summary,
   projects,
   daily,
@@ -158,6 +174,12 @@ export function AdminPanel({
   models: ProviderModel[];
   defaultProvider: LlmProvider;
   dailyLimit: number;
+  monthlyToolLimit: number;
+  energyTankDefault: number;
+  betaEnforced: boolean;
+  criticProvider: "claude" | "deepseek";
+  criticModel: string;
+  criticKeyReady: boolean;
   summary: TokenSummary;
   projects: ProjectTokens[];
   daily: DailyPoint[];
@@ -170,7 +192,14 @@ export function AdminPanel({
   const [modelDraft, setModelDraft] = useState<Record<string, string>>(
     Object.fromEntries(models.map((m) => [m.provider, m.model])),
   );
+  const [tankDraft, setTankDraft] = useState<Record<string, string>>(
+    Object.fromEntries(models.map((m) => [m.provider, String(m.energyTank)])),
+  );
   const [limitDraft, setLimitDraft] = useState(String(dailyLimit));
+  const [monthlyDraft, setMonthlyDraft] = useState(String(monthlyToolLimit));
+  const [tankDefaultDraft, setTankDefaultDraft] = useState(String(energyTankDefault));
+  const [criticProviderDraft, setCriticProviderDraft] = useState<"claude" | "deepseek">(criticProvider);
+  const [criticModelDraft, setCriticModelDraft] = useState(criticModel);
 
   async function saveLimit() {
     setBusy(true);
@@ -182,10 +211,47 @@ export function AdminPanel({
     }
   }
 
-  async function saveModel(provider: LlmProvider) {
+  async function saveProviderRow(provider: LlmProvider) {
     setBusy(true);
     try {
       await setProviderModelAction(provider, modelDraft[provider] ?? "");
+      await setProviderTankAction(provider, Number(tankDraft[provider]));
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveMonthly() {
+    setBusy(true);
+    try {
+      await setMonthlyToolLimitAction(Number(monthlyDraft));
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveTankDefault() {
+    setBusy(true);
+    try {
+      await setEnergyTankDefaultAction(Number(tankDefaultDraft));
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function toggleBeta() {
+    setBusy(true);
+    try {
+      await setBetaEnforcedAction(!betaEnforced);
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveCritic() {
+    setBusy(true);
+    try {
+      await setCriticAction(criticProviderDraft, criticModelDraft);
       router.refresh();
     } finally {
       setBusy(false);
@@ -297,7 +363,9 @@ export function AdminPanel({
           ))}
         </div>
 
-        <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">ชื่อโมเดลของแต่ละ provider:</p>
+        <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">
+          ชื่อโมเดล + ถังพลังงาน (token/โปรเจกต์) ของแต่ละ provider:
+        </p>
         <div className="space-y-2">
           {LLM_PROVIDERS.map((p) => (
             <div key={p} className="flex items-center gap-2">
@@ -308,8 +376,18 @@ export function AdminPanel({
                 placeholder="ชื่อโมเดล เช่น gpt-4o, deepseek-chat"
                 className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 font-mono text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
               />
+              <input
+                type="number"
+                min={1000}
+                step={50000}
+                value={tankDraft[p] ?? ""}
+                onChange={(e) => setTankDraft((d) => ({ ...d, [p]: e.target.value }))}
+                title="ถังพลังงาน (token) ต่อโปรเจกต์สำหรับ provider นี้"
+                placeholder="token"
+                className="w-28 shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 font-mono text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+              />
               <button
-                onClick={() => saveModel(p)}
+                onClick={() => saveProviderRow(p)}
                 disabled={busy}
                 className="shrink-0 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
               >
@@ -337,6 +415,122 @@ export function AdminPanel({
             บันทึก
           </button>
         </div>
+
+        <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">
+          จำนวนเครื่องมือใหม่ที่สร้างได้ต่อคน/เดือน (โหมดทดลอง — แก้ของเดิมไม่นับ):
+        </p>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            value={monthlyDraft}
+            onChange={(e) => setMonthlyDraft(e.target.value)}
+            className="w-28 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+          />
+          <span className="text-xs text-slate-400 dark:text-slate-500">เครื่องมือ/เดือน</span>
+          <button
+            onClick={saveMonthly}
+            disabled={busy}
+            className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
+          >
+            บันทึก
+          </button>
+        </div>
+
+        <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">
+          ถังพลังงานเริ่มต้น (token/โปรเจกต์) — ใช้เมื่อ provider ไม่ได้ตั้งค่าเฉพาะ:
+        </p>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={1000}
+            step={50000}
+            value={tankDefaultDraft}
+            onChange={(e) => setTankDefaultDraft(e.target.value)}
+            className="w-32 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 font-mono text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+          />
+          <span className="text-xs text-slate-400 dark:text-slate-500">token</span>
+          <button
+            onClick={saveTankDefault}
+            disabled={busy}
+            className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
+          >
+            บันทึก
+          </button>
+        </div>
+
+        <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">โหมด Closed beta (จำกัดเฉพาะ allowlist):</p>
+        <button
+          onClick={toggleBeta}
+          disabled={busy}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+            betaEnforced
+              ? "bg-amber-500 text-white hover:bg-amber-400"
+              : "border border-slate-200 text-slate-500 hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-400 dark:hover:bg-slate-800"
+          }`}
+        >
+          {betaEnforced ? "🔒 เปิด (เฉพาะ allowlist) — กดเพื่อปิด" : "🔓 ปิด (ทุกคนเข้าได้) — กดเพื่อเปิด"}
+        </button>
+      </section>
+
+      {/* shared rulebook critic (gate 1) — backend + model */}
+      <section className="mt-6 rounded-xl border border-slate-200 p-4 dark:border-slate-700/60">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">ตัวตรวจโค้ด (critic)</h2>
+        <p className="mb-3 mt-1 text-xs text-slate-500 dark:text-slate-400">
+          ผู้ตัดสินคุณภาพกลางตัวเดียว ใช้กับทุก provider — ทำงานหลัง AI เขียนโค้ดเสร็จ (และตอนกด &quot;ตรวจซ้ำ&quot;).
+          รองรับเฉพาะ claude / deepseek
+        </p>
+
+        <div className="flex gap-1.5">
+          {(["deepseek", "claude"] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => {
+                setCriticProviderDraft(p);
+                setCriticModelDraft(p === "claude" ? "claude-haiku-4-5-20251001" : "deepseek-chat");
+              }}
+              disabled={busy}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                criticProviderDraft === p
+                  ? "bg-emerald-500 text-white"
+                  : "border border-slate-200 text-slate-500 hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
+            >
+              {p}
+              {criticProviderDraft === p ? " ✓" : ""}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            value={criticModelDraft}
+            onChange={(e) => setCriticModelDraft(e.target.value)}
+            placeholder="ชื่อโมเดล critic"
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 font-mono text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+          />
+          <button
+            onClick={saveCritic}
+            disabled={busy}
+            className="shrink-0 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
+          >
+            บันทึก
+          </button>
+        </div>
+
+        <p className="mt-2 text-xs">
+          <span
+            className={
+              criticKeyReady
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-red-600 dark:text-red-400"
+            }
+          >
+            {criticKeyReady
+              ? `✓ API key ของ ${criticProvider} พร้อมใช้งาน`
+              : `✗ ไม่มี API key ของ ${criticProvider} (env) — critic จะรันไม่ได้`}
+          </span>
+        </p>
       </section>
 
       {/* charts: per-provider comparison */}

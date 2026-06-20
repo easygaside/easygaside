@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import Anthropic from "@anthropic-ai/sdk";
 import { buildCodegenSystemPrompt, validateGasFiles } from "@/lib/gas-codegen";
 import { reviewProject } from "@/lib/critic";
 import { getFiles } from "@/lib/files";
@@ -37,6 +36,8 @@ interface TurnResult {
   capped: boolean;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
 }
 
 async function runOpenAiTurn(
@@ -81,6 +82,7 @@ async function runOpenAiTurn(
   let forcedToolRetry = false;
   let inputTokens = 0;
   let outputTokens = 0;
+  let cacheReadTokens = 0; // OpenAI-format providers (DeepSeek/z.ai/…) auto-cache; capture the split
 
   for (let iter = 0; iter < (internal ? REPAIR_MAX_ITERATIONS : MAX_ITERATIONS); iter++) {
     const stream = await client.chat.completions.create({
@@ -99,11 +101,13 @@ async function runOpenAiTurn(
     let toolSeq = 0;
     let finish: string | null = null;
 
+    let lastUsage: OpenAI.Completions.CompletionUsage | undefined; // capture ONCE per request
     for await (const chunk of stream) {
-      if (chunk.usage) {
-        inputTokens += chunk.usage.prompt_tokens ?? 0;
-        outputTokens += chunk.usage.completion_tokens ?? 0;
-      }
+      // Some OpenAI-compat providers (DeepSeek notably) emit a `usage` object on MORE than one chunk
+      // (the finish chunk AND the trailing empty chunk), each carrying the SAME cumulative request
+      // total — so OVERWRITE here and apply exactly once after the stream. Accumulating per-chunk
+      // double-counts (~2× on DeepSeek) and inflated the COGS view.
+      if (chunk.usage) lastUsage = chunk.usage;
       const choice = chunk.choices[0];
       if (!choice) continue;
       if (choice.finish_reason) finish = choice.finish_reason;
@@ -131,6 +135,21 @@ async function runOpenAiTurn(
         if (tc.function?.name) entry.name = tc.function.name;
         if (tc.function?.arguments) entry.args += tc.function.arguments;
       }
+    }
+
+    // bill this request's usage exactly once (per create() call; summed across loop iterations).
+    if (lastUsage) {
+      const usage = lastUsage;
+      // cache hit lives in different fields per provider: DeepSeek = prompt_cache_hit_tokens,
+      // OpenAI/z.ai = prompt_tokens_details.cached_tokens. prompt_tokens INCLUDES the cached part,
+      // so the full-price input is (prompt_tokens − hit). These providers don't bill cache writes.
+      const cacheHit =
+        (usage as { prompt_cache_hit_tokens?: number }).prompt_cache_hit_tokens ??
+        usage.prompt_tokens_details?.cached_tokens ??
+        0;
+      inputTokens += Math.max(0, (usage.prompt_tokens ?? 0) - cacheHit);
+      cacheReadTokens += cacheHit;
+      outputTokens += usage.completion_tokens ?? 0;
     }
 
     // preserve arrival order; synthesize an id when the provider omits one (Gemini sometimes does) —
@@ -221,29 +240,36 @@ async function runOpenAiTurn(
     added.map((m) => ({ role: m.role, content: m })),
   );
 
-  return { mutated, capped, inputTokens, outputTokens };
+  return { mutated, capped, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens: 0 };
 }
 
 async function runOpenAiCriticGate(
   client: OpenAI,
   cfg: ProviderConfig,
   args: RunAgentArgs,
-): Promise<{ issues: number; inputTokens: number; outputTokens: number }> {
+): Promise<{
+  issues: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+}> {
   const { projectId, project, emit } = args;
   try {
     // Working state in the status bar (not chat) — same as the Claude arm.
     emit({ type: "status", text: "กำลังตรวจสอบความถูกต้องของโค้ด…" });
-    // consistent yardstick: the SAME Claude reviewer for every arm
-    const review = await reviewProject(new Anthropic(), project, projectId);
+    // consistent yardstick: the SAME shared rulebook critic for every arm (lib/critic CRITIC_PROVIDER)
+    const review = await reviewProject(project, projectId);
     if (review.issues.length === 0) {
       emit({ type: "text", delta: "\n\n✓ ตรวจคุณภาพ (rulebook critic) — ผ่าน" });
-      return { issues: 0, inputTokens: 0, outputTokens: 0 };
+      return { issues: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
     }
     const lines = review.issues.map((i) => `- [${i.severity}] ${i.file}: ${i.problem} → ${i.fix}`);
     emit({ type: "text", delta: `\n\n🔍 ตรวจคุณภาพพบ ${review.issues.length} จุด:\n${lines.join("\n")}` });
 
     const actionable = review.issues.filter((i) => i.severity !== "low");
-    if (actionable.length === 0) return { issues: review.issues.length, inputTokens: 0, outputTokens: 0 };
+    if (actionable.length === 0)
+      return { issues: review.issues.length, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
 
     emit({ type: "status", text: "กำลังแก้ตามผลตรวจคุณภาพ…" });
     const repairMsg =
@@ -256,11 +282,17 @@ async function runOpenAiCriticGate(
         ? '\n\n✓ แก้ตามผลตรวจคุณภาพบางส่วนแล้ว — ถ้ายังมีจุดค้าง พิมพ์ "แก้ต่อ" ได้ครับ'
         : "\n\n✓ แก้ตามผลตรวจคุณภาพแล้ว",
     });
-    return { issues: review.issues.length, inputTokens: repair.inputTokens, outputTokens: repair.outputTokens };
+    return {
+      issues: review.issues.length,
+      inputTokens: repair.inputTokens,
+      outputTokens: repair.outputTokens,
+      cacheReadTokens: repair.cacheReadTokens,
+      cacheCreationTokens: repair.cacheCreationTokens,
+    };
   } catch (e) {
     console.error("[openai-agent] critic gate failed (non-fatal):", e);
     emit({ type: "text", delta: "\n\n⚠️ ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้งภายหลังได้ครับ" });
-    return { issues: 0, inputTokens: 0, outputTokens: 0 };
+    return { issues: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
   }
 }
 
@@ -272,12 +304,16 @@ export async function runOpenAiAgentLoop(
   const main = await runOpenAiTurn(client, cfg, args);
   let inputTokens = main.inputTokens;
   let outputTokens = main.outputTokens;
+  let cacheReadTokens = main.cacheReadTokens;
+  let cacheCreationTokens = main.cacheCreationTokens;
   let criticIssues = 0;
   if ((args.turn ?? "codegen") === "codegen" && main.mutated && !args.skipCritic) {
     const c = await runOpenAiCriticGate(client, cfg, args);
     criticIssues = c.issues;
     inputTokens += c.inputTokens;
     outputTokens += c.outputTokens;
+    cacheReadTokens += c.cacheReadTokens;
+    cacheCreationTokens += c.cacheCreationTokens;
   }
-  return { inputTokens, outputTokens, criticIssues };
+  return { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, criticIssues };
 }

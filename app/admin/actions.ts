@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isSuperAdmin } from "@/lib/admin";
 import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/provider";
 import { getCurrentUser } from "@/lib/projects";
+import { setAppSetting } from "@/lib/settings";
 import { createServiceClient } from "@/lib/supabase/service";
 
 async function requireSuperAdmin(): Promise<void> {
@@ -54,11 +55,60 @@ export async function setDailyLimitAction(limit: number): Promise<void> {
   await requireSuperAdmin();
   const n = Math.floor(limit);
   if (!Number.isFinite(n) || n < 1 || n > 100000) throw new Error("bad_limit");
+  await setAppSetting("daily_limit", String(n));
+  revalidatePath("/admin");
+}
+
+/** Set the monthly NEW-tool (project) allowance per user (egs_app_settings.monthly_tool_limit). */
+export async function setMonthlyToolLimitAction(limit: number): Promise<void> {
+  await requireSuperAdmin();
+  const n = Math.floor(limit);
+  if (!Number.isFinite(n) || n < 1 || n > 100000) throw new Error("bad_limit");
+  await setAppSetting("monthly_tool_limit", String(n));
+  revalidatePath("/admin");
+}
+
+/** Set the fallback per-project energy tank (tokens) used when an arm has no explicit tank. */
+export async function setEnergyTankDefaultAction(tank: number): Promise<void> {
+  await requireSuperAdmin();
+  const n = Math.floor(tank);
+  if (!Number.isFinite(n) || n < 1000 || n > 100_000_000) throw new Error("bad_tank");
+  await setAppSetting("energy_tank_default", String(n));
+  revalidatePath("/admin");
+}
+
+/** Set the per-arm energy tank (tokens) — egs_provider_config.energy_tank. */
+export async function setProviderTankAction(provider: LlmProvider, tank: number): Promise<void> {
+  await requireSuperAdmin();
+  if (!LLM_PROVIDERS.includes(provider)) throw new Error("bad_provider");
+  const n = Math.floor(tank);
+  if (!Number.isFinite(n) || n < 1000 || n > 100_000_000) throw new Error("bad_tank");
   const svc = createServiceClient();
   const { error } = await svc
-    .from("egs_app_settings")
-    .upsert({ key: "daily_limit", value: String(n) }, { onConflict: "key" });
-  if (error) throw new Error(`setDailyLimit: ${error.message}`);
+    .from("egs_provider_config")
+    .upsert({ provider, energy_tank: n }, { onConflict: "provider" });
+  if (error) throw new Error(`setProviderTank: ${error.message}`);
+  revalidatePath("/admin");
+}
+
+/** Toggle closed-beta enforcement (egs_app_settings.beta_enforced). */
+export async function setBetaEnforcedAction(enforced: boolean): Promise<void> {
+  await requireSuperAdmin();
+  await setAppSetting("beta_enforced", enforced ? "on" : "off");
+  revalidatePath("/admin");
+}
+
+/**
+ * Set the shared rulebook critic's backend + model. Only claude/deepseek have an implemented
+ * backend (lib/critic.ts), so the provider is constrained to those two.
+ */
+export async function setCriticAction(provider: string, model: string): Promise<void> {
+  await requireSuperAdmin();
+  if (provider !== "claude" && provider !== "deepseek") throw new Error("bad_critic_provider");
+  const m = model.trim();
+  if (!m) throw new Error("empty_model");
+  await setAppSetting("critic_provider", provider);
+  await setAppSetting("critic_model", m);
   revalidatePath("/admin");
 }
 

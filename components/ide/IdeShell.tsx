@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ChatBubbleLeftRightIcon,
@@ -15,6 +16,7 @@ import {
 import { useProjectStore } from "@/store/useProjectStore";
 import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { ChatPanel } from "./ChatPanel";
 import { CommandPalette } from "./CommandPalette";
 import { DeployButton } from "./DeployButton";
@@ -62,6 +64,9 @@ export function IdeShell({
   const [deployUrl, setDeployUrl] = useState<string | null>(deployedUrl ?? null);
   // mobile-only: show one pane at a time (desktop shows all three side by side)
   const [pane, setPane] = useState<"chat" | "code" | "preview">("chat");
+  // width (px) of the preview pane — dragged via the splitter between code and preview (desktop only)
+  const [previewW, setPreviewW] = useState(392);
+  const [resizing, setResizing] = useState(false);
   useEffect(() => {
     setInitial(initialFiles);
   }, [initialFiles, setInitial]);
@@ -82,15 +87,43 @@ export function IdeShell({
         : "text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800"
     }`;
 
+  // drag the splitter (pointer-capture so dragging OVER the preview iframe still tracks + releases)
+  function startResize(e: ReactPointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const el = e.currentTarget;
+    const startX = e.clientX;
+    const startW = previewW;
+    el.setPointerCapture(e.pointerId);
+    setResizing(true);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    const onMove = (ev: PointerEvent) => {
+      const maxW = Math.min(760, window.innerWidth - 660);
+      setPreviewW(Math.min(Math.max(startW - (ev.clientX - startX), 300), Math.max(maxW, 320)));
+    };
+    const end = (ev: PointerEvent) => {
+      el.releasePointerCapture?.(ev.pointerId);
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", end);
+      el.removeEventListener("pointercancel", end);
+      setResizing(false);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
+  }
+
   return (
     <main className="flex h-screen flex-col bg-[#fafafa] text-slate-800 dark:bg-[#0d0f12] dark:text-slate-100">
       {/* TOP BAR */}
       <header className="flex h-[54px] flex-none items-center gap-3 border-b border-slate-200 bg-white px-3 dark:border-slate-800 dark:bg-slate-900 sm:px-4">
         <div className="flex shrink-0 items-center gap-2.5">
-          <span className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-emerald-600 text-sm font-bold text-white">
-            G
+          <Image src="/icon/android-icon-192x192.png" alt="EasyGAS" width={26} height={26} className="rounded-[7px]" />
+          <span className="hidden text-[15px] font-bold tracking-tight sm:block">
+            Easy<span className="text-emerald-600 dark:text-emerald-400">GAS</span>
           </span>
-          <span className="hidden text-[15px] font-bold tracking-tight sm:block">EasyGAS</span>
         </div>
         <span className="hidden h-[18px] w-px bg-slate-200 dark:bg-slate-700 sm:block" />
         <ProjectSwitcher currentId={projectId} currentName={projectName} projects={projects} />
@@ -98,7 +131,6 @@ export function IdeShell({
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
-            title="ค้นหาไฟล์ หรือสั่งงาน (⌘K)"
             className="flex w-[340px] items-center gap-2 rounded-[9px] border border-slate-200 bg-slate-50 px-3.5 py-[7px] text-slate-400 transition hover:border-slate-300 hover:bg-white dark:border-slate-700/70 dark:bg-slate-800/60 dark:hover:border-slate-600 dark:hover:bg-slate-800"
           >
             <MagnifyingGlassIcon className="h-3.5 w-3.5" />
@@ -109,7 +141,7 @@ export function IdeShell({
         <span className="flex-1 lg:hidden" />
         <ReportButton projectId={projectId} />
         <ThemeToggle />
-        <DeployButton projectId={projectId} googleConnected={googleConnected} onDeployed={setDeployUrl} />
+        <DeployButton projectId={projectId} googleConnected={googleConnected} deployed={!!deployUrl} onDeployed={setDeployUrl} />
       </header>
 
       {/* STATUS STRIP — live /exec URL + actions (flush, full-width) */}
@@ -144,35 +176,45 @@ export function IdeShell({
       {/* BODY: activity rail + flush 3-pane */}
       <div className="flex min-h-0 flex-1">
         <nav className="hidden w-[52px] flex-none flex-col items-center gap-1.5 border-r border-slate-200 bg-slate-50/70 py-3 lg:flex dark:border-slate-800 dark:bg-slate-950/40">
-          <button onClick={() => setPane("chat")} title="ผู้ช่วย AI" className={RAIL("chat")}>
-            <SparklesIcon className="h-[18px] w-[18px]" />
-          </button>
-          <button onClick={() => setPane("code")} title="โค้ด" className={RAIL("code")}>
-            <CodeBracketIcon className="h-[18px] w-[18px]" />
-          </button>
-          <button onClick={() => setPane("preview")} title="พรีวิว" className={RAIL("preview")}>
-            <EyeIcon className="h-[18px] w-[18px]" />
-          </button>
+          <Tooltip label="ผู้ช่วย AI" placement="right">
+            <button onClick={() => setPane("chat")} className={RAIL("chat")}>
+              <SparklesIcon className="h-[18px] w-[18px]" />
+            </button>
+          </Tooltip>
+          <Tooltip label="โค้ด" placement="right">
+            <button onClick={() => setPane("code")} className={RAIL("code")}>
+              <CodeBracketIcon className="h-[18px] w-[18px]" />
+            </button>
+          </Tooltip>
+          <Tooltip label="พรีวิว" placement="right">
+            <button onClick={() => setPane("preview")} className={RAIL("preview")}>
+              <EyeIcon className="h-[18px] w-[18px]" />
+            </button>
+          </Tooltip>
           <span className="flex-1" />
-          <Link
-            href="/settings"
-            title="ตั้งค่า"
-            className="grid h-9 w-9 place-items-center rounded-[9px] text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800"
-          >
-            <Cog6ToothIcon className="h-[18px] w-[18px]" />
-          </Link>
+          <Tooltip label="ตั้งค่า" placement="right">
+            <Link
+              href="/settings"
+              className="grid h-9 w-9 place-items-center rounded-[9px] text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800"
+            >
+              <Cog6ToothIcon className="h-[18px] w-[18px]" />
+            </Link>
+          </Tooltip>
         </nav>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[312px_1fr_392px]">
+        <div
+          className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[312px_1fr_7px_var(--preview-w,392px)]"
+          style={{ "--preview-w": `${previewW}px` } as CSSProperties}
+        >
           <section className={`${PANEL} border-slate-200 dark:border-slate-800 lg:border-r ${hideOnMobile("chat")}`}>
             <ChatPanel projectId={projectId} initialImages={initialImages} energyUsed={energyUsed} energyTank={energyTank} />
           </section>
 
-          <section className={`${PANEL} border-slate-200 dark:border-slate-800 lg:border-r ${hideOnMobile("code")}`}>
+          <section className={`${PANEL} ${hideOnMobile("code")}`}>
             <FileTree />
             <EditorToolbar projectId={projectId} />
             <div className="min-h-0 flex-1">
-              <EditorPane projectId={projectId} />
+              <EditorPane />
             </div>
             <IssuesPanel />
             {/* editor status bar */}
@@ -186,6 +228,21 @@ export function IdeShell({
               <span>V8</span>
             </div>
           </section>
+
+          {/* draggable splitter — drag to resize the preview width (desktop only) */}
+          <div
+            onPointerDown={startResize}
+            title="ลากเพื่อปรับความกว้างของพรีวิว"
+            className="group relative hidden cursor-col-resize touch-none lg:block"
+          >
+            <span
+              className={`absolute inset-y-0 left-1/2 -translate-x-1/2 transition-all ${
+                resizing
+                  ? "w-[3px] bg-emerald-400 dark:bg-emerald-500"
+                  : "w-px bg-slate-200 group-hover:w-[3px] group-hover:bg-emerald-400 dark:bg-slate-800 dark:group-hover:bg-emerald-500"
+              }`}
+            />
+          </div>
 
           <section className={`${PANEL} p-3 ${hideOnMobile("preview")}`}>
             <PreviewPane />

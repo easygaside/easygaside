@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CommandLineIcon, ComputerDesktopIcon, DevicePhoneMobileIcon } from "@heroicons/react/24/outline";
 import { useProjectStore, type FileEntry } from "@/store/useProjectStore";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const MOBILE_WIDTH = 390; // px — iPhone-ish viewport for the mobile preview
 
@@ -100,28 +101,30 @@ export function PreviewPane() {
         </div>
         {srcdoc && (
           <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5">
-            <button
-              onClick={() => setView("desktop")}
-              title="จอปกติ"
-              aria-label="มุมมองจอปกติ"
-              aria-pressed={view === "desktop"}
-              className={`grid h-6 w-7 place-items-center rounded-md transition ${
-                view === "desktop" ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-              }`}
-            >
-              <ComputerDesktopIcon className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setView("mobile")}
-              title="มือถือ"
-              aria-label="มุมมองมือถือ"
-              aria-pressed={view === "mobile"}
-              className={`grid h-6 w-7 place-items-center rounded-md transition ${
-                view === "mobile" ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-              }`}
-            >
-              <DevicePhoneMobileIcon className="h-4 w-4" />
-            </button>
+            <Tooltip label="จอปกติ" placement="bottom">
+              <button
+                onClick={() => setView("desktop")}
+                aria-label="มุมมองจอปกติ"
+                aria-pressed={view === "desktop"}
+                className={`grid h-6 w-7 place-items-center rounded-md transition ${
+                  view === "desktop" ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                }`}
+              >
+                <ComputerDesktopIcon className="h-4 w-4" />
+              </button>
+            </Tooltip>
+            <Tooltip label="มือถือ" placement="bottom">
+              <button
+                onClick={() => setView("mobile")}
+                aria-label="มุมมองมือถือ"
+                aria-pressed={view === "mobile"}
+                className={`grid h-6 w-7 place-items-center rounded-md transition ${
+                  view === "mobile" ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                }`}
+              >
+                <DevicePhoneMobileIcon className="h-4 w-4" />
+              </button>
+            </Tooltip>
           </div>
         )}
       </div>

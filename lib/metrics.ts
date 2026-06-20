@@ -12,6 +12,9 @@ export interface GenerationMetric {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  /** Anthropic cache split (true COGS — billed differently than fresh input). 0 for providers w/o cache. */
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
   criticIssues: number;
   durationMs: number;
   outcome: "ok" | "error";
@@ -29,6 +32,8 @@ export async function logGeneration(m: GenerationMetric): Promise<string | null>
         model: m.model,
         input_tokens: m.inputTokens,
         output_tokens: m.outputTokens,
+        cache_read_tokens: m.cacheReadTokens ?? 0,
+        cache_creation_tokens: m.cacheCreationTokens ?? 0,
         critic_issues: m.criticIssues,
         duration_ms: m.durationMs,
         outcome: m.outcome,

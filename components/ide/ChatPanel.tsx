@@ -12,6 +12,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
 import { compressImage, type CompressedImage } from "@/lib/client/image-compress";
+import { saveDirtyFiles } from "@/lib/client/save-files";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { rateGenerationAction } from "@/app/projects/actions";
 import { GuidedWizard } from "./GuidedWizard";
 
@@ -72,17 +74,25 @@ function EnergyBar({ used, tank }: { used: number; tank: number }) {
   const fill =
     pct > 40 ? "from-emerald-400 to-emerald-600" : pct >= 15 ? "from-amber-400 to-amber-500" : "from-red-400 to-red-500";
   return (
-    <div
-      title={`พลังงานเหลือ ${pct}% — ใช้สำหรับสร้าง/แก้โปรเจกต์นี้`}
-      className="flex items-center gap-2.5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-800/50 dark:bg-emerald-950/30"
-    >
-      <BoltIcon className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-      <span className="h-[7px] min-w-0 flex-1 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-950/60">
-        <span className={`block h-full rounded-full bg-gradient-to-r ${fill} transition-all`} style={{ width: `${pct}%` }} />
-      </span>
-      <span className="shrink-0 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">{pct}%</span>
-    </div>
+    <Tooltip label={`พลังงานเหลือ ${pct}% — ใช้สำหรับสร้าง/แก้โปรเจกต์นี้`} placement="bottom" className="w-full">
+      <div className="flex w-full items-center gap-2.5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-800/50 dark:bg-emerald-950/30">
+        <BoltIcon className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <span className="h-[7px] min-w-0 flex-1 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-950/60">
+          <span className={`block h-full rounded-full bg-gradient-to-r ${fill} transition-all`} style={{ width: `${pct}%` }} />
+        </span>
+        <span className="shrink-0 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">{pct}%</span>
+      </div>
+    </Tooltip>
   );
+}
+
+/** Segmented action-button styling — the active one gets the raised white chip; others stay quiet. */
+function segClass(active: boolean): string {
+  return `flex items-center justify-center gap-1 truncate rounded-[7px] px-2 py-1.5 text-[12.5px] transition disabled:opacity-50 ${
+    active
+      ? "bg-white font-semibold text-slate-700 shadow-sm hover:text-emerald-700 dark:bg-slate-700 dark:text-slate-100"
+      : "font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+  }`;
 }
 
 export function ChatPanel({
@@ -111,6 +121,8 @@ export function ChatPanel({
   const addEnergy = useProjectStore((s) => s.addEnergy);
   const [pendingSpec, setPendingSpec] = useState<ProjectSpec | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  // which segmented action is selected (visual active state) — ผู้ช่วย is the default
+  const [activeAction, setActiveAction] = useState<"assistant" | "explain" | "fix">("assistant");
   const [images, setImages] = useState<CompressedImage[]>([]);
   const [attaching, setAttaching] = useState(false);
   const [genId, setGenId] = useState<string | null>(null); // latest generation, for 👍/👎 rating
@@ -251,6 +263,7 @@ export function ChatPanel({
     ]);
 
     try {
+      await saveDirtyFiles(projectId); // persist the user's manual edits before the AI reads/overwrites them
       const res = await fetch(`/api/agent/${projectId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -290,6 +303,7 @@ export function ChatPanel({
     setRated(null);
     setMessages((m) => [...m, { role: "assistant", text: "" }]);
     try {
+      await saveDirtyFiles(projectId); // persist manual edits before the repair loop runs on them
       const res = await fetch(`/api/verify/${projectId}`, { method: "POST" });
       if (!res.ok) {
         let m = "เชื่อมต่อล้มเหลว — ลองใหม่อีกครั้ง";
@@ -333,11 +347,14 @@ export function ChatPanel({
           </div>
         ) : null}
 
-        {/* action segmented control — ผู้ช่วย (wizard) is primary; explain/fix appear with code */}
+        {/* action segmented control — clicking a button activates it (raised white chip) */}
         <div className={`grid gap-1 rounded-[10px] bg-slate-100 p-1 dark:bg-slate-800 ${hasFiles ? "grid-cols-3" : "grid-cols-1"}`}>
           <button
-            onClick={() => setWizardOpen(true)}
-            className="flex items-center justify-center gap-1 rounded-[7px] bg-white px-2 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-sm transition hover:text-emerald-700 dark:bg-slate-700 dark:text-slate-100"
+            onClick={() => {
+              setActiveAction("assistant");
+              setWizardOpen(true);
+            }}
+            className={segClass(activeAction === "assistant")}
           >
             <SparklesIcon className="h-3.5 w-3.5 shrink-0" />
             ผู้ช่วย
@@ -345,18 +362,22 @@ export function ChatPanel({
           {hasFiles && (
             <>
               <button
-                onClick={() => send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ")}
+                onClick={() => {
+                  setActiveAction("explain");
+                  send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ");
+                }}
                 disabled={busy}
-                className="truncate rounded-[7px] px-2 py-1.5 text-[12.5px] font-medium text-slate-500 transition hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-200"
+                className={segClass(activeAction === "explain")}
               >
                 อธิบายโค้ด
               </button>
               <button
-                onClick={() =>
-                  send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย")
-                }
+                onClick={() => {
+                  setActiveAction("fix");
+                  send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย");
+                }}
                 disabled={busy}
-                className="truncate rounded-[7px] px-2 py-1.5 text-[12.5px] font-medium text-slate-500 transition hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-200"
+                className={segClass(activeAction === "fix")}
               >
                 ตรวจบั๊ก
               </button>
@@ -568,15 +589,20 @@ export function ChatPanel({
             onChange={onPickFiles}
             className="hidden"
           />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={busy || images.length >= MAX_IMAGES}
-            title={images.length >= MAX_IMAGES ? `แนบได้สูงสุด ${MAX_IMAGES} รูป` : "แนบรูปอ้างอิง"}
-            aria-label="แนบรูป"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-slate-400 dark:text-slate-500 transition hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-40"
+          <Tooltip
+            label={images.length >= MAX_IMAGES ? `แนบได้สูงสุด ${MAX_IMAGES} รูป` : "แนบรูปอ้างอิง"}
+            placement="top"
+            className="shrink-0"
           >
-            <PhotoIcon className="h-5 w-5" />
-          </button>
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={busy || images.length >= MAX_IMAGES}
+              aria-label="แนบรูป"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-slate-400 dark:text-slate-500 transition hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-40"
+            >
+              <PhotoIcon className="h-5 w-5" />
+            </button>
+          </Tooltip>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -586,14 +612,10 @@ export function ChatPanel({
                 send();
               }
             }}
-            placeholder={
-              hasFiles
-                ? "อยากเพิ่มฟีเจอร์ หรือเจอ error? บอกได้เลย เช่น “เพิ่มปุ่มลบ” หรือวางข้อความ error ที่เจอ\nEnter = ส่ง · Shift+Enter = บรรทัดใหม่"
-                : "บอกสิ่งที่อยากให้ AI สร้าง… แนบรูปอ้างอิงได้\nEnter = ส่ง · Shift+Enter = ขึ้นบรรทัดใหม่"
-            }
+            placeholder={"Shift+Enter เพื่อขึ้นบรรทัดใหม่\nกด Enter เพื่อส่ง"}
             disabled={busy}
-            rows={3}
-            className="min-h-[72px] flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 disabled:opacity-60"
+            rows={4}
+            className="min-h-[108px] flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 disabled:opacity-60"
           />
           <button
             onClick={() => send()}

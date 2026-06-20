@@ -1,4 +1,11 @@
 import { hasOwnApiKey } from "@/lib/beta";
+import {
+  DEFAULT_PROVIDER,
+  LLM_PROVIDERS,
+  providerConfig,
+  type LlmProvider,
+  type ProviderConfig,
+} from "@/lib/llm/catalog";
 import { createServiceClient } from "@/lib/supabase/service";
 
 /**
@@ -6,61 +13,20 @@ import { createServiceClient } from "@/lib/supabase/service";
  * by the superadmin; a project locks to the arm it was first generated with (history format differs
  * per family). API keys live in env (per the chosen setup). ChatGPT + DeepSeek share the OpenAI
  * wire format (DeepSeek via baseURL override); Claude uses the Anthropic format.
+ *
+ * The pure catalog (types, LLM_PROVIDERS, providerConfig) lives in ./catalog and is re-exported here
+ * so existing importers keep working; client components should import from ./catalog directly to
+ * avoid pulling these server-only helpers (and node:crypto via beta) into the browser bundle.
  */
 
-export type LlmProvider = "claude" | "chatgpt" | "deepseek" | "gemini";
-export type LlmFamily = "anthropic" | "openai";
-
-export const LLM_PROVIDERS: LlmProvider[] = ["claude", "chatgpt", "deepseek", "gemini"];
-export const DEFAULT_PROVIDER: LlmProvider = "claude";
-
-export interface ProviderConfig {
-  provider: LlmProvider;
-  family: LlmFamily;
-  label: string;
-  model: string;
-  baseURL?: string; // openai family only
-  apiKey: string | undefined; // from env
-}
-
-export function providerConfig(p: LlmProvider): ProviderConfig {
-  switch (p) {
-    case "chatgpt":
-      return {
-        provider: "chatgpt",
-        family: "openai",
-        label: "ChatGPT",
-        model: process.env.OPENAI_MODEL ?? "gpt-4o",
-        apiKey: process.env.OPENAI_API_KEY,
-      };
-    case "deepseek":
-      return {
-        provider: "deepseek",
-        family: "openai",
-        label: "DeepSeek",
-        model: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
-        baseURL: "https://api.deepseek.com",
-        apiKey: process.env.DEEPSEEK_API_KEY,
-      };
-    case "gemini":
-      return {
-        provider: "gemini",
-        family: "openai",
-        label: "Gemini",
-        model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
-        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-        apiKey: process.env.GEMINI_API_KEY,
-      };
-    default:
-      return {
-        provider: "claude",
-        family: "anthropic",
-        label: "Claude",
-        model: "claude-sonnet-4-6",
-        apiKey: process.env.ANTHROPIC_API_KEY,
-      };
-  }
-}
+export {
+  DEFAULT_PROVIDER,
+  LLM_PROVIDERS,
+  providerConfig,
+  type LlmFamily,
+  type LlmProvider,
+  type ProviderConfig,
+} from "@/lib/llm/catalog";
 
 /** System-wide default provider (superadmin-set in egs_app_settings; falls back to claude). */
 export async function getDefaultProvider(): Promise<LlmProvider> {

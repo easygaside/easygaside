@@ -42,13 +42,11 @@ function langOf(path: string): string {
 
 const MARKER_OWNER = "egs-critic";
 
-export function EditorPane({ projectId }: { projectId: string }) {
+export function EditorPane() {
   const activePath = useProjectStore((s) => s.activePath);
   const files = useProjectStore((s) => s.files);
   const issues = useProjectStore((s) => s.issues);
   const update = useProjectStore((s) => s.updateActiveContent);
-  const markSaved = useProjectStore((s) => s.markSaved);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // refs to the live monaco instance so we can paint critic findings as gutter markers
   const editorRef = useRef<unknown>(null);
   const monacoRef = useRef<{ editor: { getModels: () => unknown[]; setModelMarkers: (...a: unknown[]) => void }; MarkerSeverity: { Error: number; Warning: number } } | null>(null);
@@ -94,23 +92,9 @@ export function EditorPane({ projectId }: { projectId: string }) {
   }, [issues, activePath]);
 
   function onChange(v: string | undefined) {
-    const content = v ?? "";
-    update(content);
-    if (!activePath) return;
-    const path = activePath;
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      // autosave user edits to egs_files (AI writes already persist server-side)
-      fetch(`/api/files/${projectId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path, content }),
-      })
-        .then((r) => {
-          if (r.ok) markSaved(path);
-        })
-        .catch(() => {});
-    }, 800);
+    // Mark the file dirty in the store; persistence is now MANUAL (the "บันทึก" button) and is also
+    // auto-flushed right before any AI run / restore via saveDirtyFiles — so edits are never lost.
+    update(v ?? "");
   }
 
   if (!activePath) {

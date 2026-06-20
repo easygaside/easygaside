@@ -11,6 +11,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { listVersionsAction, restoreVersionAction } from "@/app/projects/version-actions";
+import { saveDirtyFiles } from "@/lib/client/save-files";
 import type { VersionMeta, VersionSource } from "@/lib/versions";
 
 const SOURCE: Record<VersionSource, { label: string; Icon: typeof SparklesIcon; cls: string }> = {
@@ -46,6 +47,7 @@ export function VersionHistory({ projectId }: { projectId: string }) {
     if (restoring) return;
     if (!confirm("กู้คืนโค้ดเป็นเวอร์ชันนี้?\nโค้ดปัจจุบันถูกบันทึกเป็นเวอร์ชันไว้แล้ว — ย้อนกลับได้")) return;
     setRestoring(id);
+    await saveDirtyFiles(projectId); // keep the user's current edits as a version before overwriting
     const r = await restoreVersionAction(id);
     setRestoring(null);
     if (r.ok) {

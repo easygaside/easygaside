@@ -9,6 +9,7 @@ import {
   ClipboardIcon,
 } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 /**
  * Persistent bar for a deployed project: open/copy the live /exec URL, plus quick actions —
@@ -97,31 +98,35 @@ export function DeployedUrlBar({ url, projectId }: { url: string; projectId: str
         <span className="h-[7px] w-[7px] rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(34,197,94,0.18)]" />
         ออนไลน์
       </span>
-      {note ? (
+      {note && (
         <span className="truncate text-[11px] text-slate-500 dark:text-slate-400">· {note}</span>
-      ) : (
-        <span className="truncate text-[12px] text-slate-400 dark:text-slate-500">· …/exec</span>
       )}
       <span className="min-w-0 flex-1" />
 
-      <button
-        onClick={openDev}
-        disabled={devBusy}
-        title="เปิดดูโค้ดล่าสุด (/dev) โดยไม่ต้อง deploy ใหม่ — ต้องล็อกอิน Google เป็นเจ้าของ"
-        className={`${ICON_BTN} text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-800/50`}
+      <Tooltip
+        label="เปิดดูโค้ดล่าสุด (/dev) โดยไม่ต้อง deploy ใหม่ — ต้องล็อกอิน Google เป็นเจ้าของ"
+        placement="bottom"
+        className="shrink-0"
       >
-        <BoltIcon className={`h-3.5 w-3.5 ${devBusy ? "animate-pulse" : ""}`} />
-        {devBusy ? "กำลังเปิด…" : "เปิด /dev"}
-      </button>
-      <button
-        onClick={redeploy}
-        disabled={deployBusy}
-        title="deploy โค้ดล่าสุดทับเวอร์ชันเดิม (ลิงก์ /exec เดิม)"
-        className={`${ICON_BTN} text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-800/50`}
-      >
-        <ArrowPathIcon className={`h-3.5 w-3.5 ${deployBusy ? "animate-spin" : ""}`} />
-        {deployBusy ? "กำลัง deploy…" : "deploy ใหม่"}
-      </button>
+        <button
+          onClick={openDev}
+          disabled={devBusy}
+          className={`${ICON_BTN} text-slate-600 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-200`}
+        >
+          <BoltIcon className={`h-3.5 w-3.5 ${devBusy ? "animate-pulse" : ""}`} />
+          {devBusy ? "กำลังเปิด…" : "เปิด /dev"}
+        </button>
+      </Tooltip>
+      <Tooltip label="deploy โค้ดล่าสุดทับเวอร์ชันเดิม (ลิงก์ /exec เดิม)" placement="bottom" className="shrink-0">
+        <button
+          onClick={redeploy}
+          disabled={deployBusy}
+          className={`${ICON_BTN} text-slate-600 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-200`}
+        >
+          <ArrowPathIcon className={`h-3.5 w-3.5 ${deployBusy ? "animate-spin" : ""}`} />
+          {deployBusy ? "กำลัง deploy…" : "deploy ใหม่"}
+        </button>
+      </Tooltip>
       <button
         onClick={copy}
         className={`${ICON_BTN} text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/40`}

@@ -61,6 +61,9 @@ export function IdeShell({
   const setPaletteOpen = useProjectStore((s) => s.setPaletteOpen);
   // the file the agent is writing right now (null when idle) — drives the mobile code-tab attention pulse
   const workingPath = useProjectStore((s) => s.workingPath);
+  // editor-triggered agent actions (ทดสอบรันจริง / ซ่อมจาก issues panel) are dispatched as a store
+  // command and run inside ChatPanel, streaming into the chat pane — watch it to jump there.
+  const command = useProjectStore((s) => s.command);
   const [hintOpen, setHintOpen] = useState(true);
   const [mismatchOpen, setMismatchOpen] = useState(true);
   const [deployUrl, setDeployUrl] = useState<string | null>(deployedUrl ?? null);
@@ -74,6 +77,11 @@ export function IdeShell({
   useEffect(() => {
     setInitial(initialFiles);
   }, [initialFiles, setInitial]);
+  // "ทดสอบรันจริง" / fix-from-issues stream their result into the chat pane — jump there so the user
+  // actually sees it, especially on mobile where only one pane is visible at a time.
+  useEffect(() => {
+    if (command) setPane("chat");
+  }, [command]);
 
   const hideOnMobile = (p: "chat" | "code" | "preview") => (pane === p ? "" : "max-lg:hidden");
   const TAB = (active: boolean) =>

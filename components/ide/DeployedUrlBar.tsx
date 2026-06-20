@@ -51,21 +51,43 @@ export function DeployedUrlBar({ url, projectId }: { url: string; projectId: str
     if (devBusy) return;
     setDevBusy(true);
     setNote(null);
-    // open the tab inside the click gesture so the popup blocker doesn't eat it; fill it after fetch
+    // Open the tab inside the click gesture (popup blocker), and paint a placeholder right away so the
+    // new tab is never a scary bare "about:blank" during the (sometimes slow) first-time scratch push.
     const tab = window.open("", "_blank");
+    tab?.document.write(
+      "<!doctype html><meta charset='utf-8'><title>กำลังเตรียมพรีวิว…</title>" +
+        "<body style='margin:0;font-family:system-ui,sans-serif;display:grid;place-items:center;height:95vh;color:#334155'>" +
+        "<div style='text-align:center'><div style='font-size:28px'>⏳</div>" +
+        "<p>กำลังเตรียมพรีวิว /dev …</p>" +
+        "<p style='font-size:13px;color:#64748b'>ครั้งแรกอาจใช้เวลาสักครู่</p></div></body>",
+    );
+    // surface the reason IN the tab — calling tab.close() on an error is often blocked by the browser,
+    // which left the tab stuck on about:blank with no explanation.
+    const fail = (msg: string) => {
+      if (tab && !tab.closed)
+        tab.document.body.innerHTML =
+          "<div style='text-align:center;font-family:system-ui,sans-serif;color:#334155'>" +
+          `<div style='font-size:28px'>⚠️</div><p style='color:#b91c1c;max-width:340px;margin:10px auto;line-height:1.5'>${msg}</p>` +
+          "<p style='font-size:13px;color:#64748b'>ปิดแท็บนี้ได้เลย</p></div>";
+      setNote(msg);
+    };
     try {
       const r = await fetch(`/api/preview/${projectId}`, { method: "POST" });
       const data = await r.json();
       if (r.ok && data.devUrl) {
         if (tab) tab.location.href = data.devUrl;
         else window.open(data.devUrl, "_blank");
+      } else if (data.error === "USER_SETTINGS_DISABLED") {
+        fail("ต้องเปิด Apps Script API ก่อน — ใช้ปุ่ม Deploy ด้านบนเพื่อทำตามขั้นตอนหนึ่งครั้ง");
+      } else if (data.error === "NEEDS_REAUTH" || data.error === "NOT_CONNECTED") {
+        fail("การเชื่อมต่อ Google หมดอายุ หรือยังไม่ได้เชื่อม — เชื่อมใหม่ที่หน้า เชื่อมบัญชี Google");
+      } else if (data.error === "NO_FILES") {
+        fail("ยังไม่มีไฟล์ให้พรีวิว — ให้ AI สร้างโค้ดก่อน");
       } else {
-        tab?.close();
-        setNote("เปิด /dev ไม่สำเร็จ — ลองใหม่");
+        fail(data.message || "เปิด /dev ไม่สำเร็จ — ลองใหม่อีกครั้ง");
       }
     } catch {
-      tab?.close();
-      setNote("เปิด /dev ไม่สำเร็จ");
+      fail("เปิด /dev ไม่สำเร็จ (เครือข่ายขัดข้อง) — ลองใหม่อีกครั้ง");
     } finally {
       setDevBusy(false);
     }

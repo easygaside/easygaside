@@ -3,8 +3,9 @@ import { isSuperAdmin } from "@/lib/admin";
 import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/provider";
 import { getCurrentUser } from "@/lib/projects";
 import { createServiceClient } from "@/lib/supabase/service";
-import { AdminPanel, type AdminUser, type ArmMetric } from "@/components/admin/AdminPanel";
+import { AdminPanel, type AdminUser, type ArmMetric, type UserMetric } from "@/components/admin/AdminPanel";
 import type { AllowlistEntry } from "@/components/admin/AllowlistManager";
+import type { BetaApplication } from "@/components/admin/BetaApplicationsViewer";
 import type { FailureReport } from "@/components/admin/ReportsViewer";
 
 export const metadata = { title: "Admin — EasyGAS IDE" };
@@ -12,6 +13,7 @@ export const metadata = { title: "Admin — EasyGAS IDE" };
 interface GenRow {
   provider: string;
   project_id: string | null;
+  user_id: string | null;
   input_tokens: number;
   output_tokens: number;
   critic_issues: number;
@@ -33,19 +35,27 @@ export default async function AdminPage() {
       svc.from("egs_user_settings").select("user_id, llm_provider"),
       svc
         .from("egs_generations")
-        .select("provider, project_id, input_tokens, output_tokens, critic_issues, duration_ms, outcome, rating, created_at"),
+        .select("provider, project_id, user_id, input_tokens, output_tokens, critic_issues, duration_ms, outcome, rating, created_at"),
       svc.from("egs_provider_config").select("provider, model, energy_tank"),
       svc.from("egs_app_settings").select("key, value"),
     ]);
-  const [{ data: projectRows }, { data: allowRows }, { data: reportRows }] = await Promise.all([
-    svc.from("egs_projects").select("id, name"),
-    svc.from("egs_beta_allowlist").select("email, note, created_at").order("created_at", { ascending: true }),
-    svc
-      .from("egs_reports")
-      .select("id, kind, message, project_id, url, code_snapshot, status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(50),
-  ]);
+  const [{ data: projectRows }, { data: allowRows }, { data: reportRows }, { data: appRows }] =
+    await Promise.all([
+      svc.from("egs_projects").select("id, name"),
+      svc.from("egs_beta_allowlist").select("email, note, created_at").order("created_at", { ascending: true }),
+      svc
+        .from("egs_reports")
+        .select("id, kind, message, project_id, url, code_snapshot, status, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50),
+      svc
+        .from("egs_beta_applications")
+        .select(
+          "email, email_verified, name, business_type, build_idea, tech_level, device, willing_feedback, status, created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(200),
+    ]);
   const projectName = new Map((projectRows ?? []).map((p) => [p.id as string, p.name as string]));
 
   const allowlist: AllowlistEntry[] = (allowRows ?? []) as AllowlistEntry[];
@@ -59,6 +69,21 @@ export default async function AdminPage() {
     created_at: (r.created_at as string) ?? "",
     files: Array.isArray(r.code_snapshot) ? (r.code_snapshot as { path: string; content: string }[]) : null,
   }));
+  const APP_STATUS_ORDER: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
+  const applications: BetaApplication[] = ((appRows ?? []) as Record<string, unknown>[])
+    .map((a) => ({
+      email: a.email as string,
+      emailVerified: !!a.email_verified,
+      name: (a.name as string | null) ?? null,
+      businessType: (a.business_type as string | null) ?? null,
+      buildIdea: (a.build_idea as string) ?? "",
+      techLevel: (a.tech_level as string | null) ?? null,
+      device: (a.device as string | null) ?? null,
+      willingFeedback: !!a.willing_feedback,
+      status: (a.status as string) ?? "pending",
+      createdAt: (a.created_at as string) ?? "",
+    }))
+    .sort((x, y) => (APP_STATUS_ORDER[x.status] ?? 9) - (APP_STATUS_ORDER[y.status] ?? 9));
   const providerKeys: Record<LlmProvider, boolean> = {
     claude: !!process.env.ANTHROPIC_API_KEY,
     chatgpt: !!process.env.OPENAI_API_KEY,
@@ -128,6 +153,32 @@ export default async function AdminPage() {
     };
   });
 
+  // per-user aggregates — who is actually generating, how much, and their satisfaction signal
+  const userAgg = new Map<string, { gens: number; tokens: number; up: number; down: number; last: string }>();
+  for (const r of rows) {
+    if (!r.user_id) continue;
+    const cur = userAgg.get(r.user_id) ?? { gens: 0, tokens: 0, up: 0, down: 0, last: "" };
+    cur.gens += 1;
+    cur.tokens += tok(r);
+    if (r.rating === 1) cur.up += 1;
+    if (r.rating === -1) cur.down += 1;
+    if ((r.created_at ?? "") > cur.last) cur.last = r.created_at ?? "";
+    userAgg.set(r.user_id, cur);
+  }
+  const emailById = new Map(users.map((u) => [u.id, u.email]));
+  const armById = new Map(users.map((u) => [u.id, u.arm]));
+  const userMetrics: UserMetric[] = [...userAgg.entries()]
+    .map(([id, v]) => ({
+      email: emailById.get(id) ?? id.slice(0, 8),
+      arm: armById.get(id) ?? ("claude" as LlmProvider),
+      gens: v.gens,
+      tokens: v.tokens,
+      up: v.up,
+      down: v.down,
+      lastActive: v.last || null,
+    }))
+    .sort((a, b) => b.tokens - a.tokens);
+
   // overall token summary
   const totalIn = rows.reduce((a, r) => a + r.input_tokens, 0);
   const totalOut = rows.reduce((a, r) => a + r.output_tokens, 0);
@@ -188,6 +239,8 @@ export default async function AdminPage() {
       daily={daily}
       allowlist={allowlist}
       reports={reports}
+      applications={applications}
+      userMetrics={userMetrics}
       providerKeys={providerKeys}
     />
   );

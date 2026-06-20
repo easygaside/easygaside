@@ -132,6 +132,41 @@ export async function removeAllowlistEmailAction(email: string): Promise<void> {
   revalidatePath("/admin");
 }
 
+/**
+ * Approve a closed-beta applicant: mark the application approved AND add the email to the allowlist
+ * (one click promotes them into the beta). Idempotent on both tables.
+ */
+export async function approveBetaApplicationAction(email: string): Promise<void> {
+  await requireSuperAdmin();
+  const e = email.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error("bad_email");
+  const svc = createServiceClient();
+  const { error: aErr } = await svc
+    .from("egs_beta_applications")
+    .update({ status: "approved", updated_at: new Date().toISOString() })
+    .eq("email", e);
+  if (aErr) throw new Error(`approveBetaApplication: ${aErr.message}`);
+  const { error: lErr } = await svc
+    .from("egs_beta_allowlist")
+    .upsert({ email: e, note: "approved from beta application" }, { onConflict: "email" });
+  if (lErr) throw new Error(`approveBetaApplication allowlist: ${lErr.message}`);
+  revalidatePath("/admin");
+}
+
+/** Reject a closed-beta applicant (also removes them from the allowlist if previously approved). */
+export async function rejectBetaApplicationAction(email: string): Promise<void> {
+  await requireSuperAdmin();
+  const e = email.trim().toLowerCase();
+  const svc = createServiceClient();
+  const { error } = await svc
+    .from("egs_beta_applications")
+    .update({ status: "rejected", updated_at: new Date().toISOString() })
+    .eq("email", e);
+  if (error) throw new Error(`rejectBetaApplication: ${error.message}`);
+  await svc.from("egs_beta_allowlist").delete().eq("email", e);
+  revalidatePath("/admin");
+}
+
 /** Mark a problem report open/done (triage of the failure-capture flywheel). */
 export async function setReportStatusAction(id: string, status: "open" | "done"): Promise<void> {
   await requireSuperAdmin();

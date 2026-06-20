@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import { isSuperAdmin } from "@/lib/admin";
 import { exchangeCode, verifyIdToken } from "@/lib/google-oauth";
 import { storeConnection } from "@/lib/google-connection";
 import { createClient } from "@/lib/supabase/server";
@@ -98,5 +99,7 @@ export async function GET(request: NextRequest) {
     return fail("store_failed");
   }
 
-  return NextResponse.redirect(new URL("/projects", origin));
+  // Superadmins land on the operator console; everyone else on their projects.
+  const dest = isSuperAdmin(existing?.email ?? claims.email) ? "/admin" : "/projects";
+  return NextResponse.redirect(new URL(dest, origin));
 }

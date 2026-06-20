@@ -7,6 +7,7 @@ import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { parseAttachedImages, storeChatImages, type AttachedImage } from "@/lib/chat-images";
 import { resolveProjectProvider, resolveProvider } from "@/lib/llm/provider";
 import { runOpenAiAgentLoop } from "@/lib/openai-agent";
+import { describeImages } from "@/lib/vision-proxy";
 import { logGeneration } from "@/lib/metrics";
 import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
@@ -121,6 +122,18 @@ export async function POST(
 
   // persist attachments to the project's history bucket (best-effort; never blocks the turn)
   if (images.length > 0) await storeChatImages(id, images);
+
+  // Vision proxy: a text-only codegen arm (DeepSeek) can't read images, so have Claude describe the
+  // attached reference images and feed that DESCRIPTION as text to the codegen model. Vision-capable
+  // arms (Claude/GPT-4o/Gemini) receive the image bytes directly in their loop, so they skip this.
+  if (images.length > 0 && !cfg.vision) {
+    const described = await describeImages(images, message);
+    message =
+      (message ? `${message}\n\n` : "") +
+      (described
+        ? `[คำบรรยายรูปอ้างอิงที่ผู้ใช้แนบ — ระบบแปลงจากภาพเป็นข้อความให้ (ผู้ช่วยตัวนี้อ่านรูปเองไม่ได้) ใช้เป็นแนวทางสร้าง UI]\n${described}`
+        : "(ผู้ใช้แนบรูปมา แต่ระบบอ่านรูปไม่ได้ตอนนี้ — ตอบผู้ใช้อย่างสุภาพให้พิมพ์อธิบายรูปเป็นข้อความ)");
+  }
 
   const startedAt = Date.now();
 

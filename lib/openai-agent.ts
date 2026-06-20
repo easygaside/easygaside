@@ -72,9 +72,10 @@ async function runOpenAiTurn(
       ),
   );
 
-  // live user turn (images only for vision-capable providers; DeepSeek is text-only)
+  // live user turn — attach image parts ONLY to vision-capable arms. Text-only arms (DeepSeek/GLM)
+  // get a Claude-generated text description instead (the vision proxy runs in the route).
   const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] | string =
-    images.length && cfg.provider !== "deepseek"
+    images.length && cfg.vision
       ? [
           { type: "text", text: userMessage },
           ...images.map((img) => ({

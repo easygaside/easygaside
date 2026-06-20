@@ -31,6 +31,8 @@ export interface ProviderConfig {
    * histories — the openai loop branches on this flag.
    */
   reasoning?: boolean;
+  /** Vision-capable (accepts image input). Text-only arms (DeepSeek / GLM) must NOT be sent image parts. */
+  vision?: boolean;
 }
 
 export function providerConfig(p: LlmProvider): ProviderConfig {
@@ -43,6 +45,7 @@ export function providerConfig(p: LlmProvider): ProviderConfig {
         model: process.env.OPENAI_MODEL ?? "gpt-4o",
         apiKey: process.env.OPENAI_API_KEY,
         maxOutputTokens: 16000, // gpt-4o hard ceiling ≈ 16,384
+        vision: true,
       };
     case "deepseek":
       // deepseek-chat (V3) is the GA id today and supports tool-calls + json mode (what our codegen +
@@ -80,6 +83,7 @@ export function providerConfig(p: LlmProvider): ProviderConfig {
         baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
         apiKey: process.env.GEMINI_API_KEY,
         maxOutputTokens: 16000,
+        vision: true,
       };
     case "zai":
       // z.ai (Zhipu GLM) — OpenAI-format chat/completions at /paas/v4 (Bearer ZAI_API_KEY). A coding-
@@ -101,6 +105,7 @@ export function providerConfig(p: LlmProvider): ProviderConfig {
         model: "claude-sonnet-4-6",
         apiKey: process.env.ANTHROPIC_API_KEY,
         maxOutputTokens: 32000, // sonnet-4-6 handles ≥64K; the anthropic loop uses its own const too
+        vision: true,
       };
   }
 }

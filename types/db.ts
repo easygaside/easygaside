@@ -65,6 +65,7 @@ export interface EgsDeployment {
   entry_type: DeploymentEntryType;
   exec_url: string | null;
   version_number: number | null;
+  content_hash: string | null; // hash of the files last deployed → re-deploy change-detection
   created_at: string;
   updated_at: string;
 }

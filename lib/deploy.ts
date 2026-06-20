@@ -7,7 +7,7 @@ import {
   updateDeployment,
   type GasFile,
 } from "@/lib/gas-script-api";
-import { getFiles } from "@/lib/files";
+import { getFiles, hashFiles } from "@/lib/files";
 import { getValidAccessToken } from "@/lib/google-connection";
 import { buildWebAppManifest } from "@/lib/manifest";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -59,6 +59,8 @@ export interface DeployResult {
   scriptId: string;
   needsTriggerSetup: boolean;
   scriptEditorUrl: string;
+  /** true when the files were identical to the last deploy → nothing was pushed (URL reused as-is). */
+  unchanged: boolean;
 }
 
 export async function deployProject(
@@ -66,8 +68,39 @@ export async function deployProject(
   project: EgsProject,
 ): Promise<DeployResult> {
   const accessToken = await getValidAccessToken(userId);
-  const apiFiles = await buildApiFiles(project.id);
+  const files = await getFiles(project.id);
+  if (files.length === 0) throw new Error("no_files");
+  const deployHash = hashFiles(files);
   const svc = createServiceClient();
+
+  // Phase 7: trigger detection (auto-run via scripts.run is deferred — needs extra scope; guide instead)
+  const needsTriggerSetup = files.some((f) => INSTALL_TRIGGERS_RE.test(f.content));
+
+  // existing web-app deployment (PATCH target + change-detection baseline)
+  const { data: existingRows } = await svc
+    .from("egs_deployments")
+    .select("*")
+    .eq("project_id", project.id)
+    .eq("entry_type", "webapp")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const existing = (existingRows?.[0] as EgsDeployment | undefined) ?? null;
+
+  // ── short-circuit: files identical to the last successful deploy → skip the whole Google round-trip
+  // (no new script version, no new egs_file_versions snapshot). The /exec URL is stable, so reuse it.
+  if (existing?.content_hash === deployHash && existing.exec_url && project.script_id) {
+    return {
+      execUrl: existing.exec_url,
+      scriptId: project.script_id,
+      needsTriggerSetup,
+      scriptEditorUrl: `https://script.google.com/d/${project.script_id}/edit`,
+      unchanged: true,
+    };
+  }
+
+  const apiFiles = ensureWebAppDeployConfig(
+    toApiFiles(files.map((f) => ({ path: f.path, content: f.content }))),
+  );
 
   // 1. ensure the script exists (reuse forever)
   let scriptId = project.script_id;
@@ -85,22 +118,13 @@ export async function deployProject(
   const versionNumber = await createVersion(accessToken, scriptId, `deploy v${Date.now()}`);
 
   // 3. PATCH the existing web-app deployment (never create new — 20/script cap) or create the first
-  const { data: existingRows } = await svc
-    .from("egs_deployments")
-    .select("*")
-    .eq("project_id", project.id)
-    .eq("entry_type", "webapp")
-    .order("created_at", { ascending: false })
-    .limit(1);
-  const existing = (existingRows?.[0] as EgsDeployment | undefined) ?? null;
-
   let webAppUrl: string | undefined;
   if (existing?.deployment_id) {
     const r = await updateDeployment(accessToken, scriptId, existing.deployment_id, versionNumber, project.name);
     webAppUrl = r.webAppUrl;
     await svc
       .from("egs_deployments")
-      .update({ exec_url: webAppUrl, version_number: versionNumber, updated_at: new Date().toISOString() })
+      .update({ exec_url: webAppUrl, version_number: versionNumber, content_hash: deployHash, updated_at: new Date().toISOString() })
       .eq("id", existing.id);
   } else {
     const r = await createDeployment(accessToken, scriptId, versionNumber, project.name);
@@ -111,18 +135,16 @@ export async function deployProject(
       entry_type: "webapp",
       exec_url: webAppUrl,
       version_number: versionNumber,
+      content_hash: deployHash,
     });
   }
-
-  // Phase 7: trigger detection (auto-run via scripts.run is deferred — needs extra scope; guide instead)
-  const files = await getFiles(project.id);
-  const needsTriggerSetup = files.some((f) => INSTALL_TRIGGERS_RE.test(f.content));
 
   return {
     execUrl: webAppUrl,
     scriptId,
     needsTriggerSetup,
     scriptEditorUrl: `https://script.google.com/d/${scriptId}/edit`,
+    unchanged: false,
   };
 }
 

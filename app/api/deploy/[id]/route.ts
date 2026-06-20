@@ -34,7 +34,8 @@ export async function POST(
   try {
     const target = getTarget(project.target ?? "gas");
     const result = await target.deploy(user.id, project);
-    await snapshotProject(id, "deploy"); // version the exact code that went live
+    // nothing changed → no new code went live, so don't pile up an identical version snapshot
+    if (!result.unchanged) await snapshotProject(id, "deploy"); // version the exact code that went live
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     return mapGoogleError(e, (await getConnectionStatus(user.id)).email);

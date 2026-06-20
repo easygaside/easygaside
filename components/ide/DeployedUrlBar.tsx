@@ -9,6 +9,7 @@ import {
   ClipboardIcon,
 } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
 
 /**
@@ -21,18 +22,19 @@ export function DeployedUrlBar({ url, projectId }: { url: string; projectId: str
   const [copied, setCopied] = useState(false);
   const [devBusy, setDevBusy] = useState(false);
   const [deployBusy, setDeployBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const actionRequest = useProjectStore((s) => s.actionRequest);
   const clearActionRequest = useProjectStore((s) => s.clearActionRequest);
 
-  // command palette → "เปิด /dev" / "deploy ใหม่"
+  // command palette → "เปิด /dev" / "deploy ใหม่" (the latter still routes through the confirm modal)
   useEffect(() => {
     if (actionRequest === "openDev") {
       clearActionRequest();
       openDev();
     } else if (actionRequest === "redeploy") {
       clearActionRequest();
-      redeploy();
+      setConfirmOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actionRequest]);
@@ -100,14 +102,18 @@ export function DeployedUrlBar({ url, projectId }: { url: string; projectId: str
     try {
       const r = await fetch(`/api/deploy/${projectId}`, { method: "POST" });
       const data = await r.json();
-      if (r.ok) setNote("อัปเดตแล้ว ✓ (ลิงก์เดิม)");
+      if (r.ok)
+        // server short-circuits when files are identical → tell the user nothing needed deploying
+        setNote(data.unchanged ? "ไม่มีการเปลี่ยนแปลง — ลิงก์ล่าสุดอยู่แล้ว ✓" : "อัปเดตแล้ว ✓ (ลิงก์เดิม)");
       else if (data.error === "USER_SETTINGS_DISABLED")
         setNote("ต้องเปิด Apps Script API ก่อน — ใช้ปุ่ม Deploy ด้านบน");
+      else if (data.error === "rate_limited") setNote(data.message ?? "deploy ถี่เกินไป — รอสักครู่");
       else setNote("deploy ไม่สำเร็จ ลองใหม่");
     } catch {
       setNote("deploy ไม่สำเร็จ");
     } finally {
       setDeployBusy(false);
+      setConfirmOpen(false);
     }
   }
 
@@ -141,7 +147,7 @@ export function DeployedUrlBar({ url, projectId }: { url: string; projectId: str
       </Tooltip>
       <Tooltip label="deploy โค้ดล่าสุดทับเวอร์ชันเดิม (ลิงก์ /exec เดิม)" placement="bottom" className="shrink-0">
         <button
-          onClick={redeploy}
+          onClick={() => setConfirmOpen(true)}
           disabled={deployBusy}
           className={`${ICON_BTN} text-slate-600 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-200`}
         >
@@ -164,6 +170,22 @@ export function DeployedUrlBar({ url, projectId }: { url: string; projectId: str
       >
         เปิด <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
       </a>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="deploy โค้ดล่าสุดทับเวอร์ชันเดิม?"
+        body={
+          <>
+            จะอัปเดตแอปที่เผยแพร่อยู่ด้วยโค้ดปัจจุบัน โดยใช้ <b>ลิงก์ /exec เดิม</b> (คนที่มีลิงก์อยู่แล้วใช้ได้ต่อ)
+            <br />
+            ถ้าโค้ดไม่มีการเปลี่ยนแปลง ระบบจะข้ามให้อัตโนมัติ
+          </>
+        }
+        confirmLabel="deploy ใหม่"
+        busy={deployBusy}
+        onConfirm={redeploy}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   RocketLaunchIcon,
 } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
 
 type Result =
@@ -37,6 +38,7 @@ export function DeployButton({
   onDeployed?: (execUrl: string) => void;
 }) {
   const [res, setRes] = useState<Result>({ kind: "idle" });
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const actionRequest = useProjectStore((s) => s.actionRequest);
   const clearActionRequest = useProjectStore((s) => s.clearActionRequest);
 
@@ -44,11 +46,12 @@ export function DeployButton({
   useEffect(() => {
     if (actionRequest !== "deploy" || res.kind === "busy") return;
     clearActionRequest();
-    deploy();
+    setConfirmOpen(true); // confirm first, then deploy
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actionRequest]);
 
   async function deploy() {
+    setConfirmOpen(false);
     setRes({ kind: "busy" });
     try {
       const r = await fetch(`/api/deploy/${projectId}`, { method: "POST" });
@@ -95,7 +98,7 @@ export function DeployButton({
           className="shrink-0"
         >
           <button
-            onClick={deploy}
+            onClick={() => setConfirmOpen(true)}
             disabled={res.kind === "busy" || deployed}
             aria-label={deployed ? "Deploy แล้ว" : undefined}
             className={`flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.3)] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 ${
@@ -123,6 +126,21 @@ export function DeployButton({
           </button>
         </Tooltip>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Deploy เข้าบัญชี Google ของคุณ?"
+        body={
+          <>
+            ระบบจะสร้าง/อัปเดตแอปนี้ในบัญชี Google ของคุณเอง แล้วให้ลิงก์ <b>/exec</b> สำหรับเปิดใช้งานจริง
+            <br />
+            ครั้งแรก Google จะขอให้คุณอนุญาตสิทธิ์ของสคริปต์หนึ่งครั้ง
+          </>
+        }
+        confirmLabel="Deploy เลย"
+        onConfirm={deploy}
+        onCancel={() => setConfirmOpen(false)}
+      />
 
       {res.kind !== "idle" && res.kind !== "busy" && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm">

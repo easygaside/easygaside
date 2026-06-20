@@ -22,6 +22,7 @@ import {
   setProviderModelAction,
   setProviderTankAction,
   setUserArmAction,
+  setVisionProviderAction,
 } from "@/app/admin/actions";
 import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/catalog";
 import { AllowlistManager, type AllowlistEntry } from "./AllowlistManager";
@@ -181,6 +182,7 @@ export function AdminPanel({
   criticProvider,
   criticModel,
   criticKeyReady,
+  visionProvider,
   summary,
   projects,
   daily,
@@ -201,6 +203,7 @@ export function AdminPanel({
   criticProvider: "claude" | "deepseek";
   criticModel: string;
   criticKeyReady: boolean;
+  visionProvider: "gemini" | "chatgpt" | "claude";
   summary: TokenSummary;
   projects: ProjectTokens[];
   daily: DailyPoint[];
@@ -250,6 +253,7 @@ export function AdminPanel({
   const saveCritic = () => run(() => setCriticAction(criticProviderDraft, criticModelDraft));
   const setDefault = (p: LlmProvider) => run(() => setDefaultProviderAction(p));
   const setArm = (userId: string, arm: LlmProvider) => run(() => setUserArmAction(userId, arm));
+  const setVision = (p: "gemini" | "chatgpt" | "claude") => run(() => setVisionProviderAction(p));
   function balance() {
     if (!confirm("แบ่งผู้ใช้ทั้งหมดเป็นกลุ่มเท่า ๆ กัน (เขียนทับ arm เดิม)?")) return;
     run(() => autoBalanceArmsAction());
@@ -510,6 +514,34 @@ export function AdminPanel({
               <span className={criticKeyReady ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
                 {criticKeyReady ? `✓ API key ของ ${criticProvider} พร้อมใช้งาน` : `✗ ไม่มี API key ของ ${criticProvider} (env) — critic จะรันไม่ได้`}
               </span>
+            </p>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 p-4 dark:border-slate-700/60">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">ตัวถอดรูป (Vision proxy)</h2>
+            <p className="mb-3 mt-1 text-xs text-slate-500 dark:text-slate-400">
+              เมื่อผู้ใช้แนบรูปกับผู้ช่วยที่อ่านรูปไม่ได้ (เช่น DeepSeek) ระบบใช้ตัวนี้อ่านรูป → แปลงเป็นข้อความ → ส่งต่อให้ตัวเขียนโค้ด
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {(["gemini", "chatgpt", "claude"] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setVision(p)}
+                  disabled={busy}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                    visionProvider === p
+                      ? "bg-emerald-500 text-white"
+                      : "border border-slate-200 text-slate-500 hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-400 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {p}
+                  {visionProvider === p ? " ✓" : ""}
+                  {!providerKeys[p] && <span className="ml-1 text-red-500">✗key</span>}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+              ถ้าตัวที่เลือกไม่มี API key ระบบจะ fallback ไปตัวที่มี key ให้อัตโนมัติ (gemini → chatgpt → claude)
             </p>
           </section>
         </div>

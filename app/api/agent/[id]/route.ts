@@ -123,16 +123,22 @@ export async function POST(
   // persist attachments to the project's history bucket (best-effort; never blocks the turn)
   if (images.length > 0) await storeChatImages(id, images);
 
-  // Vision proxy: a text-only codegen arm (DeepSeek) can't read images, so have Claude describe the
-  // attached reference images and feed that DESCRIPTION as text to the codegen model. Vision-capable
-  // arms (Claude/GPT-4o/Gemini) receive the image bytes directly in their loop, so they skip this.
-  if (images.length > 0 && !cfg.vision) {
+  // Vision proxy: describe attached images as text and PERSIST it in the message. Raw images are sent
+  // to the model only on the turn they're attached (never kept in egs_messages, to avoid re-billing),
+  // so a stored description is what lets EVERY arm still understand "รูปด้านบน" in later turns without
+  // the user re-attaching. Text-only arms (DeepSeek) rely on it entirely; vision arms (Claude/GPT-4o/
+  // Gemini) also receive the bytes live this turn (their loop attaches them).
+  if (images.length > 0) {
     const described = await describeImages(images, message);
-    message =
-      (message ? `${message}\n\n` : "") +
-      (described
-        ? `[คำบรรยายรูปอ้างอิงที่ผู้ใช้แนบ — ระบบแปลงจากภาพเป็นข้อความให้ (ผู้ช่วยตัวนี้อ่านรูปเองไม่ได้) ใช้เป็นแนวทางสร้าง UI]\n${described}`
-        : "(ผู้ใช้แนบรูปมา แต่ระบบอ่านรูปไม่ได้ตอนนี้ — ตอบผู้ใช้อย่างสุภาพให้พิมพ์อธิบายรูปเป็นข้อความ)");
+    if (described) {
+      message =
+        (message ? `${message}\n\n` : "") +
+        `[คำบรรยายรูปที่ผู้ใช้แนบ — เก็บเป็นข้อความไว้ให้อ้างอิง "รูปด้านบน" ในเทิร์นถัดไปได้ด้วย]\n${described}`;
+    } else if (!cfg.vision) {
+      message =
+        (message ? `${message}\n\n` : "") +
+        "(ผู้ใช้แนบรูปมา แต่ระบบอ่านรูปไม่ได้ตอนนี้ — ตอบผู้ใช้อย่างสุภาพให้พิมพ์อธิบายรูปเป็นข้อความ)";
+    }
   }
 
   const startedAt = Date.now();

@@ -121,6 +121,9 @@ export default async function AdminPage() {
   const criticKeyReady =
     criticProvider === "claude" ? !!process.env.ANTHROPIC_API_KEY : !!process.env.DEEPSEEK_API_KEY;
 
+  // vision proxy: which vision arm describes attached images for text-only codegen arms
+  const visionProvider = (appSettings.get("vision_provider") ?? "gemini") as "gemini" | "chatgpt" | "claude";
+
   const armByUser = new Map(
     (settings ?? []).map((s) => [s.user_id as string, s.llm_provider as LlmProvider | null]),
   );
@@ -234,6 +237,7 @@ export default async function AdminPage() {
       criticProvider={criticProvider}
       criticModel={criticModel}
       criticKeyReady={criticKeyReady}
+      visionProvider={visionProvider}
       summary={summary}
       projects={projects}
       daily={daily}

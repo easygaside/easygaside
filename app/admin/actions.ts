@@ -112,6 +112,15 @@ export async function setCriticAction(provider: string, model: string): Promise<
   revalidatePath("/admin");
 }
 
+/** Set the vision-proxy arm — which vision model describes attached images for text-only codegen arms. */
+export async function setVisionProviderAction(provider: string): Promise<void> {
+  await requireSuperAdmin();
+  if (provider !== "gemini" && provider !== "chatgpt" && provider !== "claude")
+    throw new Error("bad_vision_provider");
+  await setAppSetting("vision_provider", provider);
+  revalidatePath("/admin");
+}
+
 /** Beta allowlist: add an email (who can use the closed beta). Idempotent. */
 export async function addAllowlistEmailAction(email: string): Promise<void> {
   await requireSuperAdmin();

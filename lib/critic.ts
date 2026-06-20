@@ -26,8 +26,9 @@ const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 
 /** The stock model for a critic backend when no explicit model is configured. */
 function defaultCriticModel(p: CriticProvider): string {
-  // deepseek-chat deprecates 2026-07-24 → use the GA id deepseek-v4-flash (its non-thinking mode).
-  return p === "claude" ? "claude-haiku-4-5-20251001" : "deepseek-v4-flash";
+  // deepseek-chat = current GA, supports json mode. Deprecates 2026-07-24 → confirm DeepSeek's GA
+  // replacement id and update before then. (Only a fallback; the live critic model is admin-set.)
+  return p === "claude" ? "claude-haiku-4-5-20251001" : "deepseek-chat";
 }
 
 interface CriticConfig {

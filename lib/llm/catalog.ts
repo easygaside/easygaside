@@ -25,6 +25,12 @@ export interface ProviderConfig {
    * DeepSeek V4 (flash/pro) allows up to 384K; Claude ≥64K.
    */
   maxOutputTokens: number;
+  /**
+   * Thinking/reasoning model (DeepSeek V4 Pro). These 400 if `tool_choice` is sent, and stream a
+   * separate `reasoning_content` that must be preserved on assistant messages in multi-turn tool
+   * histories — the openai loop branches on this flag.
+   */
+  reasoning?: boolean;
 }
 
 export function providerConfig(p: LlmProvider): ProviderConfig {
@@ -39,16 +45,18 @@ export function providerConfig(p: LlmProvider): ProviderConfig {
         maxOutputTokens: 16000, // gpt-4o hard ceiling ≈ 16,384
       };
     case "deepseek":
-      // DeepSeek "flash" arm. deepseek-chat/deepseek-reasoner deprecate 2026-07-24 → default to the
-      // GA id deepseek-v4-flash (non-thinking), which they map to. 384K output ceiling.
+      // deepseek-chat (V3) is the GA id today and supports tool-calls + json mode (what our codegen +
+      // critic need). NOTE: deepseek-chat/deepseek-reasoner are slated to deprecate 2026-07-24 —
+      // confirm DeepSeek's actual GA replacement id (their docs name deepseek-v4-flash, UNVERIFIED on
+      // the live API) and update this + the DB before then. 8K output ceiling.
       return {
         provider: "deepseek",
         family: "openai",
         label: "DeepSeek",
-        model: process.env.DEEPSEEK_MODEL ?? "deepseek-v4-flash",
+        model: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
         baseURL: "https://api.deepseek.com",
         apiKey: process.env.DEEPSEEK_API_KEY,
-        maxOutputTokens: 32000,
+        maxOutputTokens: 8000,
       };
     case "deepseek-pro":
       // DeepSeek V4 Pro — stronger/pricier variant (deepseek=flash). Same DeepSeek key + endpoint.
@@ -61,6 +69,7 @@ export function providerConfig(p: LlmProvider): ProviderConfig {
         baseURL: "https://api.deepseek.com",
         apiKey: process.env.DEEPSEEK_API_KEY,
         maxOutputTokens: 64000,
+        reasoning: true, // V4 Pro thinking model: omit tool_choice + preserve reasoning_content
       };
     case "gemini":
       return {

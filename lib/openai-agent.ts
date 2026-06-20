@@ -27,6 +27,16 @@ const AUTO_CONTINUE_MAX = 2; // auto-fire "ทำต่อ" this many times when
 
 type Msg = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
+/**
+ * DeepSeek thinking models (V4 Pro) stream a separate `reasoning_content` channel and REQUIRE it
+ * preserved on assistant messages in multi-turn tool histories (else a 400). Attach it for those
+ * arms; a no-op everywhere else.
+ */
+function withReasoning(msg: Msg, reasoning: string, isReasoning?: boolean): Msg {
+  if (isReasoning && reasoning) (msg as { reasoning_content?: string }).reasoning_content = reasoning;
+  return msg;
+}
+
 const OPENAI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = EGS_TOOLS.map((t) => ({
   type: "function",
   function: { name: t.name, description: t.description, parameters: t.input_schema as Record<string, unknown> },
@@ -86,17 +96,21 @@ async function runOpenAiTurn(
   let cacheReadTokens = 0; // OpenAI-format providers (DeepSeek/z.ai/…) auto-cache; capture the split
 
   for (let iter = 0; iter < (internal ? REPAIR_MAX_ITERATIONS : MAX_ITERATIONS); iter++) {
-    const stream = await client.chat.completions.create({
+    const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
       model: cfg.model,
       max_tokens: cfg.maxOutputTokens ?? MAX_TOKENS_FALLBACK,
       messages,
       tools: OPENAI_TOOLS,
-      tool_choice: forcedToolRetry ? "required" : "auto",
       stream: true,
       stream_options: { include_usage: true },
-    });
+    };
+    // DeepSeek thinking models (V4 Pro) return a 400 if tool_choice is sent — let the model decide.
+    // Other arms keep the explicit choice (auto, or "required" on the forced-tool retry).
+    if (!cfg.reasoning) params.tool_choice = forcedToolRetry ? "required" : "auto";
+    const stream = await client.chat.completions.create(params);
 
     let text = "";
+    let reasoning = ""; // DeepSeek thinking-model chain-of-thought (separate channel); preserved in history
     const toolAcc = new Map<string | number, { id: string; name: string; args: string }>();
     let lastToolKey: string | number | null = null;
     let toolSeq = 0;
@@ -118,6 +132,8 @@ async function runOpenAiTurn(
         emittedText = true;
         emit({ type: "text", delta: delta.content });
       }
+      const rc = (delta as { reasoning_content?: string } | undefined)?.reasoning_content;
+      if (rc) reasoning += rc;
       for (const tc of delta?.tool_calls ?? []) {
         // OpenAI always sends a numeric `index`; Gemini's OpenAI-compat layer often OMITS it (and may
         // deliver a whole call in one delta). Key by index when present; otherwise start a new entry
@@ -168,21 +184,27 @@ async function runOpenAiTurn(
         forcedToolRetry = true;
         continue; // re-run this step; any text already streamed stands as a preamble
       }
-      messages.push({ role: "assistant", content: text });
+      messages.push(withReasoning({ role: "assistant", content: text }, reasoning, cfg.reasoning));
       break;
     }
     forcedToolRetry = false; // got tool calls → relax back to auto for subsequent steps
 
     // assistant turn that requested tools
-    messages.push({
-      role: "assistant",
-      content: text || null,
-      tool_calls: calls.map((c) => ({
-        id: c.id,
-        type: "function",
-        function: { name: c.name, arguments: c.args || "{}" },
-      })),
-    });
+    messages.push(
+      withReasoning(
+        {
+          role: "assistant",
+          content: text || null,
+          tool_calls: calls.map((c) => ({
+            id: c.id,
+            type: "function",
+            function: { name: c.name, arguments: c.args || "{}" },
+          })),
+        },
+        reasoning,
+        cfg.reasoning,
+      ),
+    );
 
     for (const c of calls) {
       let input: Record<string, unknown> = {};

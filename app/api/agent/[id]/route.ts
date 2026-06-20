@@ -16,6 +16,23 @@ export const runtime = "nodejs";
 export const maxDuration = 300; // needs Vercel Pro for >60s; fine for local dev
 
 /**
+ * Turn a thrown agent/provider error into a short, user-facing reason so the chat shows WHY a turn
+ * failed (e.g. a bad model id → "[400] Model Not Exist") instead of an opaque "agent_error". Strips
+ * anything secret-looking and bounds the length; the full error is still in the server logs.
+ */
+function agentErrorMessage(e: unknown): string {
+  const status = (e as { status?: number } | null)?.status;
+  let detail = (e instanceof Error ? e.message : String(e))
+    .replace(/sk-[A-Za-z0-9_-]{8,}/g, "[redacted]")
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (detail.length > 240) detail = detail.slice(0, 240) + "…";
+  const head = typeof status === "number" ? `[${status}] ` : "";
+  return detail ? `ระบบขัดข้อง: ${head}${detail}` : "ระบบขัดข้อง — ลองใหม่อีกครั้ง";
+}
+
+/**
  * POST /api/agent/[id]  body: { message: string }
  * Streams the agent loop as SSE (text deltas, tool_call, file_mutation, lint, done).
  */
@@ -152,7 +169,7 @@ export async function POST(
           durationMs: Date.now() - startedAt,
           outcome: "error",
         }).catch(() => {});
-        emit({ type: "error", message: "agent_error" });
+        emit({ type: "error", message: agentErrorMessage(e) });
         emit({ type: "done" });
       } finally {
         await releaseProjectRun(id); // always free the per-project lock

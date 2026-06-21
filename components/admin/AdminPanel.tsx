@@ -308,21 +308,65 @@ export function AdminPanel({
     { id: "reports", label: "รายงาน", icon: FlagIcon, badge: openReports },
   ];
 
+  const activeLabel = TABS.find((t) => t.id === tab)?.label ?? "";
+
   return (
-    <main className="mx-auto min-h-screen max-w-4xl px-4 pb-28 pt-8 sm:px-6">
-      <Link
-        href="/projects"
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400"
-      >
-        <ArrowLeftIcon className="h-4 w-4" />
-        กลับไปหน้าโปรเจกต์
-      </Link>
-      <h1 className="text-xl font-bold sm:text-2xl">Admin — ข้อมูล &amp; ตั้งค่า</h1>
+    <div className="mx-auto flex min-h-screen w-full max-w-[1400px] lg:gap-8 lg:px-6">
+      {/* ── desktop sidebar nav (lg+) — replaces the bottom bar on wide screens ── */}
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-1 border-r border-slate-200 px-3 py-6 lg:flex dark:border-slate-800">
+        <Link
+          href="/projects"
+          className="mb-4 inline-flex items-center gap-1.5 px-2 text-sm text-slate-500 transition hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400"
+        >
+          <ArrowLeftIcon className="h-4 w-4" />
+          กลับไปหน้าโปรเจกต์
+        </Link>
+        <h1 className="mb-3 px-2 text-lg font-bold">Admin</h1>
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                active
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
+            >
+              <Icon className="h-5 w-5 shrink-0" />
+              <span className="flex-1 text-left">{t.label}</span>
+              {!!t.badge && t.badge > 0 && (
+                <span className="grid h-5 min-w-5 place-items-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                  {t.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </aside>
+
+      {/* ── main content column ── */}
+      <main className="min-w-0 flex-1 px-4 pb-28 pt-8 sm:px-6 lg:pb-10">
+        {/* mobile header (the sidebar carries this on desktop) */}
+        <div className="lg:hidden">
+          <Link
+            href="/projects"
+            className="mb-5 inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            กลับไปหน้าโปรเจกต์
+          </Link>
+          <h1 className="text-xl font-bold sm:text-2xl">Admin — ข้อมูล &amp; ตั้งค่า</h1>
+        </div>
+        {/* desktop section title */}
+        <h1 className="hidden text-2xl font-bold lg:block">{activeLabel}</h1>
 
       {/* ───────── ภาพรวม ───────── */}
       {tab === "overview" && (
         <div className="mt-5 space-y-6">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {[
               { label: "Token รวมทั้งหมด", value: fmt(summary.totalTokens), accent: true },
               { label: "Token เฉลี่ย/โปรเจกต์", value: fmt(summary.avgPerProject) },
@@ -358,7 +402,7 @@ export function AdminPanel({
                 ⬇ Export CSV
               </a>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <Bars title="Token รวม" items={metrics.map((m) => ({ label: m.provider, value: m.inTok + m.outTok, color: ARM_COLOR[m.provider] }))} />
               <Bars title="จำนวน generation" items={metrics.map((m) => ({ label: m.provider, value: m.gens, color: ARM_COLOR[m.provider] }))} />
               <Bars title="เวลาเฉลี่ย/gen (วินาที)" items={metrics.map((m) => ({ label: m.provider, value: m.avgSec, color: ARM_COLOR[m.provider] }))} unit="s" />
@@ -411,7 +455,7 @@ export function AdminPanel({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
             {[
               { label: `รายรับ ${selMonth}`, value: baht(revenueMonthThb), tone: "rev" as const },
               { label: "รายรับรวมทั้งหมด", value: baht(finance.revenueTotalThb), tone: "rev" as const },
@@ -838,8 +882,8 @@ export function AdminPanel({
         </div>
       )}
 
-      {/* ───────── bottom menu (responsive, all sizes) ───────── */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+      {/* ───────── mobile bottom menu (hidden on lg — sidebar takes over) ───────── */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-900/90">
         <div className="mx-auto flex max-w-md items-stretch justify-around px-2">
           {TABS.map((t) => {
             const active = tab === t.id;
@@ -865,6 +909,7 @@ export function AdminPanel({
           })}
         </div>
       </nav>
-    </main>
+      </main>
+    </div>
   );
 }

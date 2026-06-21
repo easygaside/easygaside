@@ -42,16 +42,25 @@ function redirectUri(): string {
   return uri;
 }
 
-/** Build the consent URL. `state` is a CSRF token we verify on callback. */
-export function buildAuthUrl(state: string): string {
+/**
+ * Build the consent URL. `state` is a CSRF token we verify on callback.
+ *
+ * `access_type=offline` returns a refresh_token on the FIRST grant (and on any re-grant).
+ * Google only re-issues a refresh_token when consent is shown, so:
+ *  - default (`prompt=select_account`) → returning users skip the scope screen; Google returns
+ *    NO refresh_token, and the callback reuses the one we already stored. Smooth repeat logins.
+ *    `select_account` also lets multi-account users pick which Google account to use.
+ *  - `forceConsent` (`prompt=consent`) → guarantees a fresh refresh_token. Used only when we have
+ *    no stored token yet (first connect, or a reconnect after revoke/needs_reauth).
+ */
+export function buildAuthUrl(state: string, forceConsent = false): string {
   const params = new URLSearchParams({
     client_id: clientId(),
     redirect_uri: redirectUri(),
     response_type: "code",
     scope: GOOGLE_SCOPES.join(" "),
-    // offline + consent → always returns a refresh_token, even on re-grant.
     access_type: "offline",
-    prompt: "consent",
+    prompt: forceConsent ? "consent" : "select_account",
     include_granted_scopes: "true",
     state,
   });

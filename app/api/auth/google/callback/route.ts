@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSuperAdmin } from "@/lib/admin";
 import { exchangeCode, verifyIdToken } from "@/lib/google-oauth";
-import { storeConnection } from "@/lib/google-connection";
+import { storeConnection, updateConnectionMeta } from "@/lib/google-connection";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
   } catch {
     return fail("exchange_failed");
   }
-  if (!tokens.refresh_token) return fail("no_refresh_token"); // guarded by prompt=consent
+  // No refresh_token is expected on returning logins (prompt=select_account, already consented) —
+  // we reuse the stored one below. The id_token is always required: it's how we sign the user in.
   if (!tokens.id_token) return fail("no_id_token");
 
   // H-3: verify the id_token signature (Google JWKS) + iss/aud/exp before trusting any claim.
@@ -88,13 +89,28 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    await storeConnection({
-      userId,
-      googleSub: claims.sub,
-      scope: tokens.scope,
-      refreshToken: tokens.refresh_token,
-      email: claims.email ?? null,
-    });
+    if (tokens.refresh_token) {
+      // Fresh grant (first connect / re-consent) → store the new encrypted refresh token.
+      await storeConnection({
+        userId,
+        googleSub: claims.sub,
+        scope: tokens.scope,
+        refreshToken: tokens.refresh_token,
+        email: claims.email ?? null,
+      });
+    } else {
+      // Returning user, no new refresh token → keep the stored one, refresh only the metadata.
+      const updated = await updateConnectionMeta({
+        userId,
+        googleSub: claims.sub,
+        scope: tokens.scope,
+        email: claims.email ?? null,
+      });
+      // No stored connection to reuse → force a one-time consent to mint a refresh token.
+      if (!updated) {
+        return NextResponse.redirect(new URL("/api/auth/google/start?reconsent=1", origin));
+      }
+    }
   } catch {
     return fail("store_failed");
   }

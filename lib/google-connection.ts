@@ -48,6 +48,35 @@ export async function storeConnection(params: {
 }
 
 /**
+ * Refresh-token-free update of a connection's metadata. Used by the OAuth callback when a
+ * returning user logs in without re-consenting (Google returns no refresh_token): we keep the
+ * already-stored token and only refresh scope/email and reactivate the row. Returns false when
+ * there's no existing row to update — the caller then forces a fresh consent.
+ */
+export async function updateConnectionMeta(params: {
+  userId: string;
+  googleSub: string;
+  scope: string;
+  email?: string | null;
+}): Promise<boolean> {
+  const svc = createServiceClient();
+  const { data, error } = await svc
+    .from(TABLE)
+    .update({
+      google_sub: params.googleSub,
+      scope: params.scope,
+      email: params.email ?? null,
+      status: "active",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", params.userId)
+    .select("user_id")
+    .maybeSingle<{ user_id: string }>();
+  if (error) throw new Error(`Failed to update Google connection: ${error.message}`);
+  return !!data;
+}
+
+/**
  * Return a fresh access token for the user, minted from the stored refresh token.
  * Phase 0 mints on every call (simple + correct); a later phase can cache by expiry.
  */

@@ -149,20 +149,9 @@ export default function BetaApplyPage() {
                   <GoogleG className="h-5 w-5" />
                   สมัครด้วย Google
                 </button>
-                <div className="my-3.5 flex items-center gap-3 text-[11px] text-slate-400 dark:text-slate-500">
-                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-                  หรือกรอกอีเมล
-                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-                </div>
-                <label htmlFor="b-email" className={LABEL}>อีเมล (Gmail ที่จะใช้กับ EasyGAS)</label>
-                <input
-                  id="b-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@gmail.com"
-                  className={FIELD}
-                />
+                <p className="mt-2.5 text-center text-[12px] text-slate-400 dark:text-slate-500">
+                  สมัครด้วยบัญชี Google ที่จะใช้กับ EasyGAS
+                </p>
               </>
             )}
           </div>
@@ -215,11 +204,11 @@ export default function BetaApplyPage() {
 
           <button
             onClick={submit}
-            disabled={submitting}
+            disabled={submitting || !googleVerified}
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(16,185,129,0.35)] transition hover:bg-emerald-400 disabled:opacity-50"
           >
             <RocketLaunchIcon className="h-5 w-5" />
-            {submitting ? "กำลังส่งใบสมัคร…" : "ส่งใบสมัคร"}
+            {submitting ? "กำลังส่งใบสมัคร…" : googleVerified ? "ส่งใบสมัคร" : "ยืนยันด้วย Google ก่อนส่งใบสมัคร"}
           </button>
           <p className="mt-2.5 text-center text-[11px] text-slate-400 dark:text-slate-500">
             สมัครฟรี · เราใช้อีเมลนี้เพื่อแจ้งผลการคัดเลือกเท่านั้น

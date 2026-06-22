@@ -105,11 +105,7 @@ export default async function ProjectsPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight">อยากสร้างอะไรดีวันนี้? 👋</h1>
           <p className="mt-1.5 max-w-xl text-sm text-slate-500 dark:text-slate-400">
-            พิมพ์บอก AI ว่าอยากได้ระบบอะไร แล้วได้เครื่องมือ Google Apps Script จริง — หรือเริ่มจาก{" "}
-            <Link href="/styleshopping" className="font-medium text-emerald-600 underline dark:text-emerald-400">
-              เลือกสไตล์
-            </Link>{" "}
-            ก็ได้
+            รายชื่อโปรเจ็คที่สร้างไว้แล้ว หรือสร้างใหม่ โดยตั้งชื่อและกดปุ่ม สร้างโปรเจ็ค
           </p>
         </div>
 

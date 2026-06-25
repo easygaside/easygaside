@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircleIcon, Cog6ToothIcon, ExclamationTriangleIcon, FolderIcon, InboxIcon, RocketLaunchIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { AppsScriptEnableNotice } from "@/components/AppsScriptEnableNotice";
 import { AppTopBar } from "@/components/AppTopBar";
 import { CreateProjectBar } from "@/components/projects/CreateProjectBar";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getAccessGate } from "@/lib/beta";
-import { getConnectionStatus } from "@/lib/google-connection";
+import { getAppsScriptReadiness, getConnectionStatus } from "@/lib/google-connection";
 import { getCurrentUser, getDeployedMap, listProjects } from "@/lib/projects";
 
 export const metadata = { title: "โปรเจกต์ของฉัน — EasyGAS" };
@@ -19,11 +20,15 @@ export default async function ProjectsPage() {
   const gate = await getAccessGate(userId, user.email);
   if (!gate.allowed) redirect("/waitlist");
 
-  const [projects, conn, deployed] = await Promise.all([
+  const [projects, conn, deployed, readiness] = await Promise.all([
     listProjects(),
     getConnectionStatus(userId),
     getDeployedMap(),
+    getAppsScriptReadiness(userId),
   ]);
+  // Connected, but the per-user Apps Script API toggle is still off → block deploy with a fix-it card.
+  const needsApiEnable =
+    readiness.state === "needs_user_enable" || readiness.state === "needs_project_enable";
   const deployedCount = projects.filter((p) => deployed[p.id]).length;
   const accountMismatch =
     conn.connected &&
@@ -117,6 +122,16 @@ export default async function ProjectsPage() {
               {needsReauth ? "เชื่อม Google ใหม่ →" : "เชื่อมต่อ Google →"}
             </Link>
           </div>
+        </div>
+      )}
+
+      {needsApiEnable && (
+        <div className="relative mx-auto mt-3 max-w-5xl px-6">
+          <AppsScriptEnableNotice
+            enableUrl={readiness.state === "needs_user_enable" || readiness.state === "needs_project_enable" ? readiness.enableUrl : ""}
+            reloadHref="/projects"
+            projectLevel={readiness.state === "needs_project_enable"}
+          />
         </div>
       )}
 

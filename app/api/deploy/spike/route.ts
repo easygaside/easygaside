@@ -7,7 +7,7 @@ import {
   UserSettingsDisabledError,
 } from "@/lib/errors";
 import { userSettingsUrl } from "@/lib/api-helpers";
-import { getConnectionStatus, getValidAccessToken } from "@/lib/google-connection";
+import { getConnectionStatus, getValidAccessToken, markAppsScriptReady } from "@/lib/google-connection";
 import {
   createDeployment,
   createProject,
@@ -124,7 +124,10 @@ export async function POST() {
       version_number: versionNumber,
     });
 
-    // 5. Done.
+    // 5. A successful deploy proves the per-user Apps Script API toggle is on — cache it.
+    await markAppsScriptReady(user.id);
+
+    // 6. Done.
     return NextResponse.json({ ok: true, scriptId, deploymentId, execUrl: webAppUrl });
   } catch (err) {
     if (err instanceof UserSettingsDisabledError) {

@@ -59,6 +59,24 @@ async function gasFetch<T>(
   return (text ? JSON.parse(text) : {}) as T;
 }
 
+/**
+ * Non-destructive readiness probe for the per-user Apps Script API toggle
+ * (script.google.com/home/usersettings). We GET a non-existent project: the usersettings and
+ * SERVICE_DISABLED gates are evaluated at the API edge BEFORE resource lookup, so a DISABLED API
+ * throws UserSettingsDisabledError / ProjectApiDisabledError here. An ENABLED API instead 404s
+ * (or permission-denies) the fake id — which we swallow → "ready". Creates nothing in the account.
+ */
+export async function probeAppsScriptEnabled(accessToken: string): Promise<void> {
+  try {
+    await gasFetch(accessToken, "/projects/easygasReadinessProbeNonexistent000000000000", {
+      method: "GET",
+    });
+  } catch (e) {
+    if (e instanceof UserSettingsDisabledError || e instanceof ProjectApiDisabledError) throw e;
+    // 404 / permission / any other response means the call passed the enable gate → API is on.
+  }
+}
+
 /** Map editor files (Code.gs, Index.html, appsscript.json) to the API's file objects. */
 export function toApiFiles(
   files: { path: string; content: string }[],

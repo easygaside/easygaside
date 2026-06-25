@@ -1,5 +1,12 @@
+import { userSettingsUrl } from "./api-helpers";
 import { decrypt, encrypt } from "./crypto";
-import { NeedsReauthError, NotConnectedError } from "./errors";
+import {
+  NeedsReauthError,
+  NotConnectedError,
+  ProjectApiDisabledError,
+  UserSettingsDisabledError,
+} from "./errors";
+import { probeAppsScriptEnabled } from "./gas-script-api";
 import { refreshAccessToken } from "./google-oauth";
 import { createServiceClient } from "./supabase/service";
 
@@ -19,6 +26,15 @@ interface ConnectionRow {
   refresh_token_tag: string;
   status: string;
 }
+
+/** Readiness of the per-user Apps Script API toggle (script.google.com/home/usersettings). */
+export type AppsScriptReadiness =
+  | { state: "not_connected" }
+  | { state: "needs_reauth" }
+  | { state: "ready" }
+  | { state: "needs_user_enable"; enableUrl: string } // the per-user usersettings wall
+  | { state: "needs_project_enable"; enableUrl: string } // our Cloud project (rare, app-config)
+  | { state: "unknown" }; // probe couldn't decide — don't nag the user
 
 /** Persist (or replace) a user's Google connection after the OAuth callback. */
 export async function storeConnection(params: {
@@ -114,14 +130,69 @@ export async function getValidAccessToken(userId: string): Promise<string> {
 }
 
 /** Lightweight status check (no token decryption) for UI gating. */
-export async function getConnectionStatus(
-  userId: string,
-): Promise<{ connected: boolean; status: string | null; email: string | null }> {
+export async function getConnectionStatus(userId: string): Promise<{
+  connected: boolean;
+  status: string | null;
+  email: string | null;
+  appsScriptReady: boolean;
+}> {
   const svc = createServiceClient();
   const { data } = await svc
     .from(TABLE)
-    .select("status, email")
+    .select("status, email, apps_script_ready")
     .eq("user_id", userId)
-    .maybeSingle<{ status: string; email: string | null }>();
-  return { connected: !!data, status: data?.status ?? null, email: data?.email ?? null };
+    .maybeSingle<{ status: string; email: string | null; apps_script_ready: boolean | null }>();
+  return {
+    connected: !!data,
+    status: data?.status ?? null,
+    email: data?.email ?? null,
+    appsScriptReady: !!data?.apps_script_ready,
+  };
+}
+
+/** Remember that the connected account has the Apps Script API toggle on (skip future probes). */
+export async function markAppsScriptReady(userId: string): Promise<void> {
+  const svc = createServiceClient();
+  await svc
+    .from(TABLE)
+    .update({ apps_script_ready: true, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+}
+
+/**
+ * Decide whether the user can actually deploy: connection present + (cached) Apps Script API on.
+ * Probes Google ONCE while the flag is still false (the onboarding window), then caches the result
+ * so steady-state page loads do no extra Google calls. A successful probe self-heals the flag.
+ */
+export async function getAppsScriptReadiness(userId: string): Promise<AppsScriptReadiness> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from(TABLE)
+    .select("status, email, apps_script_ready")
+    .eq("user_id", userId)
+    .maybeSingle<{ status: string; email: string | null; apps_script_ready: boolean | null }>();
+
+  if (!data) return { state: "not_connected" };
+  if (data.status === "needs_reauth") return { state: "needs_reauth" };
+  if (data.apps_script_ready) return { state: "ready" };
+
+  let accessToken: string;
+  try {
+    accessToken = await getValidAccessToken(userId);
+  } catch (e) {
+    if (e instanceof NeedsReauthError) return { state: "needs_reauth" };
+    return { state: "unknown" };
+  }
+
+  try {
+    await probeAppsScriptEnabled(accessToken);
+    await markAppsScriptReady(userId);
+    return { state: "ready" };
+  } catch (e) {
+    if (e instanceof UserSettingsDisabledError)
+      return { state: "needs_user_enable", enableUrl: userSettingsUrl(data.email) };
+    if (e instanceof ProjectApiDisabledError)
+      return { state: "needs_project_enable", enableUrl: e.enableUrl };
+    return { state: "unknown" };
+  }
 }

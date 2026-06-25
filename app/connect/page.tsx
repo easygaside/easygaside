@@ -10,7 +10,8 @@ import {
   LockClosedIcon,
   ServerStackIcon,
 } from "@heroicons/react/24/outline";
-import { getConnectionStatus } from "@/lib/google-connection";
+import { AppsScriptEnableNotice } from "@/components/AppsScriptEnableNotice";
+import { getAppsScriptReadiness, getConnectionStatus } from "@/lib/google-connection";
 import { createClient } from "@/lib/supabase/server";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -84,6 +85,11 @@ export default async function ConnectPage({
   const isConnected = connected && status === "active";
   const accountMismatch =
     isConnected && !!email && !!user.email && email.toLowerCase() !== user.email.toLowerCase();
+
+  // Once connected, probe whether the per-user Apps Script API toggle is on (cached after success).
+  const readiness = isConnected ? await getAppsScriptReadiness(user.id) : { state: "not_connected" as const };
+  const needsApiEnable =
+    readiness.state === "needs_user_enable" || readiness.state === "needs_project_enable";
 
   return (
     <main className="grid min-h-screen place-items-center bg-gradient-to-b from-[#eef3fb] to-[#e6ecf7] px-4 py-10 text-slate-800 dark:from-[#0b0f14] dark:to-[#0d1117] dark:text-slate-100">
@@ -178,6 +184,19 @@ export default async function ConnectPage({
                       คุณเข้าสู่ระบบเป็น <b>{user.email}</b> แต่กำลัง deploy ไปบัญชี <b>{email}</b> —
                       งานจะถูกสร้างในบัญชีที่เชื่อมนี้ ถ้าไม่ตั้งใจ กด “เชื่อม Google ใหม่” ด้านล่างเพื่อสลับกลับ
                     </span>
+                  </div>
+                )}
+                {needsApiEnable && (
+                  <AppsScriptEnableNotice
+                    enableUrl={readiness.state === "needs_user_enable" || readiness.state === "needs_project_enable" ? readiness.enableUrl : ""}
+                    reloadHref="/connect"
+                    projectLevel={readiness.state === "needs_project_enable"}
+                  />
+                )}
+                {readiness.state === "ready" && (
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2.5 text-[13px] text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+                    <CheckCircleIcon className="h-4 w-4 shrink-0" />
+                    Apps Script API พร้อมแล้ว — สร้างและ deploy ได้เลย
                   </div>
                 )}
                 <Link

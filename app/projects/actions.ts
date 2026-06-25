@@ -2,15 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { removeProjectChatImages } from "@/lib/chat-images";
 import { detectCapabilityNeeds, routeTarget } from "@/lib/deployment-targets";
 import { MonthlyToolLimitError } from "@/lib/errors";
 import { createProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 /** Shared "ครบโควตาสร้างใหม่" message for the create entry points. */
 function toolLimitMessage(limit: number): string {
-  return `ครบโควตาสร้างเครื่องมือใหม่ของเดือนนี้แล้ว (แผน Free ${limit} ตัว) — ลบของเก่า รอต้นเดือนหน้า หรือใส่ Anthropic key ของคุณในหน้า ตั้งค่า เพื่อสร้างไม่จำกัด`;
+  return `ครบโควตาสร้างเครื่องมือใหม่ของเดือนนี้แล้ว (แผน Free ${limit} ตัว) — รอต้นเดือนหน้า หรือใส่ Anthropic key ของคุณในหน้า ตั้งค่า เพื่อสร้างไม่จำกัด`;
 }
 
 function buildSpec(name: string): Record<string, unknown> {
@@ -67,10 +67,11 @@ export async function newProjectReturnId(
 }
 
 /**
- * Remove a project from EasyGAS only. RLS scopes the delete to the owner; FK ON DELETE CASCADE
- * removes its files/messages/deployments/chat-image rows. We also purge the project's chat images
- * from storage first (those bytes don't cascade). Does NOT touch the user's Google Drive / Apps
- * Script — we make no Google API call here, so the deployed script + Sheet stay in their account.
+ * Soft-delete a project: stamp deleted_at instead of removing the row. Keeps its files / messages /
+ * deployments / token-usage so history (admin metrics) survives, the monthly new-tool quota can't be
+ * gamed by create→delete, and the project stays recoverable. Hidden from the user everywhere
+ * (listProjects/getProject filter deleted_at). Does NOT touch the user's Google Drive / Apps Script —
+ * the deployed script + Sheet stay in their account.
  */
 export async function deleteProjectAction(id: string) {
   const supabase = await createClient();
@@ -79,14 +80,16 @@ export async function deleteProjectAction(id: string) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("not_authenticated");
 
-  // Confirm ownership under RLS before any service-role work (storage removal bypasses RLS).
+  // Confirm ownership under RLS before the service-role write.
   const { data: owned } = await supabase.from("egs_projects").select("id").eq("id", id).maybeSingle();
   if (!owned) throw new Error("not_found");
 
-  // Purge chat-image bytes from the bucket before the rows cascade away (paths live in those rows).
-  await removeProjectChatImages(id);
-
-  const { error } = await supabase.from("egs_projects").delete().eq("id", id);
+  const svc = createServiceClient();
+  const { error } = await svc
+    .from("egs_projects")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("owner_id", user.id); // defense-in-depth: guard owner in code on the service-role path
   if (error) throw new Error(`deleteProject: ${error.message}`);
   revalidatePath("/projects");
 }

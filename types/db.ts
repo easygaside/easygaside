@@ -24,6 +24,8 @@ export interface EgsProject {
   llm_provider: string | null;
   created_at: string;
   updated_at: string;
+  /** Soft-delete timestamp; null = live. Deleted projects are hidden but kept for history + quota. */
+  deleted_at: string | null;
 }
 
 export interface EgsFile {

@@ -168,6 +168,8 @@ export async function getMonthlyToolUsage(userId: string): Promise<QuotaStatus> 
   const svc = createServiceClient();
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  // INTENTIONALLY counts soft-deleted projects too (no deleted_at filter): the quota is "tools
+  // created this month", so deleting one must NOT refund it — otherwise create→delete bypasses the cap.
   const { count } = await svc
     .from("egs_projects")
     .select("id", { count: "exact", head: true })

@@ -29,6 +29,7 @@ export async function listProjects(): Promise<EgsProject[]> {
   const { data, error } = await supabase
     .from("egs_projects")
     .select("*")
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false });
   if (error) throw new Error(`listProjects: ${error.message}`);
   return (data ?? []) as EgsProject[];
@@ -40,6 +41,7 @@ export async function getProject(id: string): Promise<EgsProject | null> {
     .from("egs_projects")
     .select("*")
     .eq("id", id)
+    .is("deleted_at", null)
     .maybeSingle();
   if (error) throw new Error(`getProject: ${error.message}`);
   return (data as EgsProject) ?? null;

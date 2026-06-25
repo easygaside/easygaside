@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircleIcon, Cog6ToothIcon, ExclamationTriangleIcon, FolderIcon, InboxIcon, RocketLaunchIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { AppsScriptAutoVerify } from "@/components/AppsScriptAutoVerify";
 import { AppsScriptEnableNotice } from "@/components/AppsScriptEnableNotice";
 import { AppTopBar } from "@/components/AppTopBar";
 import { CreateProjectBar } from "@/components/projects/CreateProjectBar";
@@ -126,9 +127,10 @@ export default async function ProjectsPage() {
 
       {needsApiEnable && (
         <div className="relative mx-auto mt-3 max-w-5xl px-6">
+          {/* silently run a real test deploy in the background; flips to ready on success */}
+          <AppsScriptAutoVerify />
           <AppsScriptEnableNotice
             enableUrl={readiness.state === "unverified" ? readiness.enableUrl : ""}
-            testHref="/connect/done"
           />
         </div>
       )}

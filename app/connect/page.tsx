@@ -10,9 +10,18 @@ import {
   LockClosedIcon,
   ServerStackIcon,
 } from "@heroicons/react/24/outline";
+import { AppsScriptAutoVerify } from "@/components/AppsScriptAutoVerify";
 import { AppsScriptEnableNotice } from "@/components/AppsScriptEnableNotice";
+import { StepImages } from "@/components/StepImages";
 import { getAppsScriptReadiness, getConnectionStatus } from "@/lib/google-connection";
 import { createClient } from "@/lib/supabase/server";
+
+const TR = "https://qimwyprjnlejefeukuuy.supabase.co/storage/v1/object/public/tr";
+const CONSENT_STEPS = [
+  { src: `${TR}/1.png`, alt: "จอเตือน Google hasn't verified this app — กด Advanced" },
+  { src: `${TR}/2.png`, alt: "กด Go to EasyGAS (unsafe)" },
+  { src: `${TR}/3-4.png`, alt: "กดอนุญาตสิทธิ์ให้ EasyGAS" },
+];
 
 const ERROR_MESSAGES: Record<string, string> = {
   bad_state: "การยืนยันความปลอดภัยล้มเหลว (state ไม่ตรง) ลองใหม่อีกครั้ง",
@@ -186,9 +195,13 @@ export default async function ConnectPage({
                   </div>
                 )}
                 {needsApiEnable && (
-                  <AppsScriptEnableNotice
-                    enableUrl={readiness.state === "unverified" ? readiness.enableUrl : ""}
-                  />
+                  <>
+                    {/* silently run a real test deploy in the background; flips to ready on success */}
+                    <AppsScriptAutoVerify />
+                    <AppsScriptEnableNotice
+                      enableUrl={readiness.state === "unverified" ? readiness.enableUrl : ""}
+                    />
+                  </>
                 )}
                 {readiness.state === "ready" && (
                   <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2.5 text-[13px] text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300">
@@ -235,6 +248,7 @@ export default async function ConnectPage({
               <strong className="text-slate-700 dark:text-slate-200">Go to EasyGAS (unsafe)</strong>{" "}
               เพื่อดำเนินการต่อ ไม่กระทบความปลอดภัยของบัญชีคุณ
             </p>
+            <StepImages images={CONSENT_STEPS} />
           </details>
         </div>
 

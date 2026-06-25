@@ -11,9 +11,19 @@ const prompt = Prompt({
 });
 
 export const metadata: Metadata = {
+  // Resolves all relative OG/canonical URLs to the live domain (needed for correct social previews
+  // and canonical tags). Override per-environment with NEXT_PUBLIC_SITE_URL.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://easygaside.tech"),
   title: "EasyGAS IDE — AI builder for Google Apps Script",
   description:
     "Chat with AI to build Google Apps Script tools, preview live, and deploy to your own Google account.",
+  openGraph: {
+    type: "website",
+    siteName: "EasyGAS IDE",
+    title: "EasyGAS — สร้างเครื่องมือบน Google Apps Script ด้วย AI",
+    description:
+      "คุยกับ AI เพื่อสร้างเครื่องมือบน Google Apps Script พรีวิวสด แล้วกดเดียว deploy เข้าบัญชี Google ของคุณเอง",
+  },
   icons: {
     icon: [
       { url: "/icon/favicon-32x32.png", sizes: "32x32", type: "image/png" },

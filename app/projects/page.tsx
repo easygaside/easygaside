@@ -32,6 +32,11 @@ export default async function ProjectsPage() {
     !!user.email &&
     conn.email.toLowerCase() !== user.email.toLowerCase();
 
+  // Gate to deploy: warn when Google isn't connected yet, or the stored grant went stale.
+  const needsReauth = conn.connected && conn.status === "needs_reauth";
+  const notConnected = !conn.connected;
+  const showConnectWarn = notConnected || needsReauth;
+
   const googlePill =
     conn.connected && conn.status === "active" ? (
       <Link
@@ -86,6 +91,34 @@ export default async function ProjectsPage() {
           </>
         }
       />
+
+      {showConnectWarn && (
+        <div className="relative mx-auto mt-3 max-w-5xl px-6">
+          <div className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3.5 sm:flex-row sm:items-center dark:border-amber-700/60 dark:bg-amber-950/40">
+            <div className="flex items-start gap-2.5">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-300">
+                <ExclamationTriangleIcon className="h-5 w-5" />
+              </span>
+              <div>
+                <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                  {needsReauth ? "การเชื่อมต่อ Google หมดอายุ" : "ยังไม่ได้เชื่อมต่อ Google"}
+                </div>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-amber-800/90 dark:text-amber-200/80">
+                  {needsReauth
+                    ? "ต้องเชื่อมบัญชีใหม่และอนุญาตสิทธิ์อีกครั้ง ระบบถึงจะติดตั้ง (deploy) เครื่องมือขึ้น Google ของคุณได้ต่อ"
+                    : "เชื่อมบัญชี Google และอนุญาตสิทธิ์ก่อน ระบบถึงจะติดตั้ง (deploy) เครื่องมือที่ AI สร้างขึ้นบัญชีของคุณได้ — ส่วนการสร้างและแก้โค้ดในเว็บ ทำได้เลยโดยไม่ต้องเชื่อม"}
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/connect"
+              className="shrink-0 self-start rounded-xl bg-amber-500 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-amber-400 sm:ml-auto sm:self-center"
+            >
+              {needsReauth ? "เชื่อม Google ใหม่ →" : "เชื่อมต่อ Google →"}
+            </Link>
+          </div>
+        </div>
+      )}
 
       {accountMismatch && (
         <div className="relative mx-auto mt-3 max-w-5xl px-6">

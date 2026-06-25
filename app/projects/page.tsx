@@ -26,9 +26,8 @@ export default async function ProjectsPage() {
     getDeployedMap(),
     getAppsScriptReadiness(userId),
   ]);
-  // Connected, but the per-user Apps Script API toggle is still off → block deploy with a fix-it card.
-  const needsApiEnable =
-    readiness.state === "needs_user_enable" || readiness.state === "needs_project_enable";
+  // Connected but no successful deploy yet → remind to enable the Apps Script API + run a test.
+  const needsApiEnable = readiness.state === "unverified";
   const deployedCount = projects.filter((p) => deployed[p.id]).length;
   const accountMismatch =
     conn.connected &&
@@ -128,9 +127,8 @@ export default async function ProjectsPage() {
       {needsApiEnable && (
         <div className="relative mx-auto mt-3 max-w-5xl px-6">
           <AppsScriptEnableNotice
-            enableUrl={readiness.state === "needs_user_enable" || readiness.state === "needs_project_enable" ? readiness.enableUrl : ""}
-            reloadHref="/projects"
-            projectLevel={readiness.state === "needs_project_enable"}
+            enableUrl={readiness.state === "unverified" ? readiness.enableUrl : ""}
+            testHref="/connect/done"
           />
         </div>
       )}

@@ -59,37 +59,6 @@ async function gasFetch<T>(
   return (text ? JSON.parse(text) : {}) as T;
 }
 
-const DRIVE_BASE = "https://www.googleapis.com/drive/v3";
-
-/**
- * Readiness probe for the per-user Apps Script API toggle (script.google.com/home/usersettings).
- *
- * The usersettings / SERVICE_DISABLED gates only fire on a real WRITE like projects.create — a GET
- * on a random id just 404s and gives a false "ready". So we create a throwaway project:
- *   toggle OFF → UserSettingsDisabledError (or ProjectApiDisabledError) thrown here, nothing made.
- *   toggle ON  → returns a scriptId, which we best-effort delete via Drive (drive.file owns it).
- * A leftover empty script (if the delete is denied) is harmless and happens at most once per user.
- */
-export async function probeAppsScriptEnabled(accessToken: string): Promise<void> {
-  let scriptId: string | undefined;
-  try {
-    const res = await createProject(accessToken, "EasyGAS readiness check");
-    scriptId = res.scriptId;
-  } catch (e) {
-    if (e instanceof UserSettingsDisabledError || e instanceof ProjectApiDisabledError) throw e;
-    // Any other error means the call passed the enable gate → the API is on. Treat as ready.
-    return;
-  }
-  try {
-    await fetch(`${DRIVE_BASE}/files/${scriptId}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-  } catch {
-    /* leftover empty script — no impact */
-  }
-}
-
 /** Map editor files (Code.gs, Index.html, appsscript.json) to the API's file objects. */
 export function toApiFiles(
   files: { path: string; content: string }[],

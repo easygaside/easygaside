@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { mapGoogleError } from "@/lib/api-helpers";
 import { getTarget } from "@/lib/deployment-targets";
-import { getConnectionStatus } from "@/lib/google-connection";
+import { getConnectionStatus, markAppsScriptReady } from "@/lib/google-connection";
 import { getProject } from "@/lib/projects";
 import { snapshotProject } from "@/lib/versions";
 import { DEPLOY_RATE, checkRateLimit } from "@/lib/rate-limit";
@@ -34,6 +34,8 @@ export async function POST(
   try {
     const target = getTarget(project.target ?? "gas");
     const result = await target.deploy(user.id, project);
+    // A real deploy succeeded → the Apps Script API is provably enabled for this account.
+    await markAppsScriptReady(user.id);
     // nothing changed → no new code went live, so don't pile up an identical version snapshot
     if (!result.unchanged) await snapshotProject(id, "deploy"); // version the exact code that went live
     return NextResponse.json({ ok: true, ...result });

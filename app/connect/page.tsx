@@ -88,8 +88,7 @@ export default async function ConnectPage({
 
   // Once connected, probe whether the per-user Apps Script API toggle is on (cached after success).
   const readiness = isConnected ? await getAppsScriptReadiness(user.id) : { state: "not_connected" as const };
-  const needsApiEnable =
-    readiness.state === "needs_user_enable" || readiness.state === "needs_project_enable";
+  const needsApiEnable = readiness.state === "unverified";
 
   return (
     <main className="grid min-h-screen place-items-center bg-gradient-to-b from-[#eef3fb] to-[#e6ecf7] px-4 py-10 text-slate-800 dark:from-[#0b0f14] dark:to-[#0d1117] dark:text-slate-100">
@@ -188,15 +187,13 @@ export default async function ConnectPage({
                 )}
                 {needsApiEnable && (
                   <AppsScriptEnableNotice
-                    enableUrl={readiness.state === "needs_user_enable" || readiness.state === "needs_project_enable" ? readiness.enableUrl : ""}
-                    reloadHref="/connect"
-                    projectLevel={readiness.state === "needs_project_enable"}
+                    enableUrl={readiness.state === "unverified" ? readiness.enableUrl : ""}
                   />
                 )}
                 {readiness.state === "ready" && (
                   <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2.5 text-[13px] text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300">
                     <CheckCircleIcon className="h-4 w-4 shrink-0" />
-                    Apps Script API พร้อมแล้ว — สร้างและ deploy ได้เลย
+                    Apps Script API ยืนยันแล้ว (เคย deploy สำเร็จ) — พร้อมใช้งาน
                   </div>
                 )}
                 <Link

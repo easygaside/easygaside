@@ -1,19 +1,17 @@
 import { ArrowTopRightOnSquareIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 /**
- * Recovery card for the Apps Script API "enable" wall. Two flavours:
- *  - user toggle (script.google.com/home/usersettings) — what every end user must flip once
- *  - project-level (our Cloud Console) — rare, app-config; shown with a different explanation
- * "ตรวจสอบอีกครั้ง" just reloads the page; the server re-probes Google while the flag is still off.
+ * Reminder shown while a connection is "unverified" (no successful deploy yet). We don't claim the
+ * toggle is on or off — Google gives no API to read it — we just prompt the one-time enable and
+ * point at a real test deploy, which is the only reliable confirmation. Once a deploy succeeds the
+ * flag flips to ready and this disappears.
  */
 export function AppsScriptEnableNotice({
   enableUrl,
-  reloadHref,
-  projectLevel = false,
+  testHref,
 }: {
   enableUrl: string;
-  reloadHref: string;
-  projectLevel?: boolean;
+  testHref?: string;
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-700/60 dark:bg-amber-950/40">
@@ -23,31 +21,33 @@ export function AppsScriptEnableNotice({
         </span>
         <div>
           <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-            ต้องเปิด Apps Script API ก่อนถึงจะ deploy ได้
+            เปิด Apps Script API ก่อน deploy ครั้งแรก
           </div>
           <p className="mt-0.5 text-[13px] leading-relaxed text-amber-800/90 dark:text-amber-200/80">
-            {projectLevel
-              ? "ระบบยังเปิด Apps Script API ในโปรเจกต์ Google Cloud ไม่ครบ — ปกติผู้ใช้ทั่วไปไม่ต้องทำขั้นนี้ ลองเปิดลิงก์แล้วตรวจสอบอีกครั้ง"
-              : "บัญชี Google ของคุณยังไม่ได้เปิดสวิตช์ Apps Script API (ทำครั้งเดียวจบ) — เปิดลิงก์ด้านล่างโดยล็อกอินด้วยบัญชีที่เชื่อมไว้ กดเปิดสวิตช์ แล้วกลับมาตรวจสอบอีกครั้ง"}
+            บัญชี Google ของคุณต้องเปิดสวิตช์ Apps Script API หนึ่งครั้ง ระบบถึงจะติดตั้ง (deploy)
+            เครื่องมือขึ้นบัญชีของคุณได้ — เปิดสวิตช์ที่ลิงก์ด้านล่าง (ล็อกอินด้วยบัญชีที่เชื่อมไว้)
+            แล้วกดทดสอบ deploy เพื่อยืนยัน ระบบจะจำให้อัตโนมัติเมื่อสำเร็จ
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 pl-[2.875rem]">
+      <div className="flex flex-wrap items-center gap-2 sm:pl-[2.875rem]">
         <a
           href={enableUrl}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-amber-400"
         >
-          {projectLevel ? "เปิด Google Cloud Console" : "เปิดสวิตช์ Apps Script API"}
+          เปิดสวิตช์ Apps Script API
           <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
         </a>
-        <a
-          href={reloadHref}
-          className="rounded-lg border border-amber-300 px-4 py-2 text-[13px] font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-700/60 dark:text-amber-200 dark:hover:bg-amber-900/30"
-        >
-          เปิดแล้ว — ตรวจสอบอีกครั้ง
-        </a>
+        {testHref && (
+          <a
+            href={testHref}
+            className="rounded-lg border border-amber-300 px-4 py-2 text-[13px] font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-700/60 dark:text-amber-200 dark:hover:bg-amber-900/30"
+          >
+            ทดสอบ deploy เพื่อยืนยัน →
+          </a>
+        )}
       </div>
     </div>
   );

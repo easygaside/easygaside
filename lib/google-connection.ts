@@ -1,12 +1,6 @@
 import { userSettingsUrl } from "./api-helpers";
 import { decrypt, encrypt } from "./crypto";
-import {
-  NeedsReauthError,
-  NotConnectedError,
-  ProjectApiDisabledError,
-  UserSettingsDisabledError,
-} from "./errors";
-import { probeAppsScriptEnabled } from "./gas-script-api";
+import { NeedsReauthError, NotConnectedError } from "./errors";
 import { refreshAccessToken } from "./google-oauth";
 import { createServiceClient } from "./supabase/service";
 
@@ -27,14 +21,17 @@ interface ConnectionRow {
   status: string;
 }
 
-/** Readiness of the per-user Apps Script API toggle (script.google.com/home/usersettings). */
+/**
+ * Readiness of the per-user Apps Script API toggle (script.google.com/home/usersettings).
+ * Google exposes NO API to read the toggle, and synthetic probes can't reliably tell it apart from
+ * an enabled API — so we never guess: a connection is "ready" only once a REAL deploy has succeeded
+ * (which flips apps_script_ready). Until then it's "unverified" and we just remind + link out.
+ */
 export type AppsScriptReadiness =
   | { state: "not_connected" }
   | { state: "needs_reauth" }
-  | { state: "ready" }
-  | { state: "needs_user_enable"; enableUrl: string } // the per-user usersettings wall
-  | { state: "needs_project_enable"; enableUrl: string } // our Cloud project (rare, app-config)
-  | { state: "unknown" }; // probe couldn't decide — don't nag the user
+  | { state: "ready" } // a real deploy has succeeded at least once
+  | { state: "unverified"; enableUrl: string }; // connected, but not yet proven by a deploy
 
 /** Persist (or replace) a user's Google connection after the OAuth callback. */
 export async function storeConnection(params: {
@@ -160,9 +157,8 @@ export async function markAppsScriptReady(userId: string): Promise<void> {
 }
 
 /**
- * Decide whether the user can actually deploy: connection present + (cached) Apps Script API on.
- * Probes Google ONCE while the flag is still false (the onboarding window), then caches the result
- * so steady-state page loads do no extra Google calls. A successful probe self-heals the flag.
+ * Cheap, no-Google-call readiness read for UI gating. "ready" only after a real deploy has flipped
+ * the flag; otherwise "unverified" (we remind the user to enable + run a test deploy to confirm).
  */
 export async function getAppsScriptReadiness(userId: string): Promise<AppsScriptReadiness> {
   const svc = createServiceClient();
@@ -175,24 +171,5 @@ export async function getAppsScriptReadiness(userId: string): Promise<AppsScript
   if (!data) return { state: "not_connected" };
   if (data.status === "needs_reauth") return { state: "needs_reauth" };
   if (data.apps_script_ready) return { state: "ready" };
-
-  let accessToken: string;
-  try {
-    accessToken = await getValidAccessToken(userId);
-  } catch (e) {
-    if (e instanceof NeedsReauthError) return { state: "needs_reauth" };
-    return { state: "unknown" };
-  }
-
-  try {
-    await probeAppsScriptEnabled(accessToken);
-    await markAppsScriptReady(userId);
-    return { state: "ready" };
-  } catch (e) {
-    if (e instanceof UserSettingsDisabledError)
-      return { state: "needs_user_enable", enableUrl: userSettingsUrl(data.email) };
-    if (e instanceof ProjectApiDisabledError)
-      return { state: "needs_project_enable", enableUrl: e.enableUrl };
-    return { state: "unknown" };
-  }
+  return { state: "unverified", enableUrl: userSettingsUrl(data.email) };
 }

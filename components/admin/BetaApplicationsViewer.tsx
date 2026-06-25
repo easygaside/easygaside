@@ -8,7 +8,11 @@ import {
   CheckIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { approveBetaApplicationAction, rejectBetaApplicationAction } from "@/app/admin/actions";
+import {
+  approveBetaApplicationAction,
+  approveBetaApplicationsAction,
+  rejectBetaApplicationAction,
+} from "@/app/admin/actions";
 
 export interface BetaApplication {
   email: string;
@@ -49,8 +53,26 @@ const STATUS_LABEL: Record<string, string> = {
 export function BetaApplicationsViewer({ applications }: { applications: BetaApplication[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
 
   const pending = applications.filter((a) => a.status === "pending").length;
+  // Anything not already approved can be (re)approved + emailed in a batch.
+  const selectable = applications.filter((a) => a.status !== "approved");
+  const allSelected = selectable.length > 0 && selectable.every((a) => selected.has(a.email));
+
+  function toggle(email: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(email)) next.delete(email);
+      else next.add(email);
+      return next;
+    });
+  }
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(selectable.map((a) => a.email)));
+  }
 
   async function act(email: string, fn: (e: string) => Promise<void>) {
     setBusy(email);
@@ -59,6 +81,20 @@ export function BetaApplicationsViewer({ applications }: { applications: BetaApp
       router.refresh();
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function bulkApprove() {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    setResult(null);
+    try {
+      const res = await approveBetaApplicationsAction([...selected]);
+      setSelected(new Set());
+      setResult(`อนุมัติ ${res.approved} ราย · ส่งอีเมลสำเร็จ ${res.emailed} ราย`);
+      router.refresh();
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -73,8 +109,43 @@ export function BetaApplicationsViewer({ applications }: { applications: BetaApp
         )}
       </h2>
       <p className="mb-3 text-xs text-slate-400 dark:text-slate-500">
-        คำตอบแบบสอบถามจากหน้า /beta — กด &ldquo;อนุมัติ&rdquo; เพื่อเพิ่มเข้า allowlist อัตโนมัติ
+        คำตอบแบบสอบถามจากหน้า /beta — กด &ldquo;อนุมัติ&rdquo; เพื่อเพิ่มเข้า allowlist + ส่งอีเมลแจ้งผู้สมัครอัตโนมัติ
       </p>
+
+      {/* bulk toolbar */}
+      {selectable.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-slate-800/40">
+          <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4 accent-emerald-500" />
+            เลือกทั้งหมดที่ยังไม่อนุมัติ ({selectable.length})
+          </label>
+          {selected.size > 0 && (
+            <>
+              <span className="text-xs text-slate-400 dark:text-slate-500">เลือกแล้ว {selected.size} ราย</span>
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  onClick={() => setSelected(new Set())}
+                  disabled={bulkBusy}
+                  className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-200/70 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700/60"
+                >
+                  ล้าง
+                </button>
+                <button
+                  onClick={bulkApprove}
+                  disabled={bulkBusy}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50"
+                >
+                  <CheckIcon className="h-4 w-4" />
+                  {bulkBusy ? "กำลังส่ง…" : `อนุมัติ + ส่งอีเมล (${selected.size})`}
+                </button>
+              </div>
+            </>
+          )}
+          {result && selected.size === 0 && (
+            <span className="ml-auto text-xs font-medium text-emerald-600 dark:text-emerald-400">✓ {result}</span>
+          )}
+        </div>
+      )}
 
       {applications.length === 0 ? (
         <p className="text-xs text-slate-400 dark:text-slate-500">
@@ -85,14 +156,25 @@ export function BetaApplicationsViewer({ applications }: { applications: BetaApp
           {applications.map((a) => (
             <div
               key={a.email}
-              className={`rounded-xl border p-3 ${
-                a.status === "rejected"
-                  ? "border-slate-200 opacity-60 dark:border-slate-800"
-                  : "border-slate-200 dark:border-slate-700/60"
+              className={`rounded-xl border p-3 transition ${
+                selected.has(a.email)
+                  ? "border-emerald-300 ring-1 ring-emerald-300 dark:border-emerald-700/60 dark:ring-emerald-700/40"
+                  : a.status === "rejected"
+                    ? "border-slate-200 opacity-60 dark:border-slate-800"
+                    : "border-slate-200 dark:border-slate-700/60"
               }`}
             >
               {/* header: identity + status */}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {a.status !== "approved" && (
+                  <input
+                    type="checkbox"
+                    checked={selected.has(a.email)}
+                    onChange={() => toggle(a.email)}
+                    className="h-4 w-4 shrink-0 accent-emerald-500"
+                    aria-label={`เลือก ${a.email}`}
+                  />
+                )}
                 <span className="break-all text-sm font-semibold text-slate-800 dark:text-slate-100">
                   {a.name || a.email}
                 </span>

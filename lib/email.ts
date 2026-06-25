@@ -28,7 +28,7 @@ function getClient(): Resend | null {
 // account email). Set RESEND_FROM to a verified-domain address to email real applicants.
 const FROM = process.env.RESEND_FROM || "EasyGAS <onboarding@resend.dev>";
 
-function approvedHtml(loginUrl: string, greeting: string): string {
+function approvedHtml(actionUrl: string, greeting: string): string {
   return `<!doctype html>
 <html lang="th">
   <body style="margin:0;background:#eef3fb;font-family:'Segoe UI',Tahoma,sans-serif;color:#1f2937;">
@@ -40,12 +40,12 @@ function approvedHtml(loginUrl: string, greeting: string): string {
           ${greeting} ขอบคุณที่สนใจร่วมทดสอบ EasyGAS — ตอนนี้บัญชีของคุณได้รับสิทธิ์เข้าใช้งานเรียบร้อยแล้ว
           เข้าสู่ระบบด้วยบัญชี Google เดิมที่คุณใช้สมัคร แล้วเริ่มสร้างเครื่องมือ Google Apps Script ตัวแรกได้เลย
         </p>
-        <a href="${loginUrl}" style="display:inline-block;margin:8px 0 20px;background:#10b981;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 28px;border-radius:12px;">
-          เข้าสู่ระบบ EasyGAS →
+        <a href="${actionUrl}" style="display:inline-block;margin:8px 0 20px;background:#10b981;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 28px;border-radius:12px;">
+          เข้าใช้งาน EasyGAS →
         </a>
         <p style="margin:0;font-size:13px;line-height:1.6;color:#94a3b8;">
           ถ้าปุ่มกดไม่ได้ ให้คัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์:<br />
-          <span style="color:#0f766e;">${loginUrl}</span>
+          <span style="color:#0f766e;">${actionUrl}</span>
         </p>
       </div>
       <p style="text-align:center;margin:18px 0 0;font-size:12px;color:#94a3b8;">
@@ -66,14 +66,16 @@ export async function sendBetaApprovedEmail(to: string, name?: string | null): P
     console.warn("[email] RESEND_API_KEY not set — skipped beta-approved email to", to);
     return false;
   }
-  const loginUrl = `${appOrigin()}/login`;
+  // Link straight to /projects — if they're not signed in yet it bounces through /login → Google,
+  // and the OAuth callback lands them back on /projects. Already signed in → goes there directly.
+  const actionUrl = `${appOrigin()}/projects`;
   const greeting = name?.trim() ? `สวัสดีคุณ ${name.trim()}` : "สวัสดีครับ";
   try {
     const { error } = await resend.emails.send({
       from: FROM,
       to,
       subject: "🎉 คุณได้รับเลือกเข้าร่วม EasyGAS Closed Beta",
-      html: approvedHtml(loginUrl, greeting),
+      html: approvedHtml(actionUrl, greeting),
     });
     if (error) {
       console.error("[email] sendBetaApprovedEmail rejected:", error);

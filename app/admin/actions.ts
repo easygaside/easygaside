@@ -198,6 +198,39 @@ export async function approveBetaApplicationAction(email: string): Promise<void>
   revalidatePath("/admin");
 }
 
+/**
+ * Approve many applicants in one shot (multi-select in /admin). Each row is approved + allowlisted
+ * + emailed independently; a failure on one doesn't abort the rest. Returns how many were approved
+ * and how many emails actually went out (email is best-effort).
+ */
+export async function approveBetaApplicationsAction(
+  emails: string[],
+): Promise<{ approved: number; emailed: number }> {
+  await requireSuperAdmin();
+  const svc = createServiceClient();
+  let approved = 0;
+  let emailed = 0;
+  for (const raw of emails) {
+    const e = raw.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) continue;
+    const { data: app, error: aErr } = await svc
+      .from("egs_beta_applications")
+      .update({ status: "approved", updated_at: new Date().toISOString() })
+      .eq("email", e)
+      .select("name")
+      .maybeSingle<{ name: string | null }>();
+    if (aErr) continue;
+    const { error: lErr } = await svc
+      .from("egs_beta_allowlist")
+      .upsert({ email: e, note: "approved from beta application" }, { onConflict: "email" });
+    if (lErr) continue;
+    approved++;
+    if (await sendBetaApprovedEmail(e, app?.name ?? null)) emailed++;
+  }
+  revalidatePath("/admin");
+  return { approved, emailed };
+}
+
 /** Reject a closed-beta applicant (also removes them from the allowlist if previously approved). */
 export async function rejectBetaApplicationAction(email: string): Promise<void> {
   await requireSuperAdmin();

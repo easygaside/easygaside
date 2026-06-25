@@ -104,7 +104,18 @@ export function ProjectCard({ project, deployUrl }: { project: EgsProject; deplo
                 &ldquo;{project.name}&rdquo;
               </p>
               <p className="mt-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-center text-[12px] leading-relaxed text-amber-700 dark:text-amber-300">
-                ลบเฉพาะใน EasyGAS เท่านั้น — ไฟล์/สคริปต์ใน Google Drive ของคุณ <b>ไม่ถูกลบ</b>
+                {project.script_id && !isBound ? (
+                  <>
+                    จะลบ <b>Apps Script ในบัญชี Google</b> ของคุณด้วย — เว็บแอปที่ deploy ไว้จะใช้งานไม่ได้อีก
+                    และกู้คืนใน Google ไม่ได้ (ส่วนในแอปกู้คืนได้)
+                  </>
+                ) : isBound ? (
+                  <>
+                    ลบโปรเจกต์ออกจากแอป — สคริปต์ที่ผูกกับ <b>Google Sheet</b> ของคุณ <b>ไม่ถูกลบ</b>
+                  </>
+                ) : (
+                  <>ยังไม่ได้สร้างสคริปต์ใน Google — ลบเฉพาะในแอป</>
+                )}
               </p>
               <div className="mt-4 flex gap-2">
                 <button

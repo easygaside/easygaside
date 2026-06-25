@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { detectCapabilityNeeds, routeTarget } from "@/lib/deployment-targets";
 import { MonthlyToolLimitError } from "@/lib/errors";
+import { getValidAccessToken } from "@/lib/google-connection";
 import { createProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -67,11 +68,11 @@ export async function newProjectReturnId(
 }
 
 /**
- * Soft-delete a project: stamp deleted_at instead of removing the row. Keeps its files / messages /
- * deployments / token-usage so history (admin metrics) survives, the monthly new-tool quota can't be
- * gamed by create→delete, and the project stays recoverable. Hidden from the user everywhere
- * (listProjects/getProject filter deleted_at). Does NOT touch the user's Google Drive / Apps Script —
- * the deployed script + Sheet stay in their account.
+ * Delete a project. In EasyGAS this is a SOFT delete (stamp deleted_at) so token-usage history
+ * survives, the monthly new-tool quota can't be gamed by create→delete, and it stays recoverable.
+ * On Google it's a REAL delete: the standalone Apps Script project is removed from the user's Drive
+ * (best-effort — failures don't block the soft delete), so the deployed web app stops working. A
+ * bound Sheet is never touched (that's the user's own data). The UI warns before calling this.
  */
 export async function deleteProjectAction(id: string) {
   const supabase = await createClient();
@@ -80,9 +81,28 @@ export async function deleteProjectAction(id: string) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("not_authenticated");
 
-  // Confirm ownership under RLS before the service-role write.
-  const { data: owned } = await supabase.from("egs_projects").select("id").eq("id", id).maybeSingle();
+  // Confirm ownership + read the Google script id under RLS.
+  const { data: owned } = await supabase
+    .from("egs_projects")
+    .select("id, script_id, kind")
+    .eq("id", id)
+    .maybeSingle<{ id: string; script_id: string | null; kind: string }>();
   if (!owned) throw new Error("not_found");
+
+  // Best-effort: remove the standalone Apps Script project from the user's Drive. Never delete a
+  // bound script (it lives inside the user's Sheet — deleting it would risk their data).
+  if (owned.script_id && owned.kind !== "bound") {
+    try {
+      const accessToken = await getValidAccessToken(user.id);
+      await fetch(`https://www.googleapis.com/drive/v3/files/${owned.script_id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch (e) {
+      // Not connected / token stale / already gone — soft-delete in EasyGAS regardless.
+      console.error("[deleteProject] Drive delete failed; soft-deleting in EasyGAS anyway:", e);
+    }
+  }
 
   const svc = createServiceClient();
   const { error } = await svc

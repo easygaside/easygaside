@@ -59,21 +59,34 @@ async function gasFetch<T>(
   return (text ? JSON.parse(text) : {}) as T;
 }
 
+const DRIVE_BASE = "https://www.googleapis.com/drive/v3";
+
 /**
- * Non-destructive readiness probe for the per-user Apps Script API toggle
- * (script.google.com/home/usersettings). We GET a non-existent project: the usersettings and
- * SERVICE_DISABLED gates are evaluated at the API edge BEFORE resource lookup, so a DISABLED API
- * throws UserSettingsDisabledError / ProjectApiDisabledError here. An ENABLED API instead 404s
- * (or permission-denies) the fake id — which we swallow → "ready". Creates nothing in the account.
+ * Readiness probe for the per-user Apps Script API toggle (script.google.com/home/usersettings).
+ *
+ * The usersettings / SERVICE_DISABLED gates only fire on a real WRITE like projects.create — a GET
+ * on a random id just 404s and gives a false "ready". So we create a throwaway project:
+ *   toggle OFF → UserSettingsDisabledError (or ProjectApiDisabledError) thrown here, nothing made.
+ *   toggle ON  → returns a scriptId, which we best-effort delete via Drive (drive.file owns it).
+ * A leftover empty script (if the delete is denied) is harmless and happens at most once per user.
  */
 export async function probeAppsScriptEnabled(accessToken: string): Promise<void> {
+  let scriptId: string | undefined;
   try {
-    await gasFetch(accessToken, "/projects/easygasReadinessProbeNonexistent000000000000", {
-      method: "GET",
-    });
+    const res = await createProject(accessToken, "EasyGAS readiness check");
+    scriptId = res.scriptId;
   } catch (e) {
     if (e instanceof UserSettingsDisabledError || e instanceof ProjectApiDisabledError) throw e;
-    // 404 / permission / any other response means the call passed the enable gate → API is on.
+    // Any other error means the call passed the enable gate → the API is on. Treat as ready.
+    return;
+  }
+  try {
+    await fetch(`${DRIVE_BASE}/files/${scriptId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    /* leftover empty script — no impact */
   }
 }
 

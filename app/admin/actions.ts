@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isSuperAdmin } from "@/lib/admin";
+import { sendBetaApprovedEmail } from "@/lib/email";
 import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/provider";
 import { getCurrentUser } from "@/lib/projects";
 import { setAppSetting } from "@/lib/settings";
@@ -181,15 +182,19 @@ export async function approveBetaApplicationAction(email: string): Promise<void>
   const e = email.trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error("bad_email");
   const svc = createServiceClient();
-  const { error: aErr } = await svc
+  const { data: app, error: aErr } = await svc
     .from("egs_beta_applications")
     .update({ status: "approved", updated_at: new Date().toISOString() })
-    .eq("email", e);
+    .eq("email", e)
+    .select("name")
+    .maybeSingle<{ name: string | null }>();
   if (aErr) throw new Error(`approveBetaApplication: ${aErr.message}`);
   const { error: lErr } = await svc
     .from("egs_beta_allowlist")
     .upsert({ email: e, note: "approved from beta application" }, { onConflict: "email" });
   if (lErr) throw new Error(`approveBetaApplication allowlist: ${lErr.message}`);
+  // Best-effort: tell the applicant they're in. A mail failure must not fail the approval.
+  await sendBetaApprovedEmail(e, app?.name ?? null);
   revalidatePath("/admin");
 }
 

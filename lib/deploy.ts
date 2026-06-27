@@ -44,6 +44,7 @@ function ensureWebAppDeployConfig(apiFiles: GasFile[]): GasFile[] {
     const webapp = (m.webapp as Record<string, unknown> | undefined) ?? {};
     const merged = {
       ...m,
+      runtimeVersion: "V8", // Always force V8 — Rhino runtime is deprecated
       webapp: { access: "ANYONE_ANONYMOUS", ...webapp, executeAs: "USER_DEPLOYING" },
     };
     const next = [...apiFiles];

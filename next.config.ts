@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "qimwyprjnlejefeukuuy.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
+  },
   experimental: {
     // Allow large Server Action / route payloads (full GAS file sets pushed to the API).
     serverActions: { bodySizeLimit: "4mb" },

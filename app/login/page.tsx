@@ -98,13 +98,6 @@ export default function LoginPage() {
           </p>
         )}
       </div>
-
-      <p className="mt-5 text-center text-xs text-slate-400 dark:text-slate-500">
-        ยังไม่มีสิทธิ์ทดสอบ?{" "}
-        <Link href="/beta" className="font-medium text-emerald-600 underline underline-offset-2 dark:text-emerald-400">
-          สมัครเข้าร่วม Closed Beta
-        </Link>
-      </p>
     </AuthShell>
   );
 }

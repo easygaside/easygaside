@@ -6,6 +6,7 @@ import { AppsScriptEnableNotice } from "@/components/AppsScriptEnableNotice";
 import { AppTopBar } from "@/components/AppTopBar";
 import { CreateProjectBar } from "@/components/projects/CreateProjectBar";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import { FeedbackCard } from "@/components/projects/FeedbackCard";
 import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getAccessGate } from "@/lib/beta";
@@ -194,6 +195,7 @@ export default async function ProjectsPage() {
               {projects.map((p) => (
                 <ProjectCard key={p.id} project={p} deployUrl={deployed[p.id]} />
               ))}
+              <FeedbackCard />
             </div>
           )}
         </div>

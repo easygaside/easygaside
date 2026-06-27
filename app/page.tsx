@@ -8,6 +8,7 @@ import {
   SparklesIcon,
   Squares2X2Icon,
 } from "@heroicons/react/24/outline";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentUser } from "@/lib/projects";
 
 export const metadata = {
@@ -34,9 +35,35 @@ const FEATURES = [
   },
 ];
 
+async function getSystemStats() {
+  const svc = createServiceClient();
+  const [{ data: gens }, { data: projs }] = await Promise.all([
+    svc.from("egs_generations").select("input_tokens, output_tokens, project_id"),
+    svc.from("egs_projects").select("id"),
+  ]);
+
+  const totalInTokens = (gens ?? []).reduce((sum, g) => sum + (g.input_tokens || 0), 0);
+  const totalOutTokens = (gens ?? []).reduce((sum, g) => sum + (g.output_tokens || 0), 0);
+  const totalTokens = totalInTokens + totalOutTokens;
+
+  // Count unique projects that have generations
+  const projectsWithGens = new Set((gens ?? []).map((g) => g.project_id).filter(Boolean));
+  const totalProjects = projectsWithGens.size || (projs?.length || 0);
+
+  return { totalTokens, totalProjects };
+}
+
+function formatNumber(num: number): string {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+  if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+  return num.toString();
+}
+
 export default async function Home() {
   const user = await getCurrentUser();
   if (user) redirect("/projects"); // returning users go straight to work
+
+  const stats = await getSystemStats();
 
   return (
     <main className="min-h-screen bg-[#eef2f8] text-slate-800 dark:bg-[#0b0f14] dark:text-slate-100">
@@ -94,6 +121,35 @@ export default async function Home() {
           >
             <Squares2X2Icon className="h-4 w-4" /> เลือกสไตล์ให้เว็บคุณ
           </Link>
+        </div>
+      </section>
+
+      {/* stats cards */}
+      <section className="mx-auto max-w-5xl px-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="group relative overflow-hidden rounded-3xl border border-emerald-200/60 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm transition-all hover:shadow-md dark:border-emerald-900/50 dark:from-emerald-950/40 dark:to-slate-900">
+            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-emerald-500/10 blur-2xl transition-all group-hover:bg-emerald-500/20" />
+            <div className="relative">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400">
+                โทเคนที่ใช้ทั้งหมด
+              </p>
+              <p className="mt-2 text-4xl font-extrabold text-slate-900 dark:text-white">
+                {formatNumber(stats.totalTokens)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">จำนวน AI tokens ที่ใช้ไปแล้วในระบบ</p>
+            </div>
+          </div>
+
+          <div className="group relative overflow-hidden rounded-3xl border border-violet-200/60 bg-gradient-to-br from-violet-50 to-white p-6 shadow-sm transition-all hover:shadow-md dark:border-violet-900/50 dark:from-violet-950/40 dark:to-slate-900">
+            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-violet-500/10 blur-2xl transition-all group-hover:bg-violet-500/20" />
+            <div className="relative">
+              <p className="text-xs font-semibold uppercase tracking-wider text-violet-600/80 dark:text-violet-400">
+                โปรเจ็คที่สร้างแล้ว
+              </p>
+              <p className="mt-2 text-4xl font-extrabold text-slate-900 dark:text-white">{stats.totalProjects}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">โปรเจ็คที่ถูกสร้างบน EasyGAS</p>
+            </div>
+          </div>
         </div>
       </section>
 

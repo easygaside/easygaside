@@ -124,35 +124,6 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* stats cards */}
-      <section className="mx-auto max-w-5xl px-5">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="group relative overflow-hidden rounded-3xl border border-emerald-200/60 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm transition-all hover:shadow-md dark:border-emerald-900/50 dark:from-emerald-950/40 dark:to-slate-900">
-            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-emerald-500/10 blur-2xl transition-all group-hover:bg-emerald-500/20" />
-            <div className="relative">
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400">
-                โทเคนที่ใช้ทั้งหมด
-              </p>
-              <p className="mt-2 text-4xl font-extrabold text-slate-900 dark:text-white">
-                {formatNumber(stats.totalTokens)}
-              </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">จำนวน AI tokens ที่ใช้ไปแล้วในระบบ</p>
-            </div>
-          </div>
-
-          <div className="group relative overflow-hidden rounded-3xl border border-violet-200/60 bg-gradient-to-br from-violet-50 to-white p-6 shadow-sm transition-all hover:shadow-md dark:border-violet-900/50 dark:from-violet-950/40 dark:to-slate-900">
-            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-violet-500/10 blur-2xl transition-all group-hover:bg-violet-500/20" />
-            <div className="relative">
-              <p className="text-xs font-semibold uppercase tracking-wider text-violet-600/80 dark:text-violet-400">
-                โปรเจ็คที่สร้างแล้ว
-              </p>
-              <p className="mt-2 text-4xl font-extrabold text-slate-900 dark:text-white">{stats.totalProjects}</p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">โปรเจ็คที่ถูกสร้างบน EasyGAS</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* features */}
       <section className="mx-auto grid max-w-5xl gap-4 px-5 sm:grid-cols-3">
         {FEATURES.map((f) => (
@@ -192,6 +163,30 @@ export default async function Home() {
       <section className="mx-auto mt-6 max-w-5xl px-5">
         <div className="rounded-3xl border border-dashed border-slate-300 bg-white/50 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
           🚧 เร็วๆ นี้: <b className="text-slate-700 dark:text-slate-200">ผลงานยอดนิยมประจำสัปดาห์</b> — ดูเครื่องมือที่คนอื่นสร้าง แล้วกด &ldquo;ต่อยอด&rdquo; เป็นของคุณได้
+        </div>
+      </section>
+
+      {/* live stats banner */}
+      <section className="mx-auto max-w-5xl px-5">
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white/80 px-5 py-3 shadow-sm backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">ระบบกำลังทำงาน</span>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-center">
+              <p className="text-xs text-slate-400 dark:text-slate-500">โทเคนที่ใช้</p>
+              <p className="text-lg font-bold text-slate-700 dark:text-slate-200">{formatNumber(stats.totalTokens)}</p>
+            </div>
+            <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
+            <div className="text-center">
+              <p className="text-xs text-slate-400 dark:text-slate-500">โปรเจ็ค</p>
+              <p className="text-lg font-bold text-slate-700 dark:text-slate-200">{stats.totalProjects}</p>
+            </div>
+          </div>
         </div>
       </section>
 

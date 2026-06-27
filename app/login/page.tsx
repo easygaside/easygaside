@@ -2,8 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { AuthShell, AUTH_CARD } from "@/components/auth/AuthShell";
+import { StepImages } from "@/components/StepImages";
+
+const TR = "https://qimwyprjnlejefeukuuy.supabase.co/storage/v1/object/public/tr";
+const CONSENT_STEPS = [
+  { src: `${TR}/1.png`, alt: "จอเตือน Google hasn't verified this app — กด Advanced" },
+  { src: `${TR}/2.png`, alt: "กด Go to EasyGAS (unsafe)" },
+  { src: `${TR}/3-4.png`, alt: "กดอนุญาตสิทธิ์ให้ EasyGAS" },
+];
 
 const URL_ERR: Record<string, string> = {
   signin_failed: "เข้าสู่ระบบด้วย Google ไม่สำเร็จ ลองอีกครั้ง",
@@ -97,6 +106,22 @@ export default function LoginPage() {
             {error}
           </p>
         )}
+
+        {/* unverified-app note — same as connect page */}
+        <details className="group mt-5 rounded-xl border border-slate-200/70 bg-slate-50/50 px-3.5 py-2.5 text-[13px] dark:border-slate-800 dark:bg-slate-800/20">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-slate-500 dark:text-slate-400">
+            <ExclamationTriangleIcon className="h-4 w-4 text-amber-500" />
+            จะเห็นจอเตือน “Google hasn't verified this app” — ปกติของช่วงเบต้า
+            <span className="ml-auto text-slate-400 transition group-open:rotate-180">⌄</span>
+          </summary>
+          <p className="mt-2 leading-relaxed text-slate-500 dark:text-slate-400">
+            แอปยังไม่ผ่าน Google verification (อยู่ระหว่างเบต้า) — ที่จอเตือนให้กด{" "}
+            <strong className="text-slate-700 dark:text-slate-200">Advanced</strong> →{" "}
+            <strong className="text-slate-700 dark:text-slate-200">Go to EasyGAS (unsafe)</strong>{" "}
+            เพื่อดำเนินการต่อ ไม่กระทบความปลอดภัยของบัญชีคุณ
+          </p>
+          <StepImages images={CONSENT_STEPS} />
+        </details>
       </div>
     </AuthShell>
   );

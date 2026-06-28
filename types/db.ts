@@ -68,6 +68,7 @@ export interface EgsDeployment {
   exec_url: string | null;
   version_number: number | null;
   content_hash: string | null; // hash of the files last deployed → re-deploy change-detection
+  oauth_scopes: string[]; // manifest oauthScopes of the last deploy → scope-growth detection on redeploy
   created_at: string;
   updated_at: string;
 }

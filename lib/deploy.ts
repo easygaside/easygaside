@@ -55,6 +55,24 @@ function ensureWebAppDeployConfig(apiFiles: GasFile[]): GasFile[] {
   }
 }
 
+/** The oauthScopes declared in the manifest we're about to push (for scope-growth detection). */
+function manifestScopes(apiFiles: GasFile[]): string[] {
+  const m = apiFiles.find((f) => f.type === "JSON" && f.name.toLowerCase() === "appsscript");
+  if (!m) return [];
+  try {
+    const parsed = JSON.parse(m.source) as { oauthScopes?: unknown };
+    // cap count + length — the manifest is user/AI-editable, so bound what we store + echo to the client.
+    // Real Google scope URIs are short well-known strings, so 50×256 is a generous upper bound.
+    return Array.isArray(parsed.oauthScopes)
+      ? parsed.oauthScopes
+          .filter((s): s is string => typeof s === "string" && s.length <= 256)
+          .slice(0, 50)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export interface DeployResult {
   execUrl?: string;
   scriptId: string;
@@ -62,6 +80,9 @@ export interface DeployResult {
   scriptEditorUrl: string;
   /** true when the files were identical to the last deploy → nothing was pushed (URL reused as-is). */
   unchanged: boolean;
+  /** Manifest scopes added vs the previous deploy (empty on first deploy / no change). The OWNER must
+   *  re-authorize the script (consent B — customer-side) for these; the UI shows a re-consent note. */
+  scopesAdded: string[];
 }
 
 export async function deployProject(
@@ -96,12 +117,25 @@ export async function deployProject(
       needsTriggerSetup,
       scriptEditorUrl: `https://script.google.com/d/${project.script_id}/edit`,
       unchanged: true,
+      scopesAdded: [],
     };
   }
 
   const apiFiles = ensureWebAppDeployConfig(
     toApiFiles(files.map((f) => ({ path: f.path, content: f.content }))),
   );
+
+  // scope-growth detection: the manifest scopes we're pushing vs what the previous deploy carried.
+  // Only a RE-deploy that adds a scope beyond the recorded baseline needs the owner to re-authorize
+  // the script (consent B). First deploy / no recorded baseline → don't nag (first-access consent covers it).
+  // NOTE (one-time blind spot): the oauth_scopes column ships with DEFAULT '{}', so every pre-existing
+  // deployment starts with an empty baseline. On its FIRST redeploy after this feature, prevScopes is
+  // empty → we skip the diff (no false nag); the real baseline is written that run, so the 2nd redeploy
+  // onward detects growth correctly. Google's own /exec consent still catches the gap in the meantime.
+  const newScopes = manifestScopes(apiFiles);
+  const prevScopes = existing?.oauth_scopes ?? [];
+  const scopesAdded =
+    existing && prevScopes.length > 0 ? newScopes.filter((s) => !prevScopes.includes(s)) : [];
 
   // 1. ensure the script exists (reuse forever)
   let scriptId = project.script_id;
@@ -125,7 +159,7 @@ export async function deployProject(
     webAppUrl = r.webAppUrl;
     await svc
       .from("egs_deployments")
-      .update({ exec_url: webAppUrl, version_number: versionNumber, content_hash: deployHash, updated_at: new Date().toISOString() })
+      .update({ exec_url: webAppUrl, version_number: versionNumber, content_hash: deployHash, oauth_scopes: newScopes, updated_at: new Date().toISOString() })
       .eq("id", existing.id);
   } else {
     const r = await createDeployment(accessToken, scriptId, versionNumber, project.name);
@@ -137,6 +171,7 @@ export async function deployProject(
       exec_url: webAppUrl,
       version_number: versionNumber,
       content_hash: deployHash,
+      oauth_scopes: newScopes,
     });
   }
 
@@ -146,6 +181,7 @@ export async function deployProject(
     needsTriggerSetup,
     scriptEditorUrl: `https://script.google.com/d/${scriptId}/edit`,
     unchanged: false,
+    scopesAdded,
   };
 }
 

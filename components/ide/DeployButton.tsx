@@ -5,6 +5,7 @@ import {
   ArrowTopRightOnSquareIcon,
   CheckCircleIcon,
   ClockIcon,
+  ExclamationTriangleIcon,
   RocketLaunchIcon,
 } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
@@ -14,7 +15,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 type Result =
   | { kind: "idle" }
   | { kind: "busy" }
-  | { kind: "ok"; execUrl?: string; needsTriggerSetup: boolean; scriptEditorUrl: string }
+  | { kind: "ok"; execUrl?: string; needsTriggerSetup: boolean; scriptEditorUrl: string; scopesAdded: string[] }
   | { kind: "enable_api"; enableUrl: string; message: string }
   | { kind: "error"; message: string };
 
@@ -25,6 +26,20 @@ const ERR_MSG: Record<string, string> = {
   NO_FILES: "ยังไม่มีไฟล์ให้ deploy — ให้ AI สร้างระบบก่อน",
   UNKNOWN: "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง",
 };
+
+// Friendly Thai labels for scopes a redeploy may newly require (owner must re-authorize the script).
+const SCOPE_LABELS: Record<string, string> = {
+  "https://www.googleapis.com/auth/script.scriptapp": "ตั้งเวลา/แจ้งเตือนอัตโนมัติ",
+  "https://www.googleapis.com/auth/script.send_mail": "ส่งอีเมล",
+  "https://mail.google.com/": "ส่งอีเมล",
+  "https://www.googleapis.com/auth/documents": "สร้างเอกสาร/PDF",
+  "https://www.googleapis.com/auth/drive": "จัดการไฟล์ใน Drive",
+  "https://www.googleapis.com/auth/drive.file": "ไฟล์ที่แอปสร้าง",
+  "https://www.googleapis.com/auth/spreadsheets": "Google Sheets",
+};
+function scopeLabel(s: string): string {
+  return SCOPE_LABELS[s] ?? s.replace("https://www.googleapis.com/auth/", "");
+}
 
 export function DeployButton({
   projectId,
@@ -62,6 +77,7 @@ export function DeployButton({
           execUrl: data.execUrl,
           needsTriggerSetup: !!data.needsTriggerSetup,
           scriptEditorUrl: data.scriptEditorUrl,
+          scopesAdded: Array.isArray(data.scopesAdded) ? data.scopesAdded : [],
         });
         if (data.execUrl) onDeployed?.(data.execUrl); // surface the URL in the persistent bar
       } else if (data.error === "USER_SETTINGS_DISABLED") {
@@ -178,6 +194,12 @@ export function DeployButton({
                     >
                       เปิดสคริปต์ <ArrowTopRightOnSquareIcon className="inline h-3 w-3 align-text-bottom" />
                     </a>
+                  </div>
+                )}
+                {res.scopesAdded.length > 0 && (
+                  <div className="rounded-xl bg-amber-50 dark:bg-amber-950/40 p-3 text-xs text-amber-700 dark:text-amber-300">
+                    <ExclamationTriangleIcon className="inline h-4 w-4 align-text-bottom text-amber-600 dark:text-amber-400" />{" "}
+                    ฟีเจอร์ใหม่ต้องการสิทธิ์เพิ่ม: <b>{res.scopesAdded.map(scopeLabel).join(", ")}</b> — เปิดแอปของคุณ (ลิงก์ด้านบน) หลังอัปเดตนี้ ถ้าแอปขึ้นปุ่ม “กดอนุญาตสิทธิ์” ให้กดครั้งเดียว (Advanced → Allow) แล้วใช้ได้เลย
                   </div>
                 )}
                 <button

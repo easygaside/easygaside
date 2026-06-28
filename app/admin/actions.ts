@@ -78,6 +78,15 @@ export async function setEnergyTankDefaultAction(tank: number): Promise<void> {
   revalidatePath("/admin");
 }
 
+/** Set the free monthly token pool per user (pooled across projects) — egs_app_settings.free_monthly_pool. */
+export async function setMonthlyPoolAction(tokens: number): Promise<void> {
+  await requireSuperAdmin();
+  const n = Math.floor(tokens);
+  if (!Number.isFinite(n) || n < 10_000 || n > 100_000_000) throw new Error("bad_pool");
+  await setAppSetting("free_monthly_pool", String(n));
+  revalidatePath("/admin");
+}
+
 /** Set the per-arm energy tank (tokens) — egs_provider_config.energy_tank. */
 export async function setProviderTankAction(provider: LlmProvider, tank: number): Promise<void> {
   await requireSuperAdmin();
@@ -89,6 +98,23 @@ export async function setProviderTankAction(provider: LlmProvider, tank: number)
     .from("egs_provider_config")
     .upsert({ provider, energy_tank: n }, { onConflict: "provider" });
   if (error) throw new Error(`setProviderTank: ${error.message}`);
+  revalidatePath("/admin");
+}
+
+/**
+ * Set the per-arm API base URL override — egs_provider_config.base_url (OpenAI-family arms).
+ * Empty string clears it (falls back to env/static default). Must be an https URL when set.
+ */
+export async function setProviderBaseUrlAction(provider: LlmProvider, baseUrl: string): Promise<void> {
+  await requireSuperAdmin();
+  if (!LLM_PROVIDERS.includes(provider)) throw new Error("bad_provider");
+  const url = baseUrl.trim();
+  if (url && !/^https:\/\/[^\s]+$/i.test(url)) throw new Error("bad_url");
+  const svc = createServiceClient();
+  const { error } = await svc
+    .from("egs_provider_config")
+    .upsert({ provider, base_url: url || null }, { onConflict: "provider" });
+  if (error) throw new Error(`setProviderBaseUrl: ${error.message}`);
   revalidatePath("/admin");
 }
 

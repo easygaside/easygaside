@@ -42,7 +42,7 @@ export default async function AdminPage() {
         .select(
           "provider, model, project_id, user_id, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, critic_issues, duration_ms, outcome, rating, created_at",
         ),
-      svc.from("egs_provider_config").select("provider, model, energy_tank"),
+      svc.from("egs_provider_config").select("provider, model, energy_tank, base_url"),
       svc.from("egs_app_settings").select("key, value"),
     ]);
   const [
@@ -106,17 +106,19 @@ export default async function AdminPage() {
   };
 
   const cfgByProvider = new Map(
-    (pcfg ?? []).map((r) => [r.provider as LlmProvider, r as { model: string; energy_tank: number | null }]),
+    (pcfg ?? []).map((r) => [r.provider as LlmProvider, r as { model: string; energy_tank: number | null; base_url: string | null }]),
   );
   const models = LLM_PROVIDERS.map((p) => ({
     provider: p,
     model: cfgByProvider.get(p)?.model ?? "",
     energyTank: Number(cfgByProvider.get(p)?.energy_tank ?? 0) || 0,
+    baseUrl: cfgByProvider.get(p)?.base_url ?? "",
   }));
   const appSettings = new Map((appcfg ?? []).map((r) => [r.key as string, r.value as string]));
   const defaultProvider = ((appSettings.get("default_provider") as LlmProvider) ?? "claude") as LlmProvider;
   const dailyLimit = Number(appSettings.get("daily_limit") ?? 30) || 30;
   const monthlyToolLimit = Number(appSettings.get("monthly_tool_limit") ?? 2) || 2;
+  const freeMonthlyPool = Number(appSettings.get("free_monthly_pool") ?? 800000) || 800000;
   const energyTankDefault = Number(appSettings.get("energy_tank_default") ?? 400000) || 400000;
   const betaEnforced =
     (appSettings.get("beta_enforced") ?? (process.env.BETA_MODE !== "off" ? "on" : "off")) !== "off";
@@ -297,6 +299,7 @@ export default async function AdminPage() {
       defaultProvider={defaultProvider}
       dailyLimit={dailyLimit}
       monthlyToolLimit={monthlyToolLimit}
+      freeMonthlyPool={freeMonthlyPool}
       energyTankDefault={energyTankDefault}
       betaEnforced={betaEnforced}
       criticProvider={criticProvider}

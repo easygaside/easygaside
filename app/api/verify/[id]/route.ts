@@ -5,7 +5,7 @@ import { runOpenAiAgentLoop } from "@/lib/openai-agent";
 import { resolveProjectProvider, resolveProvider } from "@/lib/llm/provider";
 import { getAccessGate, getOwnApiKey } from "@/lib/beta";
 import { deployProject } from "@/lib/deploy";
-import { ENERGY_EXHAUSTED_MSG, getEnergyTank, getProjectEnergyUsed } from "@/lib/energy";
+import { POOL_EXHAUSTED_MSG, getMonthlyPool, getUserMonthlyEnergyUsed } from "@/lib/energy";
 import { probeExec } from "@/lib/gas-verify";
 import { logGeneration } from "@/lib/metrics";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
@@ -46,11 +46,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!(await checkRateLimit(user.id, AGENT_RATE)))
     return NextResponse.json({ error: "rate_limited", message: "เร็วไปนิดนึง — รอสักครู่นะครับ" }, { status: 429 });
 
-  // per-project energy tank — platform-key users are capped; BYOK (own key) bypasses (own cost)
+  // monthly credit pool — platform-key users are capped; BYOK (own key) bypasses (own cost)
   if (!(await getOwnApiKey(user.id))) {
-    const used = await getProjectEnergyUsed(id);
-    if (used >= (await getEnergyTank(user.email, project.llm_provider)))
-      return NextResponse.json({ error: "energy_exhausted", message: ENERGY_EXHAUSTED_MSG }, { status: 429 });
+    const used = await getUserMonthlyEnergyUsed(user.id);
+    if (used >= (await getMonthlyPool(user.email)))
+      return NextResponse.json({ error: "energy_exhausted", message: POOL_EXHAUSTED_MSG }, { status: 429 });
   }
 
   // share the per-project run lock with the agent (no overlapping writes/deploys)

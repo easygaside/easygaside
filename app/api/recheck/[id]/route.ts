@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getOwnApiKey } from "@/lib/beta";
-import { ENERGY_EXHAUSTED_MSG, getEnergyTank, getProjectEnergyUsed } from "@/lib/energy";
+import { POOL_EXHAUSTED_MSG, getMonthlyPool, getUserMonthlyEnergyUsed } from "@/lib/energy";
 import { reviewProject, getCriticInfo, type CriticIssue } from "@/lib/critic";
 import { getFiles } from "@/lib/files";
 import { validateGasFiles } from "@/lib/gas-codegen";
@@ -34,12 +34,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const project = await getProject(id); // RLS-scoped → null if not owned
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  // per-project energy tank — platform-key users are capped; BYOK (own key) bypasses (own cost)
+  // monthly credit pool — platform-key users are capped; BYOK (own key) bypasses (own cost)
   if (!(await getOwnApiKey(user.id))) {
-    const used = await getProjectEnergyUsed(id);
-    if (used >= (await getEnergyTank(user.email, project.llm_provider)))
+    const used = await getUserMonthlyEnergyUsed(user.id);
+    if (used >= (await getMonthlyPool(user.email)))
       return NextResponse.json(
-        { error: "energy_exhausted", issues: [], message: ENERGY_EXHAUSTED_MSG },
+        { error: "energy_exhausted", issues: [], message: POOL_EXHAUSTED_MSG },
         { status: 429 },
       );
   }

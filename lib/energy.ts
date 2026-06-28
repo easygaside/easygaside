@@ -1,4 +1,5 @@
 import { isSuperAdmin } from "@/lib/admin";
+import { bangkokMonthStartISO } from "@/lib/month";
 import { getNumberSetting } from "@/lib/settings";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -63,3 +64,49 @@ export async function getProjectEnergyUsed(projectId: string): Promise<number> {
     0,
   );
 }
+
+// ── monthly credit/แต้ม pool (per-USER, pooled across ALL the user's projects) ──
+// Replaces the per-project tank for enforcement: one monthly token budget spendable on any project,
+// so a complex tool isn't walled by an arbitrary per-project ceiling (see docs/CRITIC-FINDINGS notes).
+// 1 แต้ม = CREDIT_TOKENS tokens; the bar shows แต้ม, never raw tokens. The pool resets each calendar month.
+
+export const CREDIT_TOKENS = 10_000;
+export const FREE_MONTHLY_POOL_FALLBACK = 800_000; // free plan: 800k tokens/เดือน (= 80 แต้ม)
+
+/** tokens → แต้ม (floor; never negative). */
+export function tokensToCredits(tokens: number): number {
+  return Math.max(0, Math.floor(tokens / CREDIT_TOKENS));
+}
+
+/** Start of the current month in Asia/Bangkok (UTC ISO) — the pool resets at Thai midnight on the 1st. */
+function monthStartISO(): string {
+  return bangkokMonthStartISO();
+}
+
+/** The monthly token pool for DISPLAY (always finite — never the superadmin Infinity). */
+export async function monthlyPoolSize(): Promise<number> {
+  return getNumberSetting("free_monthly_pool", FREE_MONTHLY_POOL_FALLBACK);
+}
+
+/** The monthly token pool for ENFORCEMENT — superadmins are uncapped (founder testing). */
+export async function getMonthlyPool(email: string | null | undefined): Promise<number> {
+  return isSuperAdmin(email) ? Number.POSITIVE_INFINITY : monthlyPoolSize();
+}
+
+/** Tokens (input+output) the user has spent across ALL their projects this calendar month. */
+export async function getUserMonthlyEnergyUsed(userId: string): Promise<number> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_generations")
+    .select("input_tokens, output_tokens")
+    .eq("user_id", userId)
+    .gte("created_at", monthStartISO());
+  return (data ?? []).reduce(
+    (a, r) => a + ((r.input_tokens as number) ?? 0) + ((r.output_tokens as number) ?? 0),
+    0,
+  );
+}
+
+/** Shown when the monthly pool is exhausted (chat / verify / re-check). */
+export const POOL_EXHAUSTED_MSG =
+  "แต้มเดือนนี้หมดแล้ว — เดือนหน้าแต้มจะรีเซ็ตอัตโนมัติ หรือใส่ Anthropic API key ของคุณเองในหน้า ตั้งค่า เพื่อใช้แบบไม่จำกัด";

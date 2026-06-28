@@ -11,6 +11,18 @@ export type LlmFamily = "anthropic" | "openai";
 export const LLM_PROVIDERS: LlmProvider[] = ["claude", "chatgpt", "deepseek", "deepseek-pro", "gemini", "zai"];
 export const DEFAULT_PROVIDER: LlmProvider = "claude";
 
+/**
+ * Admin endpoint presets per provider — so the operator switches the base URL by PICKING from a
+ * dropdown, not typing. url:"" = clear the override (fall back to env/static default in providerConfig).
+ * Only providers listed here show the endpoint selector in /admin.
+ */
+export const BASE_URL_PRESETS: Partial<Record<LlmProvider, { label: string; url: string }[]>> = {
+  zai: [
+    { label: "ค่าเริ่มต้น · standalone API (ปลอดภัยเชิงพาณิชย์)", url: "" },
+    { label: "Coding Plan · /api/coding (เสี่ยง ToS)", url: "https://api.z.ai/api/coding/paas/v4" },
+  ],
+};
+
 export interface ProviderConfig {
   provider: LlmProvider;
   family: LlmFamily;
@@ -86,14 +98,18 @@ export function providerConfig(p: LlmProvider): ProviderConfig {
         vision: true,
       };
     case "zai":
-      // z.ai (Zhipu GLM) — OpenAI-format chat/completions at /paas/v4 (Bearer ZAI_API_KEY). A coding-
-      // optimised variant lives at /api/coding/paas/v4 — swap baseURL if you want that one.
+      // z.ai (Zhipu GLM) — OpenAI-format chat/completions. ZAI_BASE_URL is env so we can swap the
+      // endpoint without a code change:
+      //   - https://api.z.ai/api/paas/v4         = standalone API (pay-as-you-go) — commercial/SaaS-safe (default)
+      //   - https://api.z.ai/api/coding/paas/v4  = Coding Plan subscription endpoint — NOTE: that plan
+      //     forbids "custom integrations / SDK-based access" (only supported coding tools); use the
+      //     standalone API for this product. See docs/CRITIC-FINDINGS.md / MONETIZATION notes.
       return {
         provider: "zai",
         family: "openai",
         label: "GLM (z.ai)",
         model: process.env.ZAI_MODEL ?? "glm-4.6",
-        baseURL: "https://api.z.ai/api/paas/v4",
+        baseURL: process.env.ZAI_BASE_URL ?? "https://api.z.ai/api/paas/v4",
         apiKey: process.env.ZAI_API_KEY,
         maxOutputTokens: 16000,
       };

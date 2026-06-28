@@ -21,15 +21,17 @@ import {
   setDefaultProviderAction,
   setEnergyTankDefaultAction,
   setMonthlyToolLimitAction,
+  setMonthlyPoolAction,
   setProviderModelAction,
   setProviderTankAction,
+  setProviderBaseUrlAction,
   setUserArmAction,
   setVisionProviderAction,
   addPaymentAction,
   deletePaymentAction,
   setFxRateAction,
 } from "@/app/admin/actions";
-import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/catalog";
+import { BASE_URL_PRESETS, LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/catalog";
 import { AllowlistManager, type AllowlistEntry } from "./AllowlistManager";
 import { BetaApplicationsViewer, type BetaApplication } from "./BetaApplicationsViewer";
 import { ReportsViewer, type FailureReport } from "./ReportsViewer";
@@ -185,6 +187,7 @@ export interface ProviderModel {
   provider: LlmProvider;
   model: string;
   energyTank: number;
+  baseUrl: string;
 }
 
 type Tab = "overview" | "finance" | "providers" | "users" | "beta" | "reports";
@@ -196,6 +199,7 @@ export function AdminPanel({
   defaultProvider,
   dailyLimit,
   monthlyToolLimit,
+  freeMonthlyPool,
   energyTankDefault,
   betaEnforced,
   criticProvider,
@@ -218,6 +222,7 @@ export function AdminPanel({
   defaultProvider: LlmProvider;
   dailyLimit: number;
   monthlyToolLimit: number;
+  freeMonthlyPool: number;
   energyTankDefault: number;
   betaEnforced: boolean;
   criticProvider: "claude" | "deepseek";
@@ -243,8 +248,12 @@ export function AdminPanel({
   const [tankDraft, setTankDraft] = useState<Record<string, string>>(
     Object.fromEntries(models.map((m) => [m.provider, String(m.energyTank)])),
   );
+  const [baseUrlDraft, setBaseUrlDraft] = useState<Record<string, string>>(
+    Object.fromEntries(models.map((m) => [m.provider, m.baseUrl])),
+  );
   const [limitDraft, setLimitDraft] = useState(String(dailyLimit));
   const [monthlyDraft, setMonthlyDraft] = useState(String(monthlyToolLimit));
+  const [poolDraft, setPoolDraft] = useState(String(freeMonthlyPool));
   const [tankDefaultDraft, setTankDefaultDraft] = useState(String(energyTankDefault));
   const [criticProviderDraft, setCriticProviderDraft] = useState<"claude" | "deepseek">(criticProvider);
   const [criticModelDraft, setCriticModelDraft] = useState(criticModel);
@@ -271,8 +280,10 @@ export function AdminPanel({
     run(async () => {
       await setProviderModelAction(p, modelDraft[p] ?? "");
       await setProviderTankAction(p, Number(tankDraft[p]));
+      await setProviderBaseUrlAction(p, baseUrlDraft[p] ?? "");
     });
   const saveMonthly = () => run(() => setMonthlyToolLimitAction(Number(monthlyDraft)));
+  const savePool = () => run(() => setMonthlyPoolAction(Number(poolDraft)));
   const saveTankDefault = () => run(() => setEnergyTankDefaultAction(Number(tankDefaultDraft)));
   const toggleBeta = () => run(() => setBetaEnforcedAction(!betaEnforced));
   const saveCritic = () => run(() => setCriticAction(criticProviderDraft, criticModelDraft));
@@ -624,12 +635,12 @@ export function AdminPanel({
               ))}
             </div>
 
-            <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">ชื่อโมเดล + ถังพลังงาน (token/โปรเจกต์) ของแต่ละ provider:</p>
+            <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">ชื่อโมเดล + ถังพลังงาน (token/โปรเจกต์) + API base URL (เว้นว่าง=ค่าเริ่มต้น) ของแต่ละ provider:</p>
             <div className="space-y-2.5">
               {LLM_PROVIDERS.map((p) => (
                 <div key={p} className="flex flex-col gap-2 rounded-lg border border-slate-100 p-2 sm:flex-row sm:items-center sm:border-0 sm:p-0 dark:border-slate-800 sm:dark:border-0">
                   <span className="text-xs font-medium text-slate-600 dark:text-slate-300 sm:w-20 sm:shrink-0">{p}</span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <input
                       value={modelDraft[p] ?? ""}
                       onChange={(e) => setModelDraft((d) => ({ ...d, [p]: e.target.value }))}
@@ -646,6 +657,20 @@ export function AdminPanel({
                       placeholder="token"
                       className="w-24 shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-mono text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800 sm:w-28"
                     />
+                    {BASE_URL_PRESETS[p] && (
+                      <select
+                        value={baseUrlDraft[p] ?? ""}
+                        onChange={(e) => setBaseUrlDraft((d) => ({ ...d, [p]: e.target.value }))}
+                        title="API endpoint (เลือกได้ ไม่ต้องพิมพ์ URL)"
+                        className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+                      >
+                        {BASE_URL_PRESETS[p]!.map((o) => (
+                          <option key={o.url} value={o.url}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <button
                       onClick={() => saveProviderRow(p)}
                       disabled={busy}
@@ -688,7 +713,23 @@ export function AdminPanel({
               </button>
             </div>
 
-            <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">ถังพลังงานเริ่มต้น (token/โปรเจกต์) — ใช้เมื่อ provider ไม่ได้ตั้งค่าเฉพาะ:</p>
+            <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">แต้มฟรีต่อคน/เดือน (pool รวมทุกโปรเจกต์ · 10,000 token = 1 แต้ม):</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={10000}
+                step={50000}
+                value={poolDraft}
+                onChange={(e) => setPoolDraft(e.target.value)}
+                className="w-32 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+              />
+              <span className="text-xs text-slate-400 dark:text-slate-500">token/เดือน (≈ {Math.floor(Number(poolDraft || 0) / 10000)} แต้ม)</span>
+              <button onClick={savePool} disabled={busy} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50">
+                บันทึก
+              </button>
+            </div>
+
+            <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">ถังพลังงานเริ่มต้น (token/โปรเจกต์) — legacy (ตอนนี้ใช้แต้มรายเดือนด้านบนแทน):</p>
             <div className="flex items-center gap-2">
               <input
                 type="number"

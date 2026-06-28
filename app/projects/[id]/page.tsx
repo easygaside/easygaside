@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { IdeShell } from "@/components/ide/IdeShell";
 import { getAccessGate } from "@/lib/beta";
 import { listProjectChatImages } from "@/lib/chat-images";
-import { energyTankFor, getProjectEnergyUsed } from "@/lib/energy";
+import { getUserMonthlyEnergyUsed, monthlyPoolSize } from "@/lib/energy";
 import { getFiles } from "@/lib/files";
 import { getConnectionStatus } from "@/lib/google-connection";
 import { getCurrentUser, getDeployedMap, getDeployedUrl, getProject, listProjects } from "@/lib/projects";
@@ -28,8 +28,8 @@ export default async function ProjectBuilderPage({
       getFiles(id),
       getConnectionStatus(userId),
       listProjectChatImages(id),
-      getProjectEnergyUsed(id),
-      energyTankFor(project.llm_provider),
+      getUserMonthlyEnergyUsed(userId),
+      monthlyPoolSize(),
       getDeployedUrl(id),
       listProjects(),
       getDeployedMap(),

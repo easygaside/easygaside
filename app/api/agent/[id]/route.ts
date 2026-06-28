@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { acquireProjectRun, releaseProjectRun } from "@/lib/agent-lock";
 import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
 import { getAccessGate, getOwnApiKey } from "@/lib/beta";
-import { ENERGY_EXHAUSTED_MSG, getEnergyTank, getProjectEnergyUsed } from "@/lib/energy";
+import { POOL_EXHAUSTED_MSG, getMonthlyPool, getUserMonthlyEnergyUsed } from "@/lib/energy";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { parseAttachedImages, storeChatImages, type AttachedImage } from "@/lib/chat-images";
 import { resolveProjectProvider, resolveProvider } from "@/lib/llm/provider";
@@ -106,15 +106,15 @@ export async function POST(
     );
   }
 
-  // Platform-key users only (BYOK = own cost → no platform cap). The per-PROJECT energy tank
-  // replaces the old per-day request count: a tool can be edited freely until its tank fills.
+  // Platform-key users only (BYOK = own cost → no platform cap). Monthly credit pool: one token
+  // budget pooled across ALL the user's projects (resets each calendar month), shown as แต้ม in the UI.
   if (!byok) {
-    const tank = await getEnergyTank(user.email, provider);
-    const energyUsed = await getProjectEnergyUsed(id);
-    if (energyUsed >= tank) {
+    const pool = await getMonthlyPool(user.email);
+    const used = await getUserMonthlyEnergyUsed(user.id);
+    if (used >= pool) {
       await releaseProjectRun(id);
       return NextResponse.json(
-        { error: "energy_exhausted", message: ENERGY_EXHAUSTED_MSG },
+        { error: "energy_exhausted", message: POOL_EXHAUSTED_MSG },
         { status: 429 },
       );
     }

@@ -51,9 +51,23 @@ export async function getProviderModel(p: LlmProvider): Promise<string> {
   return data?.model?.trim() || providerConfig(p).model;
 }
 
-/** Full config with the model name resolved from DB (use this on the request path). */
+/**
+ * Full config with the model name + base URL resolved from DB (use this on the request path).
+ * Precedence: DB (egs_provider_config) → env/static default in catalog. Empty DB values fall through.
+ */
 export async function resolveProvider(p: LlmProvider): Promise<ProviderConfig> {
-  return { ...providerConfig(p), model: await getProviderModel(p) };
+  const base = providerConfig(p);
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_provider_config")
+    .select("model, base_url")
+    .eq("provider", p)
+    .maybeSingle<{ model: string | null; base_url: string | null }>();
+  return {
+    ...base,
+    model: data?.model?.trim() || base.model,
+    baseURL: data?.base_url?.trim() || base.baseURL,
+  };
 }
 
 /** The user's assigned arm, or the system default when unassigned. */

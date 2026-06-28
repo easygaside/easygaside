@@ -71,19 +71,28 @@ const EDIT_SUGGESTIONS = [
   "กดแล้วขึ้น error — ช่วยแก้ให้",
 ];
 
-/** Small "energy" gauge = remaining per-project token budget. We never show raw token counts. */
+/** Monthly "แต้ม" (credit) gauge = แต้มที่ใช้ไป / ทั้งหมด ของ pool รายเดือน (แชร์ทุกโปรเจกต์).
+ *  1 แต้ม = 10k tokens; แสดง "ใช้ไป X/total" — bar เติมขึ้นตามการใช้, เขียว→แดงเมื่อใกล้เต็ม. รีเซ็ตรายเดือน. */
 function EnergyBar({ used, tank }: { used: number; tank: number }) {
-  const pct = Math.max(0, Math.min(100, Math.round((1 - used / tank) * 100)));
+  const finite = Number.isFinite(tank) && tank > 0;
+  const pctUsed = finite ? Math.max(0, Math.min(100, Math.round((used / tank) * 100))) : 0;
+  const total = finite ? Math.floor(tank / 10000) : 0;
+  const usedCredits = finite ? Math.min(total, Math.round(used / 10000)) : 0;
+  const label = finite ? `ใช้ไป ${usedCredits}/${total} แต้ม` : "ไม่จำกัด";
   const fill =
-    pct > 40 ? "from-emerald-400 to-emerald-600" : pct >= 15 ? "from-amber-400 to-amber-500" : "from-red-400 to-red-500";
+    pctUsed < 60 ? "from-emerald-400 to-emerald-600" : pctUsed < 85 ? "from-amber-400 to-amber-500" : "from-red-400 to-red-500";
   return (
-    <Tooltip label={`พลังงานเหลือ ${pct}% — ใช้สำหรับสร้าง/แก้โปรเจกต์นี้`} placement="bottom" className="w-full">
+    <Tooltip
+      label={finite ? `ใช้ไป ${usedCredits}/${total} แต้มเดือนนี้ — รวมทุกเครื่องมือ รีเซ็ตต้นเดือนหน้า` : "ไม่จำกัด"}
+      placement="bottom"
+      className="w-full"
+    >
       <div className="flex w-full items-center gap-2.5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-800/50 dark:bg-emerald-950/30">
         <BoltIcon className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
         <span className="h-[7px] min-w-0 flex-1 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-950/60">
-          <span className={`block h-full rounded-full bg-gradient-to-r ${fill} transition-all`} style={{ width: `${pct}%` }} />
+          <span className={`block h-full rounded-full bg-gradient-to-r ${fill} transition-all`} style={{ width: `${pctUsed}%` }} />
         </span>
-        <span className="shrink-0 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">{pct}%</span>
+        <span className="shrink-0 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">{label}</span>
       </div>
     </Tooltip>
   );

@@ -109,7 +109,7 @@ export async function POST(
   // Platform-key users only (BYOK = own cost → no platform cap). Monthly credit pool: one token
   // budget pooled across ALL the user's projects (resets each calendar month), shown as แต้ม in the UI.
   if (!byok) {
-    const pool = await getMonthlyPool(user.email);
+    const pool = await getMonthlyPool(user.id, user.email);
     const used = await getUserMonthlyEnergyUsed(user.id);
     if (used >= pool) {
       await releaseProjectRun(id);

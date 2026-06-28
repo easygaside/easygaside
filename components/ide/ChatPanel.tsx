@@ -372,9 +372,14 @@ export function ChatPanel({
         </div>
 
         {energyTank ? (
-          <div className="mb-3">
+          <div className="mb-3 space-y-1.5">
             <EnergyBar used={energy} tank={energyTank} />
-            <UpgradeModelButton projectId={projectId} currentArm={currentArm} isPaid={isPaid} />
+            <UpgradeModelButton
+              projectId={projectId}
+              currentArm={currentArm}
+              isPaid={isPaid}
+              lowCredit={!!energyTank && energy / energyTank > 0.85}
+            />
           </div>
         ) : null}
 

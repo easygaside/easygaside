@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { isSuperAdmin } from "@/lib/admin";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { bangkokMonthStartISO } from "@/lib/month";
+import { PLAN_CONFIG, getUserPlan } from "@/lib/plan";
 import { getBoolSetting, getNumberSetting } from "@/lib/settings";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -165,7 +166,7 @@ export async function getMonthlyToolLimit(): Promise<number> {
 }
 
 /** "เหลือสร้างใหม่ N ตัว" — NEW tools (projects) the user created this calendar month vs the plan. */
-export async function getMonthlyToolUsage(userId: string): Promise<QuotaStatus> {
+export async function getMonthlyToolUsage(userId: string, email?: string | null): Promise<QuotaStatus> {
   const svc = createServiceClient();
   const monthStart = bangkokMonthStartISO(); // Thai-month boundary (matches the credit pool reset)
   // INTENTIONALLY counts soft-deleted projects too (no deleted_at filter): the quota is "tools
@@ -176,7 +177,8 @@ export async function getMonthlyToolUsage(userId: string): Promise<QuotaStatus> 
     .eq("owner_id", userId)
     .gte("created_at", monthStart);
   const used = count ?? 0;
-  const limit = await getMonthlyToolLimit();
+  const plan = await getUserPlan(userId, email);
+  const limit = plan === "free" ? await getMonthlyToolLimit() : PLAN_CONFIG[plan].tools;
   return { used, limit, remaining: Math.max(0, limit - used) };
 }
 
@@ -192,7 +194,7 @@ export async function canCreateNewTool(
     const inf = Number.POSITIVE_INFINITY;
     return { ok: true, usage: { used: 0, limit: inf, remaining: inf } };
   }
-  const usage = await getMonthlyToolUsage(userId);
+  const usage = await getMonthlyToolUsage(userId, email);
   return { ok: usage.remaining > 0, usage };
 }
 

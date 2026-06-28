@@ -49,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // monthly credit pool — platform-key users are capped; BYOK (own key) bypasses (own cost)
   if (!(await getOwnApiKey(user.id))) {
     const used = await getUserMonthlyEnergyUsed(user.id);
-    if (used >= (await getMonthlyPool(user.email)))
+    if (used >= (await getMonthlyPool(user.id, user.email)))
       return NextResponse.json({ error: "energy_exhausted", message: POOL_EXHAUSTED_MSG }, { status: 429 });
   }
 

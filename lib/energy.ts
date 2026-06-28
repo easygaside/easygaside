@@ -1,5 +1,6 @@
 import { isSuperAdmin } from "@/lib/admin";
 import { bangkokMonthStartISO } from "@/lib/month";
+import { PLAN_CONFIG, getUserPlan } from "@/lib/plan";
 import { getNumberSetting } from "@/lib/settings";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -83,14 +84,20 @@ function monthStartISO(): string {
   return bangkokMonthStartISO();
 }
 
-/** The monthly token pool for DISPLAY (always finite — never the superadmin Infinity). */
-export async function monthlyPoolSize(): Promise<number> {
-  return getNumberSetting("free_monthly_pool", FREE_MONTHLY_POOL_FALLBACK);
+/** The FREE-tier pool (admin-editable 'free_monthly_pool'); paid-tier pools come from PLAN_CONFIG. */
+async function freePoolSize(): Promise<number> {
+  return getNumberSetting("free_monthly_pool", PLAN_CONFIG.free.pool);
+}
+
+/** The monthly token pool for a user's plan (always finite — display + the base of enforcement). */
+export async function poolSizeForUser(userId: string, email?: string | null): Promise<number> {
+  const plan = await getUserPlan(userId, email);
+  return plan === "free" ? await freePoolSize() : PLAN_CONFIG[plan].pool;
 }
 
 /** The monthly token pool for ENFORCEMENT — superadmins are uncapped (founder testing). */
-export async function getMonthlyPool(email: string | null | undefined): Promise<number> {
-  return isSuperAdmin(email) ? Number.POSITIVE_INFINITY : monthlyPoolSize();
+export async function getMonthlyPool(userId: string, email?: string | null): Promise<number> {
+  return isSuperAdmin(email) ? Number.POSITIVE_INFINITY : poolSizeForUser(userId, email);
 }
 
 /** Tokens (input+output) the user has spent across ALL their projects this calendar month. */

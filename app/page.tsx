@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  ArrowRightOnRectangleIcon,
   BoltIcon,
   CheckBadgeIcon,
   RocketLaunchIcon,
@@ -114,12 +115,18 @@ export default async function Home() {
         <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
           สร้างเครื่องมือบน <span className="text-emerald-600 dark:text-emerald-400">Google Apps Script</span> ด้วยการพิมพ์คุยกับ AI
         </h1>
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-7 flex flex-row items-stretch justify-center gap-3">
           <Link
             href="/styleshopping"
-            className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:flex-none"
           >
-            <Squares2X2Icon className="h-4 w-4" /> เลือกสไตล์ให้เว็บคุณ
+            <Squares2X2Icon className="h-4 w-4 shrink-0" /> เลือกสไตล์ให้เว็บคุณ
+          </Link>
+          <Link
+            href="/login"
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 sm:flex-none"
+          >
+            <ArrowRightOnRectangleIcon className="h-4 w-4 shrink-0" /> ลงทะเบียน / เข้าสู่ระบบ
           </Link>
         </div>
       </section>

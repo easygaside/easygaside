@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
     // Allow large Server Action / route payloads (full GAS file sets pushed to the API).
     serverActions: { bodySizeLimit: "4mb" },
   },
+  async redirects() {
+    return [
+      // The closed-beta page is retired — send anyone landing on /beta to the home page.
+      { source: "/beta", destination: "/", permanent: false },
+    ];
+  },
   // Baseline security headers (SECURITY-TODO M-4). A full nonce-based script CSP is still a
   // separate, larger task (Monaco, Supabase, and the preview iframe need careful allowances), so
   // we deliberately do NOT set `script-src`/`default-src` here. The CSP below only locks framing

@@ -38,6 +38,7 @@ import { AllowlistManager, type AllowlistEntry } from "./AllowlistManager";
 import { BetaApplicationsViewer, type BetaApplication } from "./BetaApplicationsViewer";
 import { UpgradeRequestsViewer, type UpgradeRequest } from "./UpgradeRequestsViewer";
 import { SubscribersViewer, type Subscriber } from "./SubscribersViewer";
+import { AddSubscriber } from "./AddSubscriber";
 import { ReportsViewer, type FailureReport } from "./ReportsViewer";
 
 export interface AdminUser {
@@ -962,6 +963,7 @@ export function AdminPanel({
       {tab === "plans" && (
         <div className="mt-5 space-y-8">
           <UpgradeRequestsViewer requests={upgradeRequests} />
+          <AddSubscriber users={users.map((u) => ({ id: u.id, email: u.email }))} />
           <SubscribersViewer subscribers={subscribers} />
         </div>
       )}

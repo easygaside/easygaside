@@ -1,4 +1,3 @@
-import { isSuperAdmin } from "@/lib/admin";
 import type { LlmProvider } from "@/lib/llm/catalog";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -74,11 +73,11 @@ export function normalizePlan(v: unknown): Plan {
 export const PLAN_PERIOD_DAYS = 30;
 
 /**
- * The user's EFFECTIVE billing plan (egs_user_settings.plan). Superadmin = 'pro'. A paid plan whose
+ * The user's EFFECTIVE billing plan (egs_user_settings.plan) — shown verbatim everywhere (no virtual
+ * superadmin override; the founder grants themselves a real plan in /admin). A paid plan whose
  * plan_expires_at is in the past auto-downgrades to 'free' at read time (no background job needed).
  */
-export async function getUserPlan(userId: string, email?: string | null): Promise<Plan> {
-  if (isSuperAdmin(email)) return "pro";
+export async function getUserPlan(userId: string, _email?: string | null): Promise<Plan> {
   const svc = createServiceClient();
   const { data } = await svc
     .from("egs_user_settings")

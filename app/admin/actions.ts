@@ -160,6 +160,34 @@ export async function setPlanAction(userId: string, plan: string): Promise<void>
   revalidatePath("/admin");
 }
 
+/**
+ * Grant ANY user a paid plan with an EXPLICIT expiry date (the admin "add subscriber" tool). expiresAt
+ * is a yyyy-mm-dd calendar date (the UI defaults it to +30 days) stored as Thai end-of-day, so the plan
+ * stays active through that whole day. Sets the GLM arm like the slip-approval path. Used to add the
+ * founder (easygaside) — or any comped user — onto a real plan instead of a virtual override.
+ */
+export async function grantPlanAction(userId: string, plan: string, expiresAt: string): Promise<void> {
+  await requireSuperAdmin();
+  if (!userId) throw new Error("bad_user");
+  if (plan !== "lite" && plan !== "starter" && plan !== "pro") throw new Error("bad_plan");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiresAt)) throw new Error("bad_date");
+  const expiresIso = new Date(`${expiresAt}T23:59:59+07:00`).toISOString();
+  if (Number.isNaN(new Date(expiresIso).getTime())) throw new Error("bad_date");
+  const svc = createServiceClient();
+  const { error } = await svc.from("egs_user_settings").upsert(
+    {
+      user_id: userId,
+      plan,
+      plan_expires_at: expiresIso,
+      llm_provider: "zai",
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (error) throw new Error(`grantPlan: ${error.message}`);
+  revalidatePath("/admin");
+}
+
 /** Cancel a user's plan → back to free (clears expiry + the GLM arm override). */
 export async function cancelPlanAction(userId: string): Promise<void> {
   await requireSuperAdmin();

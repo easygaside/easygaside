@@ -1,5 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { isSuperAdmin } from "@/lib/admin";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { bangkokMonthStartISO } from "@/lib/month";
 import { getPlanLimits, getUserPlan } from "@/lib/plan";
@@ -183,14 +182,14 @@ export async function getMonthlyToolUsage(userId: string, email?: string | null)
 }
 
 /**
- * May this user create a NEW tool right now? BYOK (own key) and superadmins are unlimited;
- * everyone else is held to the plan's monthly new-tool allowance (Free for now — §3).
+ * May this user create a NEW tool right now? BYOK (own Anthropic key) is unlimited; everyone else —
+ * the founder included — is held to their REAL plan's monthly new-tool allowance (§3).
  */
 export async function canCreateNewTool(
   userId: string,
   email: string | null | undefined,
 ): Promise<{ ok: boolean; usage: QuotaStatus }> {
-  if (isSuperAdmin(email) || (await hasOwnApiKey(userId))) {
+  if (await hasOwnApiKey(userId)) {
     const inf = Number.POSITIVE_INFINITY;
     return { ok: true, usage: { used: 0, limit: inf, remaining: inf } };
   }

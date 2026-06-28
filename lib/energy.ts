@@ -96,9 +96,12 @@ export async function poolSizeForUser(userId: string, email?: string | null): Pr
   return plan === "free" ? await freePoolSize() : (await getPlanLimits(plan)).pool;
 }
 
-/** The monthly token pool for ENFORCEMENT — superadmins are uncapped (founder testing). */
+/**
+ * The monthly token pool for ENFORCEMENT — now identical to the display pool (poolSizeForUser), so
+ * everyone (founder included) is metered by their REAL plan. Unlimited use = BYOK (own Anthropic key).
+ */
 export async function getMonthlyPool(userId: string, email?: string | null): Promise<number> {
-  return isSuperAdmin(email) ? Number.POSITIVE_INFINITY : poolSizeForUser(userId, email);
+  return poolSizeForUser(userId, email);
 }
 
 /**

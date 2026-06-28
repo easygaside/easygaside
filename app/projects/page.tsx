@@ -10,6 +10,7 @@ import { FeedbackCard } from "@/components/projects/FeedbackCard";
 import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getAccessGate, getMonthlyToolUsage } from "@/lib/beta";
+import { getUserMonthlyEnergyUsed, poolSizeForUser } from "@/lib/energy";
 import { getAppsScriptReadiness, getConnectionStatus } from "@/lib/google-connection";
 import { PLAN_CONFIG, getUserPlan } from "@/lib/plan";
 import { getCurrentUser, getDeployedMap, listProjects } from "@/lib/projects";
@@ -23,14 +24,18 @@ export default async function ProjectsPage() {
   const gate = await getAccessGate(userId, user.email);
   if (!gate.allowed) redirect("/waitlist");
 
-  const [projects, conn, deployed, readiness, plan, toolUsage] = await Promise.all([
+  const [projects, conn, deployed, readiness, plan, toolUsage, poolSize, poolUsed] = await Promise.all([
     listProjects(),
     getConnectionStatus(userId),
     getDeployedMap(),
     getAppsScriptReadiness(userId),
     getUserPlan(userId, user.email),
     getMonthlyToolUsage(userId, user.email),
+    poolSizeForUser(userId, user.email),
+    getUserMonthlyEnergyUsed(userId),
   ]);
+  const creditsTotal = Math.floor(poolSize / 10000);
+  const creditsLeft = Math.max(0, Math.floor((poolSize - poolUsed) / 10000));
   // Connected but no successful deploy yet → remind to enable the Apps Script API + run a test.
   const needsApiEnable = readiness.state === "unverified";
   const deployedCount = projects.filter((p) => deployed[p.id]).length;
@@ -169,7 +174,10 @@ export default async function ProjectsPage() {
             แพ็กเกจ {PLAN_CONFIG[plan].label}
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-slate-600 dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-300">
-            เหลือสร้างใหม่ {toolUsage.remaining}/{toolUsage.limit} ตัวเดือนนี้
+            เหลือสร้างใหม่ {toolUsage.remaining}/{toolUsage.limit} ตัว
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-slate-600 dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-300">
+            เหลือ {creditsLeft}/{creditsTotal} แต้มเดือนนี้
           </span>
           {plan === "free" && (
             <Link

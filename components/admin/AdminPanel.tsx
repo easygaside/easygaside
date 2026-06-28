@@ -8,6 +8,7 @@ import {
   BanknotesIcon,
   ChartBarIcon,
   Cog6ToothIcon,
+  CreditCardIcon,
   FlagIcon,
   InboxStackIcon,
   TrashIcon,
@@ -193,7 +194,7 @@ export interface ProviderModel {
   baseUrl: string;
 }
 
-type Tab = "overview" | "finance" | "providers" | "users" | "beta" | "reports";
+type Tab = "overview" | "finance" | "providers" | "users" | "plans" | "beta" | "reports";
 
 export function AdminPanel({
   users,
@@ -329,6 +330,7 @@ export function AdminPanel({
     { id: "finance", label: "การเงิน", icon: BanknotesIcon },
     { id: "providers", label: "Provider", icon: Cog6ToothIcon },
     { id: "users", label: "ผู้ใช้", icon: UsersIcon },
+    { id: "plans", label: "แพ็กเกจ", icon: CreditCardIcon, badge: upgradeRequests.length },
     { id: "beta", label: "Beta", icon: InboxStackIcon, badge: pendingApps },
     { id: "reports", label: "รายงาน", icon: FlagIcon, badge: openReports },
   ];
@@ -956,12 +958,18 @@ export function AdminPanel({
         </div>
       )}
 
+      {/* ───────── แพ็กเกจ (สมาชิก + คำขออัปเกรด) ───────── */}
+      {tab === "plans" && (
+        <div className="mt-5 space-y-8">
+          <UpgradeRequestsViewer requests={upgradeRequests} />
+          <SubscribersViewer subscribers={subscribers} />
+        </div>
+      )}
+
       {/* ───────── Beta ───────── */}
       {tab === "beta" && (
         <div className="mt-5 space-y-8">
           <AllowlistManager emails={allowlist} />
-          <SubscribersViewer subscribers={subscribers} />
-          <UpgradeRequestsViewer requests={upgradeRequests} />
           <BetaApplicationsViewer applications={applications} />
         </div>
       )}

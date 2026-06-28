@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { notifyDiscord } from "@/lib/discord";
+import { notifyTelegram } from "@/lib/telegram";
 import { PLAN_CONFIG, normalizePlan } from "@/lib/plan";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -59,10 +59,10 @@ export async function submitUpgradeRequest(
     return { error: "บันทึกคำขอไม่สำเร็จ ลองใหม่อีกครั้ง" };
   }
 
-  await notifyDiscord(
-    `🧾 **คำขออัปเกรดใหม่** — ${PLAN_CONFIG[plan].label} ฿${amount}\n` +
+  await notifyTelegram(
+    `🧾 คำขออัปเกรดใหม่ — ${PLAN_CONFIG[plan].label} ฿${amount}\n` +
       `ผู้ใช้: ${user.email ?? user.id}\n` +
-      `กดอนุมัติ/ปฏิเสธที่หน้า /admin`,
+      `อนุมัติ/ปฏิเสธที่ /admin → แท็บ แพ็กเกจ`,
   );
   revalidatePath("/pricing");
   return { ok: true };

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { getFiles } from "@/lib/files";
+import { resolveProvider } from "@/lib/llm/provider";
 import { getAppSetting } from "@/lib/settings";
 import type { EgsProject } from "@/types/db";
 
@@ -17,8 +18,9 @@ import type { EgsProject } from "@/types/db";
 // Default = DeepSeek v4-flash: at ~$0.28/M output it's ~18× cheaper than Haiku, making the gate
 // near-free — which is the whole point (keep the per-build overhead tiny so the energy tank stretches).
 // Provider/model are superadmin-editable in /admin (egs_app_settings.critic_provider/critic_model);
-// env (CRITIC_PROVIDER / CRITIC_MODEL) is the fallback when the DB rows are absent. Only claude and
-// deepseek backends are implemented, so /admin constrains the choice to those two.
+// env (CRITIC_PROVIDER / CRITIC_MODEL) is the fallback when the DB rows are absent. The admin-set default
+// (claude/deepseek) is the SHARED yardstick — EXCEPT a project built on the paid GLM arm (zai) reviews
+// itself on GLM, so its critic never depends on a separate DeepSeek balance that can run dry.
 type CriticProvider = "deepseek" | "claude";
 const CRITIC_PROVIDER_FALLBACK = ((process.env.CRITIC_PROVIDER as CriticProvider) || "deepseek") as CriticProvider;
 const CRITIC_MODEL_FALLBACK = process.env.CRITIC_MODEL || "";
@@ -188,14 +190,21 @@ async function reviewWithAnthropic(userPrompt: string, model: string): Promise<C
   });
 }
 
-/** Critic backend: DeepSeek (OpenAI wire format via baseURL). Auto-caches the stable system prefix;
- * json_object mode keeps the reply parseable. Non-streaming — it's a short one-shot JSON verdict. */
-async function reviewWithDeepSeek(userPrompt: string, model: string): Promise<CriticResult> {
-  const client = new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: DEEPSEEK_BASE_URL });
-  // V4 Pro / reasoner are thinking models: they reject response_format(json_object) and spend output
-  // tokens on the chain-of-thought first, so give them headroom and parse the JSON out of the text
-  // (parseIssues already extracts the {...} block, so we don't need the json_object guarantee).
-  const reasoning = /v4-pro|reasoner/i.test(model);
+/**
+ * Critic backend: OpenAI wire format (DeepSeek OR z.ai-GLM — both speak it). Auto-caches the stable
+ * system prefix; json_object mode keeps the reply parseable. Reasoning models (DeepSeek V4-Pro/reasoner,
+ * GLM-5.x) reject response_format(json_object) and spend output on the chain-of-thought first, so we
+ * give them headroom and parse the JSON out of the text (parseIssues extracts the {...}; reasoning_content
+ * is a fallback when the final answer lands there). Non-streaming — a short one-shot JSON verdict.
+ */
+async function reviewWithOpenAi(
+  userPrompt: string,
+  model: string,
+  apiKey: string | undefined,
+  baseURL: string | undefined,
+): Promise<CriticResult> {
+  const client = new OpenAI({ apiKey, baseURL });
+  const reasoning = /v4-pro|reasoner|glm-5/i.test(model);
   const res = await client.chat.completions.create({
     model,
     max_tokens: reasoning ? 8000 : CRITIC_MAX_TOKENS,
@@ -205,7 +214,8 @@ async function reviewWithDeepSeek(userPrompt: string, model: string): Promise<Cr
     ],
     ...(reasoning ? {} : { response_format: { type: "json_object" as const } }),
   });
-  const text = res.choices[0]?.message?.content ?? "";
+  const m = res.choices[0]?.message as { content?: string | null; reasoning_content?: string } | undefined;
+  const text = m?.content?.trim() || m?.reasoning_content || "";
   const u = res.usage;
   const cacheHit =
     (u as { prompt_cache_hit_tokens?: number } | undefined)?.prompt_cache_hit_tokens ??
@@ -217,6 +227,11 @@ async function reviewWithDeepSeek(userPrompt: string, model: string): Promise<Cr
     cacheReadTokens: cacheHit,
     cacheCreationTokens: 0,
   });
+}
+
+/** DeepSeek backend (default critic) — OpenAI wire format via the DeepSeek endpoint + key. */
+function reviewWithDeepSeek(userPrompt: string, model: string): Promise<CriticResult> {
+  return reviewWithOpenAi(userPrompt, model, process.env.DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL);
 }
 
 export interface CriticInfo {
@@ -243,8 +258,15 @@ export async function getCriticInfo(): Promise<CriticInfo> {
 export async function reviewProject(project: EgsProject, projectId: string): Promise<CriticResult> {
   const files = await getFiles(projectId);
   if (files.length === 0) return EMPTY;
-  const { provider, model } = await resolveCritic();
   const userPrompt = buildReviewPrompt(files, project);
+  // Paid plans build on GLM (zai) — review on GLM too, so the critic doesn't depend on a SEPARATE
+  // DeepSeek balance (which can run dry: a successful GLM build then showed "ระบบขัดข้อง" when the
+  // DeepSeek critic call failed). Falls back to the admin-configured critic if the z.ai key is absent.
+  if (project.llm_provider === "zai") {
+    const cfg = await resolveProvider("zai");
+    if (cfg.apiKey) return reviewWithOpenAi(userPrompt, cfg.model, cfg.apiKey, cfg.baseURL);
+  }
+  const { provider, model } = await resolveCritic();
   return provider === "claude"
     ? reviewWithAnthropic(userPrompt, model)
     : reviewWithDeepSeek(userPrompt, model);

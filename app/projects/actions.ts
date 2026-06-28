@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { detectCapabilityNeeds, routeTarget } from "@/lib/deployment-targets";
 import { MonthlyToolLimitError } from "@/lib/errors";
 import { getValidAccessToken } from "@/lib/google-connection";
+import { providerConfig, type LlmProvider } from "@/lib/llm/catalog";
+import { PLAN_CONFIG, getUserPlan, isPaidPlan } from "@/lib/plan";
 import { createProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -122,4 +124,52 @@ export async function rateGenerationAction(generationId: string, rating: 1 | -1)
   } = await supabase.auth.getUser();
   if (!user) return;
   await supabase.from("egs_generations").update({ rating }).eq("id", generationId);
+}
+
+export type RepointResult =
+  | { ok: true; arm: LlmProvider }
+  | { error: "not_paid" | "not_found" | "wrong_family" | "already" };
+
+/**
+ * "อัปเกรดโมเดลของเครื่องมือนี้" — re-point an EXISTING project to the user's paid GLM arm so they can
+ * keep building it with the better model after upgrading. PAID users only (the UI sends free users to
+ * /pricing). Allowed only WITHIN the OpenAI wire family (DeepSeek↔GLM — history format is compatible);
+ * Claude is a different family so its history can't carry over. Strips the DeepSeek reasoning_content
+ * from the stored history so the non-reasoning GLM arm won't 400 on it.
+ */
+export async function repointProjectModelAction(projectId: string): Promise<RepointResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("not_authenticated");
+
+  const plan = await getUserPlan(user.id, user.email);
+  if (!isPaidPlan(plan)) return { error: "not_paid" };
+  const targetArm = PLAN_CONFIG[plan].arm; // paid = "zai" (GLM)
+
+  // ownership + current provider under RLS
+  const { data: owned } = await supabase
+    .from("egs_projects")
+    .select("id, llm_provider")
+    .eq("id", projectId)
+    .maybeSingle<{ id: string; llm_provider: LlmProvider | null }>();
+  if (!owned) return { error: "not_found" };
+
+  const current = owned.llm_provider;
+  if (current === targetArm) return { error: "already" };
+  // only re-point within the same wire family (compatible history). claude (anthropic) ≠ openai → block.
+  if (current && providerConfig(current).family !== providerConfig(targetArm).family)
+    return { error: "wrong_family" };
+
+  const svc = createServiceClient();
+  await svc
+    .from("egs_projects")
+    .update({ llm_provider: targetArm })
+    .eq("id", projectId)
+    .eq("owner_id", user.id); // defense-in-depth on the service-role path
+  // drop deepseek-pro reasoning_content so the non-reasoning GLM arm won't 400 on the resumed history
+  await svc.rpc("egs_strip_reasoning", { p_project: projectId });
+  revalidatePath(`/projects/${projectId}`);
+  return { ok: true, arm: targetArm };
 }

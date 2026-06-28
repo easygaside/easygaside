@@ -70,16 +70,25 @@ export function normalizePlan(v: unknown): Plan {
   return v === "lite" || v === "starter" || v === "pro" ? v : "free";
 }
 
-/** The user's billing plan (egs_user_settings.plan). Superadmin is treated as 'pro'. */
+/** Days a paid plan lasts before it lapses (set on approval/extend). */
+export const PLAN_PERIOD_DAYS = 30;
+
+/**
+ * The user's EFFECTIVE billing plan (egs_user_settings.plan). Superadmin = 'pro'. A paid plan whose
+ * plan_expires_at is in the past auto-downgrades to 'free' at read time (no background job needed).
+ */
 export async function getUserPlan(userId: string, email?: string | null): Promise<Plan> {
   if (isSuperAdmin(email)) return "pro";
   const svc = createServiceClient();
   const { data } = await svc
     .from("egs_user_settings")
-    .select("plan")
+    .select("plan, plan_expires_at")
     .eq("user_id", userId)
-    .maybeSingle<{ plan: string | null }>();
-  return normalizePlan(data?.plan);
+    .maybeSingle<{ plan: string | null; plan_expires_at: string | null }>();
+  const plan = normalizePlan(data?.plan);
+  if (plan !== "free" && data?.plan_expires_at && new Date(data.plan_expires_at).getTime() < Date.now())
+    return "free";
+  return plan;
 }
 
 /** Config for the user's current plan (pool / tools / arm / pricing). */

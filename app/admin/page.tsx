@@ -8,6 +8,10 @@ import { AdminPanel, type AdminUser, type ArmMetric, type FinanceData, type User
 import type { AllowlistEntry } from "@/components/admin/AllowlistManager";
 import type { BetaApplication } from "@/components/admin/BetaApplicationsViewer";
 import type { UpgradeRequest } from "@/components/admin/UpgradeRequestsViewer";
+import type { Subscriber } from "@/components/admin/SubscribersViewer";
+import { getUserMonthlyEnergyUsed } from "@/lib/energy";
+import { bangkokMonthStartISO } from "@/lib/month";
+import { getPlanLimits } from "@/lib/plan";
 import type { FailureReport } from "@/components/admin/ReportsViewer";
 
 export const metadata = { title: "Admin — EasyGAS IDE" };
@@ -37,7 +41,7 @@ export default async function AdminPage() {
   const [{ data: list }, { data: settings }, { data: gens }, { data: pcfg }, { data: appcfg }, { data: plancfg }] =
     await Promise.all([
       svc.auth.admin.listUsers({ perPage: 1000 }),
-      svc.from("egs_user_settings").select("user_id, llm_provider"),
+      svc.from("egs_user_settings").select("user_id, llm_provider, plan, plan_expires_at"),
       svc
         .from("egs_generations")
         .select(
@@ -215,6 +219,30 @@ export default async function AdminPage() {
     userAgg.set(r.user_id, cur);
   }
   const emailById = new Map(users.map((u) => [u.id, u.email]));
+  const monthStart = bangkokMonthStartISO();
+  const subscribers: Subscriber[] = await Promise.all(
+    ((settings ?? []) as { user_id: string; plan: string | null; plan_expires_at: string | null }[])
+      .filter((s) => s.plan && s.plan !== "free")
+      .map(async (s) => {
+        const plan = s.plan as "lite" | "starter" | "pro";
+        const limits = await getPlanLimits(plan);
+        const [poolUsed, toolCount] = await Promise.all([
+          getUserMonthlyEnergyUsed(s.user_id),
+          svc.from("egs_projects").select("id", { count: "exact", head: true }).eq("owner_id", s.user_id).gte("created_at", monthStart),
+        ]);
+        const toolsUsed = toolCount.count ?? 0;
+        return {
+          userId: s.user_id,
+          email: emailById.get(s.user_id) ?? s.user_id,
+          plan,
+          expiresAt: s.plan_expires_at,
+          toolsLeft: Math.max(0, limits.tools - toolsUsed),
+          toolsLimit: limits.tools,
+          creditsLeft: Math.floor(Math.max(0, limits.pool - poolUsed) / 10000),
+          creditsLimit: Math.floor(limits.pool / 10000),
+        };
+      }),
+  );
   const armById = new Map(users.map((u) => [u.id, u.arm]));
   const userMetrics: UserMetric[] = [...userAgg.entries()]
     .map(([id, v]) => ({
@@ -346,6 +374,7 @@ export default async function AdminPage() {
       reports={reports}
       applications={applications}
       upgradeRequests={upgradeRequests}
+      subscribers={subscribers}
       userMetrics={userMetrics}
       finance={finance}
       providerKeys={providerKeys}

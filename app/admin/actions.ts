@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isSuperAdmin } from "@/lib/admin";
 import { sendBetaApprovedEmail } from "@/lib/email";
 import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/provider";
+import { PLAN_PERIOD_DAYS } from "@/lib/plan";
 import { getCurrentUser } from "@/lib/projects";
 import { setAppSetting } from "@/lib/settings";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -97,9 +98,10 @@ export async function approveUpgradeAction(requestId: string): Promise<void> {
     .eq("id", requestId)
     .maybeSingle<{ user_id: string; plan: string; status: string }>();
   if (!req || req.status !== "pending") throw new Error("bad_request");
-  // grant the plan: paid tier → GLM arm so NEW projects use it (existing ones via the re-point button)
+  // grant the plan: paid tier → GLM arm + 30-day expiry (NEW projects use GLM; existing via re-point)
+  const expires = new Date(Date.now() + PLAN_PERIOD_DAYS * 24 * 3600 * 1000).toISOString();
   await svc.from("egs_user_settings").upsert(
-    { user_id: req.user_id, plan: req.plan, llm_provider: "zai", updated_at: new Date().toISOString() },
+    { user_id: req.user_id, plan: req.plan, plan_expires_at: expires, llm_provider: "zai", updated_at: new Date().toISOString() },
     { onConflict: "user_id" },
   );
   await svc
@@ -117,6 +119,55 @@ export async function rejectUpgradeAction(requestId: string): Promise<void> {
     .from("egs_upgrade_requests")
     .update({ status: "rejected", decided_at: new Date().toISOString() })
     .eq("id", requestId);
+  revalidatePath("/admin");
+}
+
+const PLAN_PERIOD_MS = PLAN_PERIOD_DAYS * 24 * 3600 * 1000;
+
+/** Extend a user's plan by 30 days (from the later of now / current expiry). */
+export async function extendPlanAction(userId: string): Promise<void> {
+  await requireSuperAdmin();
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_user_settings")
+    .select("plan_expires_at")
+    .eq("user_id", userId)
+    .maybeSingle<{ plan_expires_at: string | null }>();
+  const cur = data?.plan_expires_at ? new Date(data.plan_expires_at).getTime() : 0;
+  const base = cur > Date.now() ? cur : Date.now();
+  await svc
+    .from("egs_user_settings")
+    .update({ plan_expires_at: new Date(base + PLAN_PERIOD_MS).toISOString(), updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  revalidatePath("/admin");
+}
+
+/** Change a user's paid plan (resets expiry to +30 days, GLM arm). */
+export async function setPlanAction(userId: string, plan: string): Promise<void> {
+  await requireSuperAdmin();
+  if (plan !== "lite" && plan !== "starter" && plan !== "pro") throw new Error("bad_plan");
+  const svc = createServiceClient();
+  await svc.from("egs_user_settings").upsert(
+    {
+      user_id: userId,
+      plan,
+      plan_expires_at: new Date(Date.now() + PLAN_PERIOD_MS).toISOString(),
+      llm_provider: "zai",
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  revalidatePath("/admin");
+}
+
+/** Cancel a user's plan → back to free (clears expiry + the GLM arm override). */
+export async function cancelPlanAction(userId: string): Promise<void> {
+  await requireSuperAdmin();
+  const svc = createServiceClient();
+  await svc
+    .from("egs_user_settings")
+    .update({ plan: "free", plan_expires_at: null, llm_provider: null, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
   revalidatePath("/admin");
 }
 

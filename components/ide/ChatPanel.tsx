@@ -18,6 +18,7 @@ import { saveDirtyFiles } from "@/lib/client/save-files";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { rateGenerationAction } from "@/app/projects/actions";
 import { GuidedWizard } from "./GuidedWizard";
+import { UpgradeModelButton } from "@/components/ide/UpgradeModelButton";
 
 const MAX_IMAGES = 4;
 
@@ -112,11 +113,15 @@ export function ChatPanel({
   initialImages,
   energyUsed = 0,
   energyTank,
+  currentArm = null,
+  isPaid = false,
 }: {
   projectId: string;
   initialImages?: { url: string }[];
   energyUsed?: number;
   energyTank?: number;
+  currentArm?: string | null;
+  isPaid?: boolean;
 }) {
   const applyMutation = useProjectStore((s) => s.applyMutation);
   const setWorking = useProjectStore((s) => s.setWorking);
@@ -369,6 +374,7 @@ export function ChatPanel({
         {energyTank ? (
           <div className="mb-3">
             <EnergyBar used={energy} tank={energyTank} />
+            <UpgradeModelButton projectId={projectId} currentArm={currentArm} isPaid={isPaid} />
           </div>
         ) : null}
 

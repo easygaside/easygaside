@@ -3,6 +3,7 @@ import { IdeShell } from "@/components/ide/IdeShell";
 import { getAccessGate } from "@/lib/beta";
 import { listProjectChatImages } from "@/lib/chat-images";
 import { getUserMonthlyEnergyUsed, monthlyPoolSize } from "@/lib/energy";
+import { getUserPlan, isPaidPlan } from "@/lib/plan";
 import { getFiles } from "@/lib/files";
 import { getConnectionStatus } from "@/lib/google-connection";
 import { getCurrentUser, getDeployedMap, getDeployedUrl, getProject, listProjects } from "@/lib/projects";
@@ -34,6 +35,7 @@ export default async function ProjectBuilderPage({
       listProjects(),
       getDeployedMap(),
     ]);
+  const isPaid = isPaidPlan(await getUserPlan(userId, user.email));
   const switcherProjects = allProjects.map((p) => ({
     id: p.id,
     name: p.name,
@@ -64,6 +66,8 @@ export default async function ProjectBuilderPage({
       googleConnected={conn.connected && conn.status === "active"}
       energyUsed={energyUsed}
       energyTank={energyTank}
+      currentArm={project.llm_provider}
+      isPaid={isPaid}
       deployedUrl={deployedUrl}
       projects={switcherProjects}
       accountMismatch={accountMismatch}

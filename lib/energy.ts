@@ -1,6 +1,6 @@
 import { isSuperAdmin } from "@/lib/admin";
 import { bangkokMonthStartISO } from "@/lib/month";
-import { PLAN_CONFIG, getUserPlan } from "@/lib/plan";
+import { PLAN_CONFIG, getPlanLimits, getUserPlan } from "@/lib/plan";
 import { getNumberSetting } from "@/lib/settings";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -92,7 +92,7 @@ async function freePoolSize(): Promise<number> {
 /** The monthly token pool for a user's plan (always finite — display + the base of enforcement). */
 export async function poolSizeForUser(userId: string, email?: string | null): Promise<number> {
   const plan = await getUserPlan(userId, email);
-  return plan === "free" ? await freePoolSize() : PLAN_CONFIG[plan].pool;
+  return plan === "free" ? await freePoolSize() : (await getPlanLimits(plan)).pool;
 }
 
 /** The monthly token pool for ENFORCEMENT — superadmins are uncapped (founder testing). */

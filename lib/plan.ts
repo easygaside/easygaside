@@ -86,3 +86,23 @@ export async function getUserPlan(userId: string, email?: string | null): Promis
 export async function getUserPlanConfig(userId: string, email?: string | null): Promise<PlanConfig> {
   return PLAN_CONFIG[await getUserPlan(userId, email)];
 }
+
+/**
+ * Admin-editable per-PAID-plan limits (egs_plan_config), falling back to PLAN_CONFIG when no row.
+ * Free tier keeps its own admin knobs (egs_app_settings free_monthly_pool / monthly_tool_limit).
+ */
+export async function getPlanLimits(plan: Plan): Promise<{ pool: number; tools: number }> {
+  if (plan === "free") return { pool: PLAN_CONFIG.free.pool, tools: PLAN_CONFIG.free.tools };
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_plan_config")
+    .select("pool, tools")
+    .eq("plan", plan)
+    .maybeSingle<{ pool: number; tools: number }>();
+  const pool = Number(data?.pool);
+  const tools = Number(data?.tools);
+  return {
+    pool: Number.isFinite(pool) && pool > 0 ? pool : PLAN_CONFIG[plan].pool,
+    tools: Number.isFinite(tools) && tools > 0 ? tools : PLAN_CONFIG[plan].tools,
+  };
+}

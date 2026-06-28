@@ -120,6 +120,20 @@ export async function rejectUpgradeAction(requestId: string): Promise<void> {
   revalidatePath("/admin");
 }
 
+/** Set a PAID plan's monthly pool (tokens) + new-tool allowance — egs_plan_config. */
+export async function setPlanLimitsAction(plan: string, pool: number, tools: number): Promise<void> {
+  await requireSuperAdmin();
+  if (plan !== "lite" && plan !== "starter" && plan !== "pro") throw new Error("bad_plan");
+  const p = Math.floor(pool);
+  const t = Math.floor(tools);
+  if (!Number.isFinite(p) || p < 10_000 || p > 100_000_000) throw new Error("bad_pool");
+  if (!Number.isFinite(t) || t < 1 || t > 100000) throw new Error("bad_tools");
+  const svc = createServiceClient();
+  const { error } = await svc.from("egs_plan_config").upsert({ plan, pool: p, tools: t }, { onConflict: "plan" });
+  if (error) throw new Error(`setPlanLimits: ${error.message}`);
+  revalidatePath("/admin");
+}
+
 /** Set the per-arm energy tank (tokens) — egs_provider_config.energy_tank. */
 export async function setProviderTankAction(provider: LlmProvider, tank: number): Promise<void> {
   await requireSuperAdmin();

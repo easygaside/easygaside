@@ -34,7 +34,7 @@ export default async function AdminPage() {
   if (!isSuperAdmin(user.email)) redirect("/projects");
 
   const svc = createServiceClient();
-  const [{ data: list }, { data: settings }, { data: gens }, { data: pcfg }, { data: appcfg }] =
+  const [{ data: list }, { data: settings }, { data: gens }, { data: pcfg }, { data: appcfg }, { data: plancfg }] =
     await Promise.all([
       svc.auth.admin.listUsers({ perPage: 1000 }),
       svc.from("egs_user_settings").select("user_id, llm_provider"),
@@ -45,6 +45,7 @@ export default async function AdminPage() {
         ),
       svc.from("egs_provider_config").select("provider, model, energy_tank, base_url"),
       svc.from("egs_app_settings").select("key, value"),
+      svc.from("egs_plan_config").select("plan, pool, tools"),
     ]);
   const [
     { data: projectRows },
@@ -140,6 +141,12 @@ export default async function AdminPage() {
     baseUrl: cfgByProvider.get(p)?.base_url ?? "",
   }));
   const appSettings = new Map((appcfg ?? []).map((r) => [r.key as string, r.value as string]));
+  const planLimitsMap = new Map((plancfg ?? []).map((r) => [r.plan as string, r as { pool: number; tools: number }]));
+  const planLimits = (["lite", "starter", "pro"] as const).map((p) => ({
+    plan: p,
+    pool: Number(planLimitsMap.get(p)?.pool ?? 0) || 0,
+    tools: Number(planLimitsMap.get(p)?.tools ?? 0) || 0,
+  }));
   const defaultProvider = ((appSettings.get("default_provider") as LlmProvider) ?? "claude") as LlmProvider;
   const dailyLimit = Number(appSettings.get("daily_limit") ?? 30) || 30;
   const monthlyToolLimit = Number(appSettings.get("monthly_tool_limit") ?? 2) || 2;
@@ -325,6 +332,7 @@ export default async function AdminPage() {
       dailyLimit={dailyLimit}
       monthlyToolLimit={monthlyToolLimit}
       freeMonthlyPool={freeMonthlyPool}
+      planLimits={planLimits}
       energyTankDefault={energyTankDefault}
       betaEnforced={betaEnforced}
       criticProvider={criticProvider}

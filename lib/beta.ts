@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { isSuperAdmin } from "@/lib/admin";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { bangkokMonthStartISO } from "@/lib/month";
-import { PLAN_CONFIG, getUserPlan } from "@/lib/plan";
+import { getPlanLimits, getUserPlan } from "@/lib/plan";
 import { getBoolSetting, getNumberSetting } from "@/lib/settings";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -178,7 +178,7 @@ export async function getMonthlyToolUsage(userId: string, email?: string | null)
     .gte("created_at", monthStart);
   const used = count ?? 0;
   const plan = await getUserPlan(userId, email);
-  const limit = plan === "free" ? await getMonthlyToolLimit() : PLAN_CONFIG[plan].tools;
+  const limit = plan === "free" ? await getMonthlyToolLimit() : (await getPlanLimits(plan)).tools;
   return { used, limit, remaining: Math.max(0, limit - used) };
 }
 

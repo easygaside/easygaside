@@ -22,6 +22,7 @@ import {
   setEnergyTankDefaultAction,
   setMonthlyToolLimitAction,
   setMonthlyPoolAction,
+  setPlanLimitsAction,
   setProviderModelAction,
   setProviderTankAction,
   setProviderBaseUrlAction,
@@ -201,6 +202,7 @@ export function AdminPanel({
   dailyLimit,
   monthlyToolLimit,
   freeMonthlyPool,
+  planLimits,
   energyTankDefault,
   betaEnforced,
   criticProvider,
@@ -225,6 +227,7 @@ export function AdminPanel({
   dailyLimit: number;
   monthlyToolLimit: number;
   freeMonthlyPool: number;
+  planLimits: { plan: string; pool: number; tools: number }[];
   energyTankDefault: number;
   betaEnforced: boolean;
   criticProvider: "claude" | "deepseek";
@@ -257,6 +260,9 @@ export function AdminPanel({
   const [limitDraft, setLimitDraft] = useState(String(dailyLimit));
   const [monthlyDraft, setMonthlyDraft] = useState(String(monthlyToolLimit));
   const [poolDraft, setPoolDraft] = useState(String(freeMonthlyPool));
+  const [planDraft, setPlanDraft] = useState<Record<string, { pool: string; tools: string }>>(
+    Object.fromEntries(planLimits.map((p) => [p.plan, { pool: String(p.pool), tools: String(p.tools) }])),
+  );
   const [tankDefaultDraft, setTankDefaultDraft] = useState(String(energyTankDefault));
   const [criticProviderDraft, setCriticProviderDraft] = useState<"claude" | "deepseek">(criticProvider);
   const [criticModelDraft, setCriticModelDraft] = useState(criticModel);
@@ -287,6 +293,8 @@ export function AdminPanel({
     });
   const saveMonthly = () => run(() => setMonthlyToolLimitAction(Number(monthlyDraft)));
   const savePool = () => run(() => setMonthlyPoolAction(Number(poolDraft)));
+  const savePlan = (plan: string) =>
+    run(() => setPlanLimitsAction(plan, Number(planDraft[plan]?.pool), Number(planDraft[plan]?.tools)));
   const saveTankDefault = () => run(() => setEnergyTankDefaultAction(Number(tankDefaultDraft)));
   const toggleBeta = () => run(() => setBetaEnforcedAction(!betaEnforced));
   const saveCritic = () => run(() => setCriticAction(criticProviderDraft, criticModelDraft));
@@ -730,6 +738,40 @@ export function AdminPanel({
               <button onClick={savePool} disabled={busy} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50">
                 บันทึก
               </button>
+            </div>
+
+            <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">แพ็กเกจจ่ายเงิน — pool (token/เดือน) + สร้างใหม่/เดือน (free แก้ด้านบน):</p>
+            <div className="space-y-2.5">
+              {planLimits.map((pl) => (
+                <div key={pl.plan} className="flex flex-col gap-2 rounded-lg border border-slate-100 p-2 sm:flex-row sm:items-center sm:border-0 sm:p-0 dark:border-slate-800 sm:dark:border-0">
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300 sm:w-20 sm:shrink-0">{pl.plan}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="number"
+                      min={10000}
+                      step={100000}
+                      value={planDraft[pl.plan]?.pool ?? ""}
+                      onChange={(e) => setPlanDraft((d) => ({ ...d, [pl.plan]: { pool: e.target.value, tools: d[pl.plan]?.tools ?? "" } }))}
+                      title="pool (token)/เดือน"
+                      placeholder="token"
+                      className="w-28 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-mono text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      value={planDraft[pl.plan]?.tools ?? ""}
+                      onChange={(e) => setPlanDraft((d) => ({ ...d, [pl.plan]: { pool: d[pl.plan]?.pool ?? "", tools: e.target.value } }))}
+                      title="สร้างใหม่/เดือน"
+                      placeholder="ตัว"
+                      className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-mono text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
+                    />
+                    <span className="text-xs text-slate-400 dark:text-slate-500">≈ {Math.floor(Number(planDraft[pl.plan]?.pool || 0) / 10000)} แต้ม</span>
+                    <button onClick={() => savePlan(pl.plan)} disabled={busy} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-50">
+                      บันทึก
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <p className="mb-2 mt-4 text-xs text-slate-500 dark:text-slate-400">ถังพลังงานเริ่มต้น (token/โปรเจกต์) — legacy (ตอนนี้ใช้แต้มรายเดือนด้านบนแทน):</p>

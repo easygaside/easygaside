@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircleIcon, Cog6ToothIcon, ExclamationTriangleIcon, FolderIcon, InboxIcon, RocketLaunchIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, Cog6ToothIcon, ExclamationTriangleIcon, FolderIcon, InboxIcon, RocketLaunchIcon, SparklesIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import { AppsScriptAutoVerify } from "@/components/AppsScriptAutoVerify";
 import { AppsScriptEnableNotice } from "@/components/AppsScriptEnableNotice";
 import { AppTopBar } from "@/components/AppTopBar";
@@ -9,8 +9,9 @@ import { ProjectCard } from "@/components/projects/ProjectCard";
 import { FeedbackCard } from "@/components/projects/FeedbackCard";
 import { ReportButton } from "@/components/ReportButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { getAccessGate } from "@/lib/beta";
+import { getAccessGate, getMonthlyToolUsage } from "@/lib/beta";
 import { getAppsScriptReadiness, getConnectionStatus } from "@/lib/google-connection";
+import { PLAN_CONFIG, getUserPlan } from "@/lib/plan";
 import { getCurrentUser, getDeployedMap, listProjects } from "@/lib/projects";
 
 export const metadata = { title: "โปรเจกต์ของฉัน — EasyGAS" };
@@ -22,11 +23,13 @@ export default async function ProjectsPage() {
   const gate = await getAccessGate(userId, user.email);
   if (!gate.allowed) redirect("/waitlist");
 
-  const [projects, conn, deployed, readiness] = await Promise.all([
+  const [projects, conn, deployed, readiness, plan, toolUsage] = await Promise.all([
     listProjects(),
     getConnectionStatus(userId),
     getDeployedMap(),
     getAppsScriptReadiness(userId),
+    getUserPlan(userId, user.email),
+    getMonthlyToolUsage(userId, user.email),
   ]);
   // Connected but no successful deploy yet → remind to enable the Apps Script API + run a test.
   const needsApiEnable = readiness.state === "unverified";
@@ -159,6 +162,24 @@ export default async function ProjectsPage() {
         </div>
 
         <CreateProjectBar existingNames={projects.map((p) => p.name)} />
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-medium">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-slate-600 dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-300">
+            <SparklesIcon className="h-3.5 w-3.5 text-emerald-500" />
+            แพ็กเกจ {PLAN_CONFIG[plan].label}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-slate-600 dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-300">
+            เหลือสร้างใหม่ {toolUsage.remaining}/{toolUsage.limit} ตัวเดือนนี้
+          </span>
+          {plan === "free" && (
+            <Link
+              href="/pricing"
+              className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 font-semibold text-amber-700 transition hover:bg-amber-100 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-300"
+            >
+              อัปเกรด ✨
+            </Link>
+          )}
+        </div>
 
         {projects.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-medium">

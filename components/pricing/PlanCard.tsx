@@ -14,14 +14,12 @@ export function PlanCard({
   plan,
   label,
   priceThb,
-  yearlyThb,
   highlights,
   isCurrent,
 }: {
   plan: string;
   label: string;
   priceThb: number;
-  yearlyThb: number;
   highlights: string[];
   isCurrent: boolean;
 }) {
@@ -42,9 +40,6 @@ export function PlanCard({
         {paid ? `฿${priceThb}` : "ฟรี"}
         {paid && <span className="text-sm font-medium text-slate-400"> /เดือน</span>}
       </p>
-      {paid && yearlyThb > 0 && (
-        <p className="text-xs text-slate-400 dark:text-slate-500">รายปี ฿{yearlyThb.toLocaleString()} (ถูกกว่า ~2 เดือน)</p>
-      )}
 
       <ul className="mt-4 flex-1 space-y-2">
         {highlights.map((h) => (

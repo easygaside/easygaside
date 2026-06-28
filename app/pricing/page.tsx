@@ -14,8 +14,8 @@ export default async function PricingPage() {
       <div className="text-center">
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">เลือกแพ็กเกจ easygas</h1>
         <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-          ฟรีใช้ DeepSeek สร้างเครื่องมือได้จริง — อัปเกรดเป็นแพ็กเกจจ่ายเงินเพื่อใช้ <b>GLM</b> (แอปสวย/ฉลาดขึ้น),
-          สร้างได้มากขึ้น, แต้มเยอะขึ้น และฟีเจอร์ระดับโปร
+          ฟรีก็สร้างเครื่องมือได้จริง — อัปเกรดเป็นแพ็กเกจจ่ายเงินเพื่อใช้ <b>AI โมเดล Flagship</b> ที่ออกแบบ UI
+          สวยและฉลาดกว่า สร้างได้มากขึ้น แต้มเยอะขึ้น และฟีเจอร์ระดับโปร
         </p>
       </div>
 
@@ -28,7 +28,6 @@ export default async function PricingPage() {
               plan={p}
               label={c.label}
               priceThb={c.priceThb}
-              yearlyThb={c.yearlyThb}
               highlights={c.highlights}
               isCurrent={currentPlan === p}
             />

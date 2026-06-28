@@ -7,13 +7,14 @@ import { repointProjectModelAction } from "@/app/projects/actions";
 const GLM_ARM = "zai";
 // arms whose stored history is OpenAI wire format → can re-point to GLM without losing the conversation
 const OPENAI_FAMILY = new Set(["deepseek", "deepseek-pro", "chatgpt", "gemini", "zai"]);
+// User-facing tier label (we never expose the underlying model brand to end users — see pricing copy).
 const ARM_LABEL: Record<string, string> = {
-  deepseek: "DeepSeek",
-  "deepseek-pro": "DeepSeek",
-  chatgpt: "ChatGPT",
-  gemini: "Gemini",
-  zai: "GLM",
-  claude: "Claude",
+  deepseek: "มาตรฐาน",
+  "deepseek-pro": "มาตรฐาน",
+  chatgpt: "มาตรฐาน",
+  gemini: "มาตรฐาน",
+  zai: "Flagship",
+  claude: "Flagship",
 };
 
 /**
@@ -45,7 +46,7 @@ export function UpgradeModelButton({
   if (arm === GLM_ARM) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-        <SparklesIcon className="h-3.5 w-3.5" /> GLM
+        <SparklesIcon className="h-3.5 w-3.5" /> Flagship
       </span>
     );
   }
@@ -79,7 +80,7 @@ export function UpgradeModelButton({
       <button
         onClick={go}
         disabled={busy}
-        title={paidRepoint ? "สลับเครื่องมือนี้เป็น GLM (สวย/ฉลาดขึ้น)" : "อัปเกรดเพื่อใช้ GLM"}
+        title={paidRepoint ? "สลับเครื่องมือนี้เป็น AI Flagship (สวย/ฉลาดขึ้น)" : "อัปเกรดเพื่อใช้ AI Flagship"}
         className="group inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500 transition hover:border-amber-300 hover:text-amber-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-amber-300"
       >
         <BoltIcon className="h-3.5 w-3.5" />

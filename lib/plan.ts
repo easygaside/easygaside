@@ -34,7 +34,7 @@ export const PLAN_CONFIG: Record<Plan, PlanConfig> = {
     arm: "deepseek-pro",
     tools: 2,
     pool: 800_000,
-    highlights: ["AI: DeepSeek", "สร้างใหม่ 2 ตัว/เดือน", "80 แต้ม/เดือน", "ติดตั้งบน Google ของคุณ"],
+    highlights: ["AI มาตรฐาน — สร้างได้จริง", "สร้างใหม่ 2 ตัว/เดือน", "80 แต้ม/เดือน", "ติดตั้งบน Google ของคุณ"],
   },
   lite: {
     label: "Lite",
@@ -43,7 +43,7 @@ export const PLAN_CONFIG: Record<Plan, PlanConfig> = {
     arm: "zai",
     tools: 3,
     pool: 1_500_000,
-    highlights: ["AI: GLM (สวย/ฉลาดกว่า)", "สร้างใหม่ 3 ตัว/เดือน", "150 แต้ม/เดือน", "โดเมนตัวเอง · ไม่มี badge · ใช้เชิงพาณิชย์"],
+    highlights: ["AI โมเดล Flagship — UI สวย + ฉลาดกว่า", "สร้างใหม่ 3 ตัว/เดือน", "150 แต้ม/เดือน", "โดเมนตัวเอง · ไม่มี badge · ใช้เชิงพาณิชย์"],
   },
   starter: {
     label: "Starter",
@@ -52,7 +52,7 @@ export const PLAN_CONFIG: Record<Plan, PlanConfig> = {
     arm: "zai",
     tools: 5,
     pool: 2_500_000,
-    highlights: ["AI: GLM", "สร้างใหม่ 5 ตัว/เดือน", "250 แต้ม/เดือน", "Supabase (กล้อง/realtime) · LINE priority"],
+    highlights: ["AI โมเดล Flagship — UI สวย + ฉลาดกว่า", "สร้างใหม่ 5 ตัว/เดือน", "250 แต้ม/เดือน", "Supabase (กล้อง/realtime) · LINE priority"],
   },
   pro: {
     label: "Pro",
@@ -61,7 +61,7 @@ export const PLAN_CONFIG: Record<Plan, PlanConfig> = {
     arm: "zai",
     tools: 15,
     pool: 6_000_000,
-    highlights: ["AI: GLM", "สร้างใหม่ 15 ตัว/เดือน", "600 แต้ม/เดือน", "BYO-Supabase · priority + onboarding"],
+    highlights: ["AI โมเดล Flagship — UI สวย + ฉลาดกว่า", "สร้างใหม่ 15 ตัว/เดือน", "600 แต้ม/เดือน", "BYO-Supabase · priority + onboarding"],
   },
 };
 

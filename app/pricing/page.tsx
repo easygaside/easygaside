@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { PlanCard } from "@/components/pricing/PlanCard";
+import { ByokCard } from "@/components/pricing/ByokCard";
+import { hasOwnApiKey } from "@/lib/beta";
 import { getCurrentUser } from "@/lib/projects";
 import { PLAN_CONFIG, getUserPlan, type Plan } from "@/lib/plan";
 
@@ -7,7 +9,9 @@ const ORDER: Plan[] = ["free", "lite", "starter", "pro"];
 
 export default async function PricingPage() {
   const user = await getCurrentUser();
-  const currentPlan: Plan = user ? await getUserPlan(user.id, user.email) : "free";
+  const [currentPlan, hasKey]: [Plan, boolean] = user
+    ? await Promise.all([getUserPlan(user.id, user.email), hasOwnApiKey(user.id)])
+    : ["free", false];
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
@@ -34,6 +38,8 @@ export default async function PricingPage() {
           );
         })}
       </div>
+
+      <ByokCard hasKey={hasKey} />
 
       <p className="mt-8 text-center text-xs text-slate-400 dark:text-slate-500">
         ชำระผ่าน PromptPay แล้วแนบสลิป — ทีมงานยืนยันแล้วเปิดแพ็กเกจให้ · <Link href="/projects" className="underline">กลับไปที่เครื่องมือ</Link>

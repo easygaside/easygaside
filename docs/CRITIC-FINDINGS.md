@@ -93,16 +93,19 @@ function doGet(e) {
 - ✅ กฎ: re-entrant LockService deadlock (= high)
 - ✅ กฎ: status-transition guard (= medium)
 - ✅ กฎ: doGet provisioning ต้องไม่บล็อกการ render UI/login (= high)
-- ✅ scope ground-truth map (ปิด false-positive `script.storage`)
+- ✅ scope ground-truth map (ปิด false-positive `script.storage`; แยก MailApp=script.send_mail vs GmailApp=gmail.send)
+- ✅ กฎ: getAuthorizationInfo guard ใน doGet (self-heal scope growth = medium)
+- ✅ กฎ: ห้าม Advanced Services + manifest libraries — built-in เท่านั้น (= high)
 
 ใน `lib/gas-codegen.ts` (codegen system prompt):
-- ✅ service→scope map + "`script.storage` ไม่มีจริง อย่าใส่"
+- ✅ service→scope map + "`script.storage` ไม่มีจริง อย่าใส่" + MailApp/GmailApp scope แยก
 - ✅ กฎ doGet ต้อง render UI ก่อน + trigger setup lazy/guarded ห้าม throw ออกจาก doGet
+- ✅ getAuthorizationInfo guard + ban Advanced Services/libraries (built-in only)
 
 ## 7. ค้างไว้ (open / TODO)
 
 - ⏳ **Deterministic scope-deriver** — สังเคราะห์ oauthScopes ขั้นต่ำจาก service ที่โค้ดอ้างถึงจริง (เลิกพึ่งโมเดลเขียนมือ) → ฆ่า R3 ที่ราก
-- ⏳ **Re-consent ตอน scope โตหลัง deploy** (scope ชั้น B — ราย project ฝั่งลูกค้า, **ไม่เกี่ยวกับ /connect**) — เคสที่เหลือหลังแก้ที่ source แล้ว: ผู้ใช้ deploy ไปก่อน แล้วเพิ่งสั่ง AI เพิ่มฟีเจอร์ที่ต้อง scope ใหม่ทีหลัง แนวที่พิจารณา: (a) เก็บ scope set ที่ deploy ไปใน `egs_deployments` → diff ตอน redeploy เพื่อ trigger คำเตือน; (b) ให้ codegen ใส่ guard ใน doGet ด้วย `ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL)` → ถ้า status = REQUIRED ให้ render ปุ่มลิงก์ `getAuthorizationUrl()` ("อนุญาตสิทธิ์เพิ่ม") แทนหน้าแอป (ฝั่งลูกค้า, reliable สำหรับเจ้าของ, ไม่ต้องเปิด editor) **ข้อจำกัด:** ต้องประกาศ scope ใน manifest ก่อน getAuthorizationInfo ถึงจะรู้ว่า REQUIRED; ไม่ช่วย anonymous (เจ้าของต้องอนุมัติก่อน) — การ "เรียก API ตรง ๆ ใน doGet" ไม่ทำให้ popup เด้ง (server รันแบบ headless → throw ไม่ใช่ prompt)
+- ✅ **Re-consent ตอน scope โตหลัง deploy** (scope ชั้น B — ราย project ฝั่งลูกค้า, **ไม่เกี่ยวกับ /connect**) — **ทำแล้ว** (push b3bd5e8): (a) เก็บ scope set ใน `egs_deployments.oauth_scopes` → `deployProject` คืน `scopesAdded` → DeployButton โชว์ note เตือน; (b) codegen/critic บังคับ guard `ScriptApp.getAuthorizationInfo(FULL)` ใน doGet → status=REQUIRED render `getAuthorizationUrl()` แทนหน้าแอป (self-heal ฝั่งลูกค้า ไม่ต้องเปิด editor) **ข้อจำกัดที่เหลือ:** ต้องประกาศ scope ใน manifest ก่อน; ไม่ช่วย anonymous (เจ้าของอนุมัติเองก่อนหนึ่งครั้ง); การ "เรียก API ตรง ๆ ใน doGet" ไม่ทำให้ popup เด้ง (server headless → throw ไม่ใช่ prompt)
 - ⏳ **Persist critic issue detail** — เก็บ problem/fix/severity/line ลง DB เพื่อให้วิเคราะห์ซ้ำได้โดยไม่ต้องขุด `egs_messages`
 
 ## 8. Ledger (ดูตาราง `public.egs_known_issues`)
@@ -115,7 +118,8 @@ function doGet(e) {
 | `critic-rule:reentrant-lock-deadlock` | critic-rule-added | fixed |
 | `critic-rule:status-transition-guard` | critic-rule-added | fixed |
 | `critic-rule:doget-provisioning-blocks-render` | critic-rule-added | fixed |
+| `critic-rule:no-advanced-services-or-libraries` | critic-rule-added | fixed |
 | `critic-fp:script-storage-hallucination` | critic-false-positive | fixed |
 | `codegen:oauthscopes-mismatch` | codegen-pattern | mitigated |
-| `platform-gap:scope-change-needs-reauth` | platform-gap | open |
+| `platform-gap:scope-change-needs-reauth` | platform-gap | mitigated |
 | `user-incident:fire-extinguisher-trigger-scope` | user-incident | analyzed |

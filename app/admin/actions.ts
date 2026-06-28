@@ -87,6 +87,39 @@ export async function setMonthlyPoolAction(tokens: number): Promise<void> {
   revalidatePath("/admin");
 }
 
+/** Approve an upgrade request → set the user's plan + GLM arm, mark the request approved. */
+export async function approveUpgradeAction(requestId: string): Promise<void> {
+  await requireSuperAdmin();
+  const svc = createServiceClient();
+  const { data: req } = await svc
+    .from("egs_upgrade_requests")
+    .select("user_id, plan, status")
+    .eq("id", requestId)
+    .maybeSingle<{ user_id: string; plan: string; status: string }>();
+  if (!req || req.status !== "pending") throw new Error("bad_request");
+  // grant the plan: paid tier → GLM arm so NEW projects use it (existing ones via the re-point button)
+  await svc.from("egs_user_settings").upsert(
+    { user_id: req.user_id, plan: req.plan, llm_provider: "zai", updated_at: new Date().toISOString() },
+    { onConflict: "user_id" },
+  );
+  await svc
+    .from("egs_upgrade_requests")
+    .update({ status: "approved", decided_at: new Date().toISOString() })
+    .eq("id", requestId);
+  revalidatePath("/admin");
+}
+
+/** Reject an upgrade request (no plan change). */
+export async function rejectUpgradeAction(requestId: string): Promise<void> {
+  await requireSuperAdmin();
+  const svc = createServiceClient();
+  await svc
+    .from("egs_upgrade_requests")
+    .update({ status: "rejected", decided_at: new Date().toISOString() })
+    .eq("id", requestId);
+  revalidatePath("/admin");
+}
+
 /** Set the per-arm energy tank (tokens) — egs_provider_config.energy_tank. */
 export async function setProviderTankAction(provider: LlmProvider, tank: number): Promise<void> {
   await requireSuperAdmin();

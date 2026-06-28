@@ -34,6 +34,7 @@ import {
 import { BASE_URL_PRESETS, LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/catalog";
 import { AllowlistManager, type AllowlistEntry } from "./AllowlistManager";
 import { BetaApplicationsViewer, type BetaApplication } from "./BetaApplicationsViewer";
+import { UpgradeRequestsViewer, type UpgradeRequest } from "./UpgradeRequestsViewer";
 import { ReportsViewer, type FailureReport } from "./ReportsViewer";
 
 export interface AdminUser {
@@ -212,6 +213,7 @@ export function AdminPanel({
   allowlist,
   reports,
   applications,
+  upgradeRequests,
   userMetrics,
   finance,
   providerKeys,
@@ -235,6 +237,7 @@ export function AdminPanel({
   allowlist: AllowlistEntry[];
   reports: FailureReport[];
   applications: BetaApplication[];
+  upgradeRequests: UpgradeRequest[];
   userMetrics: UserMetric[];
   finance: FinanceData;
   providerKeys: Record<LlmProvider, boolean>;
@@ -912,6 +915,7 @@ export function AdminPanel({
       {tab === "beta" && (
         <div className="mt-5 space-y-8">
           <AllowlistManager emails={allowlist} />
+          <UpgradeRequestsViewer requests={upgradeRequests} />
           <BetaApplicationsViewer applications={applications} />
         </div>
       )}

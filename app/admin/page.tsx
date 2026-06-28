@@ -7,6 +7,7 @@ import { DEFAULT_USD_THB, genCostUsd } from "@/lib/pricing";
 import { AdminPanel, type AdminUser, type ArmMetric, type FinanceData, type UserMetric } from "@/components/admin/AdminPanel";
 import type { AllowlistEntry } from "@/components/admin/AllowlistManager";
 import type { BetaApplication } from "@/components/admin/BetaApplicationsViewer";
+import type { UpgradeRequest } from "@/components/admin/UpgradeRequestsViewer";
 import type { FailureReport } from "@/components/admin/ReportsViewer";
 
 export const metadata = { title: "Admin — EasyGAS IDE" };
@@ -51,6 +52,7 @@ export default async function AdminPage() {
     { data: reportRows },
     { data: appRows },
     { data: payRows },
+    { data: upgradeRows },
   ] = await Promise.all([
       svc.from("egs_projects").select("id, name"),
       svc.from("egs_beta_allowlist").select("email, note, created_at").order("created_at", { ascending: true }),
@@ -67,6 +69,11 @@ export default async function AdminPage() {
         .order("created_at", { ascending: false })
         .limit(200),
       svc.from("egs_payments").select("id, amount_thb, note, paid_at").order("paid_at", { ascending: false }),
+      svc
+        .from("egs_upgrade_requests")
+        .select("id, email, plan, amount_thb, slip_path, created_at")
+        .eq("status", "pending")
+        .order("created_at", { ascending: true }),
     ]);
   const projectName = new Map((projectRows ?? []).map((p) => [p.id as string, p.name as string]));
 
@@ -96,6 +103,24 @@ export default async function AdminPage() {
       createdAt: (a.created_at as string) ?? "",
     }))
     .sort((x, y) => (APP_STATUS_ORDER[x.status] ?? 9) - (APP_STATUS_ORDER[y.status] ?? 9));
+  const upgradeRequests: UpgradeRequest[] = await Promise.all(
+    ((upgradeRows ?? []) as Record<string, unknown>[]).map(async (u) => {
+      let slipUrl: string | null = null;
+      const path = u.slip_path as string | null;
+      if (path) {
+        const { data } = await svc.storage.from("egs-slips").createSignedUrl(path, 3600);
+        slipUrl = data?.signedUrl ?? null;
+      }
+      return {
+        id: u.id as string,
+        email: (u.email as string | null) ?? null,
+        plan: (u.plan as string) ?? "",
+        amountThb: Number(u.amount_thb ?? 0),
+        slipUrl,
+        createdAt: (u.created_at as string) ?? "",
+      };
+    }),
+  );
   const providerKeys: Record<LlmProvider, boolean> = {
     claude: !!process.env.ANTHROPIC_API_KEY,
     chatgpt: !!process.env.OPENAI_API_KEY,
@@ -312,6 +337,7 @@ export default async function AdminPage() {
       allowlist={allowlist}
       reports={reports}
       applications={applications}
+      upgradeRequests={upgradeRequests}
       userMetrics={userMetrics}
       finance={finance}
       providerKeys={providerKeys}

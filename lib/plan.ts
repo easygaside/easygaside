@@ -72,6 +72,9 @@ export function normalizePlan(v: unknown): Plan {
 /** Days a paid plan lasts before it lapses (set on approval/extend). */
 export const PLAN_PERIOD_DAYS = 30;
 
+/** BYO add-on — bring your own Anthropic key. Paid ฿/month (not a Plan; tracked via byo_enabled). */
+export const BYO_PRICE_THB = 99;
+
 /**
  * The user's EFFECTIVE billing plan (egs_user_settings.plan) — shown verbatim everywhere (no virtual
  * superadmin override; the founder grants themselves a real plan in /admin). A paid plan whose

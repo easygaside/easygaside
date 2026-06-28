@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { notifyTelegram } from "@/lib/telegram";
-import { PLAN_CONFIG, normalizePlan } from "@/lib/plan";
+import { BYO_PRICE_THB, PLAN_CONFIG, normalizePlan, type Plan } from "@/lib/plan";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -28,8 +28,11 @@ export async function submitUpgradeRequest(
   } = await supabase.auth.getUser();
   if (!user) return { error: "กรุณาเข้าสู่ระบบก่อน" };
 
-  const plan = normalizePlan(formData.get("plan"));
-  if (plan === "free") return { error: "แพ็กเกจไม่ถูกต้อง" };
+  // "byo" = the BYO add-on (own Anthropic key, ฿99/mo); everything else is a normal plan tier.
+  const raw = String(formData.get("plan") ?? "");
+  const isByo = raw === "byo";
+  const plan = isByo ? "byo" : normalizePlan(raw);
+  if (!isByo && plan === "free") return { error: "แพ็กเกจไม่ถูกต้อง" };
 
   const slip = formData.get("slip");
   if (!(slip instanceof File) || slip.size === 0) return { error: "กรุณาแนบสลิปโอนเงิน" };
@@ -46,7 +49,8 @@ export async function submitUpgradeRequest(
     return { error: "อัปโหลดสลิปไม่สำเร็จ ลองใหม่อีกครั้ง" };
   }
 
-  const amount = PLAN_CONFIG[plan].priceThb;
+  const amount = isByo ? BYO_PRICE_THB : PLAN_CONFIG[plan as Plan].priceThb;
+  const label = isByo ? "BYO (คีย์ตัวเอง)" : PLAN_CONFIG[plan as Plan].label;
   const { error } = await svc.from("egs_upgrade_requests").insert({
     user_id: user.id,
     email: user.email ?? null,
@@ -60,7 +64,7 @@ export async function submitUpgradeRequest(
   }
 
   await notifyTelegram(
-    `🧾 คำขออัปเกรดใหม่ — ${PLAN_CONFIG[plan].label} ฿${amount}\n` +
+    `🧾 คำขออัปเกรดใหม่ — ${label} ฿${amount}\n` +
       `ผู้ใช้: ${user.email ?? user.id}\n` +
       `อนุมัติ/ปฏิเสธที่ /admin → แท็บ แพ็กเกจ`,
   );

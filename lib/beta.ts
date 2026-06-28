@@ -57,7 +57,7 @@ export async function getAccessGate(
   email: string | null | undefined,
 ): Promise<AccessGate> {
   if (!(await isBetaEnforced())) return { allowed: true, reason: "ok" };
-  if (await hasOwnApiKey(userId)) return { allowed: true, reason: "ok" };
+  if (await isByoActive(userId)) return { allowed: true, reason: "ok" }; // paid BYO add-on → access
   return (await isBetaAllowed(email))
     ? { allowed: true, reason: "ok" }
     : { allowed: false, reason: "not_in_beta" };
@@ -71,6 +71,7 @@ interface KeyRow {
   anthropic_key_tag: string | null;
 }
 
+/** Raw check: a key is stored (regardless of BYO entitlement) — used by the settings form state. */
 export async function hasOwnApiKey(userId: string): Promise<boolean> {
   const svc = createServiceClient();
   const { data } = await svc
@@ -81,15 +82,38 @@ export async function hasOwnApiKey(userId: string): Promise<boolean> {
   return !!data?.anthropic_key_enc;
 }
 
-/** Decrypt the user's stored Anthropic key, or null if none. Server-only. */
+/** BYO add-on (฿99/mo) active = paid entitlement, not expired. Gates whether a stored key is honored. */
+export async function isByoActive(userId: string): Promise<boolean> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("egs_user_settings")
+    .select("byo_enabled, byo_expires_at")
+    .eq("user_id", userId)
+    .maybeSingle<{ byo_enabled: boolean | null; byo_expires_at: string | null }>();
+  if (!data?.byo_enabled) return false;
+  if (data.byo_expires_at && new Date(data.byo_expires_at).getTime() < Date.now()) return false;
+  return true;
+}
+
+/** Does the user actually run on their OWN Anthropic key right now? = BYO active AND a key is stored. */
+export async function usesOwnKey(userId: string): Promise<boolean> {
+  return (await isByoActive(userId)) && (await hasOwnApiKey(userId));
+}
+
+/**
+ * Decrypt the user's stored Anthropic key — but ONLY while the BYO add-on (฿99/mo) is active, so the
+ * monthly fee actually gates usage (a lapsed/never-paid key is ignored → user falls back to their plan).
+ */
 export async function getOwnApiKey(userId: string): Promise<string | null> {
   const svc = createServiceClient();
   const { data } = await svc
     .from("egs_user_settings")
-    .select("anthropic_key_enc, anthropic_key_iv, anthropic_key_tag")
+    .select("anthropic_key_enc, anthropic_key_iv, anthropic_key_tag, byo_enabled, byo_expires_at")
     .eq("user_id", userId)
-    .maybeSingle<KeyRow>();
-  if (!data?.anthropic_key_enc || !data.anthropic_key_iv || !data.anthropic_key_tag) return null;
+    .maybeSingle<KeyRow & { byo_enabled: boolean | null; byo_expires_at: string | null }>();
+  if (!data?.byo_enabled) return null;
+  if (data.byo_expires_at && new Date(data.byo_expires_at).getTime() < Date.now()) return null;
+  if (!data.anthropic_key_enc || !data.anthropic_key_iv || !data.anthropic_key_tag) return null;
   try {
     return decrypt({ enc: data.anthropic_key_enc, iv: data.anthropic_key_iv, tag: data.anthropic_key_tag });
   } catch {
@@ -189,7 +213,7 @@ export async function canCreateNewTool(
   userId: string,
   email: string | null | undefined,
 ): Promise<{ ok: boolean; usage: QuotaStatus }> {
-  if (await hasOwnApiKey(userId)) {
+  if (await usesOwnKey(userId)) {
     const inf = Number.POSITIVE_INFINITY;
     return { ok: true, usage: { used: 0, limit: inf, remaining: inf } };
   }

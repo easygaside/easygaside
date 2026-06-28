@@ -98,12 +98,21 @@ export async function approveUpgradeAction(requestId: string): Promise<void> {
     .eq("id", requestId)
     .maybeSingle<{ user_id: string; plan: string; status: string }>();
   if (!req || req.status !== "pending") throw new Error("bad_request");
-  // grant the plan: paid tier → GLM arm + 30-day expiry (NEW projects use GLM; existing via re-point)
   const expires = new Date(Date.now() + PLAN_PERIOD_DAYS * 24 * 3600 * 1000).toISOString();
-  await svc.from("egs_user_settings").upsert(
-    { user_id: req.user_id, plan: req.plan, plan_expires_at: expires, llm_provider: "zai", updated_at: new Date().toISOString() },
-    { onConflict: "user_id" },
-  );
+  if (req.plan === "byo") {
+    // BYO add-on: enable the entitlement + 30-day expiry (their stored key now gets honored). Do NOT
+    // touch plan/arm — getUserProvider locks them to Claude on their own key while BYO is active.
+    await svc.from("egs_user_settings").upsert(
+      { user_id: req.user_id, byo_enabled: true, byo_expires_at: expires, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" },
+    );
+  } else {
+    // paid tier → GLM arm + 30-day expiry (NEW projects use GLM; existing via re-point)
+    await svc.from("egs_user_settings").upsert(
+      { user_id: req.user_id, plan: req.plan, plan_expires_at: expires, llm_provider: "zai", updated_at: new Date().toISOString() },
+      { onConflict: "user_id" },
+    );
+  }
   await svc
     .from("egs_upgrade_requests")
     .update({ status: "approved", decided_at: new Date().toISOString() })
@@ -185,6 +194,25 @@ export async function grantPlanAction(userId: string, plan: string, expiresAt: s
     { onConflict: "user_id" },
   );
   if (error) throw new Error(`grantPlan: ${error.message}`);
+  revalidatePath("/admin");
+}
+
+/**
+ * Manually enable the BYO add-on for a user (founder grant, no slip) with an explicit expiry date
+ * (UI defaults +30 days). Their stored Anthropic key is honored while this is active.
+ */
+export async function grantByoAction(userId: string, expiresAt: string): Promise<void> {
+  await requireSuperAdmin();
+  if (!userId) throw new Error("bad_user");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiresAt)) throw new Error("bad_date");
+  const expiresIso = new Date(`${expiresAt}T23:59:59+07:00`).toISOString();
+  if (Number.isNaN(new Date(expiresIso).getTime())) throw new Error("bad_date");
+  const svc = createServiceClient();
+  const { error } = await svc.from("egs_user_settings").upsert(
+    { user_id: userId, byo_enabled: true, byo_expires_at: expiresIso, updated_at: new Date().toISOString() },
+    { onConflict: "user_id" },
+  );
+  if (error) throw new Error(`grantByo: ${error.message}`);
   revalidatePath("/admin");
 }
 

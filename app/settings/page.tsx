@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeftIcon, ArrowRightOnRectangleIcon, BoltIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, ArrowRightOnRectangleIcon, BoltIcon, KeyIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { ApiKeyForm } from "@/components/settings/ApiKeyForm";
 import { signOutAction } from "@/app/auth-actions";
-import { getMonthlyToolUsage, hasOwnApiKey } from "@/lib/beta";
+import { getMonthlyToolUsage, hasOwnApiKey, isByoActive } from "@/lib/beta";
 import { CREDIT_TOKENS, getUserMonthlyEnergyUsed, poolSizeForUser } from "@/lib/energy";
-import { PLAN_CONFIG, getUserPlan, isPaidPlan } from "@/lib/plan";
+import { BYO_PRICE_THB, PLAN_CONFIG, getUserPlan, isPaidPlan } from "@/lib/plan";
 import { getCurrentUser } from "@/lib/projects";
 
 export const metadata = { title: "ตั้งค่า — EasyGAS IDE" };
@@ -16,16 +16,18 @@ export default async function SettingsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const [plan, usage, hasKey, poolSize, poolUsed] = await Promise.all([
+  const [plan, usage, hasKey, byoActive, poolSize, poolUsed] = await Promise.all([
     getUserPlan(user.id, user.email),
     getMonthlyToolUsage(user.id, user.email),
     hasOwnApiKey(user.id),
+    isByoActive(user.id),
     poolSizeForUser(user.id, user.email),
     getUserMonthlyEnergyUsed(user.id),
   ]);
 
   const planLabel = PLAN_CONFIG[plan].label;
   const paid = isPaidPlan(plan);
+  const unlimited = byoActive && hasKey; // BYO add-on active + key stored → runs on own key, no limits
   const creditsTotal = Math.floor(poolSize / CREDIT_TOKENS);
   const creditsLeft = Math.max(0, Math.floor((poolSize - poolUsed) / CREDIT_TOKENS));
   const creditPct = Math.min(100, Math.round((poolUsed / Math.max(1, poolSize)) * 100));
@@ -59,9 +61,9 @@ export default async function SettingsPage() {
           </span>
         </h2>
 
-        {hasKey ? (
+        {unlimited ? (
           <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-            ใช้ Anthropic key ของคุณเอง — <b>สร้างได้ไม่จำกัด</b> (ไม่กินแต้ม/โควตาแพ็กเกจ)
+            BYO เปิดอยู่ — ใช้ Anthropic key ของคุณ <b>สร้างได้ไม่จำกัด</b> (ไม่กินแต้ม/โควตาแพ็กเกจ)
           </p>
         ) : (
           <div className="space-y-3">
@@ -118,7 +120,27 @@ export default async function SettingsPage() {
       </section>
 
       <section className="mt-6">
-        <ApiKeyForm hasKey={hasKey} />
+        {byoActive ? (
+          <ApiKeyForm hasKey={hasKey} />
+        ) : (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+              <KeyIcon className="h-4 w-4 text-indigo-500" />
+              ใช้ Anthropic (Claude) key ของคุณเอง — BYO
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              สมัคร BYO (฿{BYO_PRICE_THB}/เดือน) แล้วใส่คีย์ของคุณ เพื่อใช้ Claude ระดับ Flagship แบบ
+              <b>ไม่จำกัด · ไม่กินแต้ม</b> — จ่ายค่า AI กับ Anthropic ตามจริงเอง
+            </p>
+            <Link
+              href="/pricing"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
+            >
+              <SparklesIcon className="h-4 w-4" />
+              อัปเกรดเป็น BYO ฿{BYO_PRICE_THB}/เดือน →
+            </Link>
+          </div>
+        )}
       </section>
 
       <section className="mt-8 border-t border-slate-200 pt-6 dark:border-slate-800">

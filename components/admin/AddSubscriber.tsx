@@ -1,14 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { grantPlanAction } from "@/app/admin/actions";
+import { grantByoAction, grantPlanAction } from "@/app/admin/actions";
 
 interface UserOption {
   id: string;
   email: string;
 }
 
-const PAID = ["lite", "starter", "pro"] as const;
+const OPTIONS: { value: string; label: string }[] = [
+  { value: "lite", label: "Lite" },
+  { value: "starter", label: "Starter" },
+  { value: "pro", label: "Pro" },
+  { value: "byo", label: "BYO (คีย์ตัวเอง)" },
+];
 
 /** Today + 30 days as yyyy-mm-dd (default expiry the founder can override). */
 function plus30Days(): string {
@@ -27,7 +32,7 @@ export function AddSubscriber({ users }: { users: UserOption[] }) {
     [users],
   );
   const [userId, setUserId] = useState("");
-  const [plan, setPlan] = useState<(typeof PAID)[number]>("pro");
+  const [plan, setPlan] = useState<string>("pro");
   const [expiresAt, setExpiresAt] = useState(plus30Days);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -40,9 +45,11 @@ export function AddSubscriber({ users }: { users: UserOption[] }) {
     setBusy(true);
     setMsg(null);
     try {
-      await grantPlanAction(userId, plan, expiresAt);
+      if (plan === "byo") await grantByoAction(userId, expiresAt);
+      else await grantPlanAction(userId, plan, expiresAt);
       const email = sorted.find((u) => u.id === userId)?.email ?? userId;
-      setMsg({ ok: true, text: `ตั้ง ${plan.toUpperCase()} ให้ ${email} ถึง ${expiresAt} แล้ว` });
+      const what = plan === "byo" ? "BYO" : plan.toUpperCase();
+      setMsg({ ok: true, text: `ตั้ง ${what} ให้ ${email} ถึง ${expiresAt} แล้ว` });
       setUserId("");
       setExpiresAt(plus30Days());
     } catch (e) {
@@ -57,7 +64,7 @@ export function AddSubscriber({ users }: { users: UserOption[] }) {
       <div>
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">เพิ่ม/ตั้งแพ็กเกจให้ผู้ใช้</h3>
         <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-          เลือกผู้ใช้ → แพ็กเกจ → วันหมดอายุ (เริ่มต้น +30 วัน) · ตั้งเป็น GLM อัตโนมัติ
+          เลือกผู้ใช้ → แพ็กเกจ/BYO → วันหมดอายุ (เริ่มต้น +30 วัน) · แพ็กเกจจ่ายเงินตั้ง GLM ให้อัตโนมัติ
         </p>
       </div>
 
@@ -78,14 +85,14 @@ export function AddSubscriber({ users }: { users: UserOption[] }) {
 
         <select
           value={plan}
-          onChange={(e) => setPlan(e.target.value as (typeof PAID)[number])}
+          onChange={(e) => setPlan(e.target.value)}
           disabled={busy}
           title="แพ็กเกจ"
           className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-300 dark:border-slate-700/60 dark:bg-slate-800"
         >
-          {PAID.map((p) => (
-            <option key={p} value={p}>
-              {p}
+          {OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>

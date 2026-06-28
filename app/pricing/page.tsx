@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { PlanCard } from "@/components/pricing/PlanCard";
 import { ByokCard } from "@/components/pricing/ByokCard";
-import { hasOwnApiKey } from "@/lib/beta";
+import { isByoActive } from "@/lib/beta";
 import { getCurrentUser } from "@/lib/projects";
-import { PLAN_CONFIG, getUserPlan, type Plan } from "@/lib/plan";
+import { BYO_PRICE_THB, PLAN_CONFIG, getUserPlan, type Plan } from "@/lib/plan";
 
 const ORDER: Plan[] = ["free", "lite", "starter", "pro"];
 
 export default async function PricingPage() {
   const user = await getCurrentUser();
-  const [currentPlan, hasKey]: [Plan, boolean] = user
-    ? await Promise.all([getUserPlan(user.id, user.email), hasOwnApiKey(user.id)])
+  const [currentPlan, byoActive]: [Plan, boolean] = user
+    ? await Promise.all([getUserPlan(user.id, user.email), isByoActive(user.id)])
     : ["free", false];
 
   return (
@@ -39,7 +39,7 @@ export default async function PricingPage() {
         })}
       </div>
 
-      <ByokCard hasKey={hasKey} />
+      <ByokCard active={byoActive} priceThb={BYO_PRICE_THB} />
 
       <p className="mt-8 text-center text-xs text-slate-400 dark:text-slate-500">
         ชำระผ่าน PromptPay แล้วแนบสลิป — ทีมงานยืนยันแล้วเปิดแพ็กเกจให้ · <Link href="/projects" className="underline">กลับไปที่เครื่องมือ</Link>

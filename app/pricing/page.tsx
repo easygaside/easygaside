@@ -25,6 +25,7 @@ export default async function PricingPage() {
           return (
             <PlanCard
               key={p}
+              plan={p}
               label={c.label}
               priceThb={c.priceThb}
               yearlyThb={c.yearlyThb}

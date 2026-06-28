@@ -1,22 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import { CheckIcon } from "@heroicons/react/24/outline";
+import { submitUpgradeRequest, type UpgradeFormState } from "@/app/pricing/actions";
 
 const PROMPTPAY_TARGET = "0995588665";
 
 /**
- * One pricing tier. Paid tiers reveal a PromptPay QR (promptpay.io, no server call) for the selected
- * amount on "เลือก". The slip upload + upgrade request + Discord notify land in the next stage; for now
- * the card guides the manual transfer.
+ * One pricing tier. Paid tiers reveal a PromptPay QR (promptpay.io, no server call) + a slip-upload
+ * form on "เลือก". Submitting creates a pending upgrade request (the founder approves in /admin).
  */
 export function PlanCard({
+  plan,
   label,
   priceThb,
   yearlyThb,
   highlights,
   isCurrent,
 }: {
+  plan: string;
   label: string;
   priceThb: number;
   yearlyThb: number;
@@ -24,6 +26,7 @@ export function PlanCard({
   isCurrent: boolean;
 }) {
   const [showQr, setShowQr] = useState(false);
+  const [state, formAction, pending] = useActionState<UpgradeFormState, FormData>(submitUpgradeRequest, {});
   const paid = priceThb > 0;
 
   return (
@@ -62,23 +65,47 @@ export function PlanCard({
             onClick={() => setShowQr((v) => !v)}
             className="w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400"
           >
-            {showQr ? "ซ่อน QR" : "เลือกแพ็กเกจนี้"}
+            {showQr ? "ซ่อน" : "เลือกแพ็กเกจนี้"}
           </button>
+
           {showQr && (
             <div className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700/60 dark:bg-slate-800/50">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`https://promptpay.io/${PROMPTPAY_TARGET}/${priceThb}.png`}
                 alt={`PromptPay ฿${priceThb}`}
-                width={176}
-                height={176}
+                width={168}
+                height={168}
                 className="rounded-lg bg-white"
               />
               <p className="text-center text-[12px] leading-relaxed text-slate-500 dark:text-slate-400">
-                สแกนโอน <b>฿{priceThb}</b> (พร้อมเพย์ {PROMPTPAY_TARGET})
-                <br />
-                แล้วแนบสลิปเพื่อยืนยัน — <span className="text-amber-600 dark:text-amber-400">ระบบแนบสลิปในแอปเร็ว ๆ นี้</span> หรือแจ้งทาง LINE
+                สแกนโอน <b>฿{priceThb}</b> (พร้อมเพย์ {PROMPTPAY_TARGET}) แล้วแนบสลิปเพื่อยืนยัน
               </p>
+
+              {state.ok ? (
+                <p className="rounded-lg bg-emerald-100 px-3 py-2 text-center text-[12px] font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  ✓ ส่งคำขอแล้ว — ทีมงานจะยืนยันแล้วเปิดแพ็กเกจให้
+                </p>
+              ) : (
+                <form action={formAction} className="flex w-full flex-col gap-2">
+                  <input type="hidden" name="plan" value={plan} />
+                  <input
+                    type="file"
+                    name="slip"
+                    accept="image/*"
+                    required
+                    className="text-[11px] text-slate-500 file:mr-2 file:rounded-md file:border-0 file:bg-slate-200 file:px-2 file:py-1 file:text-[11px] file:font-medium dark:text-slate-400 dark:file:bg-slate-700"
+                  />
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="rounded-lg bg-emerald-600 py-1.5 text-[12px] font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                  >
+                    {pending ? "กำลังส่ง…" : "แนบสลิป + ส่งคำขอ"}
+                  </button>
+                  {state.error && <p className="text-center text-[11px] text-red-600 dark:text-red-400">{state.error}</p>}
+                </form>
+              )}
             </div>
           )}
         </div>

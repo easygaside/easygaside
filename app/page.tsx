@@ -8,6 +8,7 @@ import {
   RocketLaunchIcon,
   SparklesIcon,
   Squares2X2Icon,
+  TagIcon,
 } from "@heroicons/react/24/outline";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentUser } from "@/lib/projects";
@@ -115,18 +116,18 @@ export default async function Home() {
         <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
           สร้างเครื่องมือบน <span className="text-emerald-600 dark:text-emerald-400">Google Apps Script</span> ด้วยการพิมพ์คุยกับ AI
         </h1>
-        <div className="mt-7 flex flex-row items-stretch justify-center gap-3">
+        <div className="mt-7 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
           <Link
-            href="/styleshopping"
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:flex-none"
+            href="/pricing"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:w-auto"
           >
-            <Squares2X2Icon className="h-4 w-4 shrink-0" /> เลือกสไตล์ให้เว็บคุณ
+            <TagIcon className="h-4 w-4 shrink-0" /> ดูแพ็กเกจ
           </Link>
           <Link
             href="/login"
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 sm:flex-none"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 sm:w-auto"
           >
-            <ArrowRightOnRectangleIcon className="h-4 w-4 shrink-0" /> ลงทะเบียน / เข้าสู่ระบบ
+            <ArrowRightOnRectangleIcon className="h-4 w-4 shrink-0" /> สมัครใช้งานฟรี
           </Link>
         </div>
       </section>

@@ -26,6 +26,7 @@ export const PRICING: Record<string, ModelPrice> = {
   "gpt-4o": { input: 2.5, output: 10, cacheRead: 1.25, cacheWrite: 2.5 },
   "gemini-2.5-flash": { input: 0.3, output: 2.5, cacheRead: 0.075, cacheWrite: 0.3 },
   "glm-4.6": { input: 0.6, output: 2.2, cacheRead: 0.6, cacheWrite: 0.6 },
+  "glm-5.2": { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0.26 }, // z.ai list (cache-write n/a — openai-format logs 0)
 };
 
 const FALLBACK: ModelPrice = { input: 1, output: 3, cacheRead: 0.5, cacheWrite: 1 };

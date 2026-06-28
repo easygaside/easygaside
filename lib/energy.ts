@@ -1,6 +1,7 @@
 import { isSuperAdmin } from "@/lib/admin";
 import { bangkokMonthStartISO } from "@/lib/month";
 import { PLAN_CONFIG, getPlanLimits, getUserPlan } from "@/lib/plan";
+import { genCostUsd, priceFor, type GenTokens } from "@/lib/pricing";
 import { getNumberSetting } from "@/lib/settings";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -100,18 +101,27 @@ export async function getMonthlyPool(userId: string, email?: string | null): Pro
   return isSuperAdmin(email) ? Number.POSITIVE_INFINITY : poolSizeForUser(userId, email);
 }
 
-/** Tokens (input+output) the user has spent across ALL their projects this calendar month. */
+/**
+ * Cost-equivalent tokens for one generation = its USD cost (which INCLUDES cache) expressed in the
+ * model's output-token units. This makes the pool COUNT CACHE without over-weighting DeepSeek's
+ * near-free cache: DeepSeek stays ≈ input+output, while GLM's pricier cache makes a project burn ~3×
+ * more — in line with real COGS — so the same pool sizes still work.
+ */
+function effectiveTokens(g: GenTokens): number {
+  const outPerTok = priceFor(g.model).output / 1_000_000;
+  if (!(outPerTok > 0)) return (g.input_tokens ?? 0) + (g.output_tokens ?? 0);
+  return genCostUsd(g) / outPerTok;
+}
+
+/** Cost-equivalent energy (incl. cache) the user has spent across ALL projects this calendar month. */
 export async function getUserMonthlyEnergyUsed(userId: string): Promise<number> {
   const svc = createServiceClient();
   const { data } = await svc
     .from("egs_generations")
-    .select("input_tokens, output_tokens")
+    .select("model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens")
     .eq("user_id", userId)
     .gte("created_at", monthStartISO());
-  return (data ?? []).reduce(
-    (a, r) => a + ((r.input_tokens as number) ?? 0) + ((r.output_tokens as number) ?? 0),
-    0,
-  );
+  return Math.round((data ?? []).reduce((a, g) => a + effectiveTokens(g as GenTokens), 0));
 }
 
 /** Shown when the monthly pool is exhausted (chat / verify / re-check). */

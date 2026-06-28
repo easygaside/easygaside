@@ -108,7 +108,7 @@ export function providerConfig(p: LlmProvider): ProviderConfig {
         provider: "zai",
         family: "openai",
         label: "GLM (z.ai)",
-        model: process.env.ZAI_MODEL ?? "glm-4.6",
+        model: process.env.ZAI_MODEL ?? "glm-5.2",
         baseURL: process.env.ZAI_BASE_URL ?? "https://api.z.ai/api/paas/v4",
         apiKey: process.env.ZAI_API_KEY,
         maxOutputTokens: 16000,

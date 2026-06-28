@@ -115,6 +115,7 @@ export function ChatPanel({
   energyTank,
   currentArm = null,
   isPaid = false,
+  planLabel = "ฟรี",
 }: {
   projectId: string;
   initialImages?: { url: string }[];
@@ -122,6 +123,7 @@ export function ChatPanel({
   energyTank?: number;
   currentArm?: string | null;
   isPaid?: boolean;
+  planLabel?: string;
 }) {
   const applyMutation = useProjectStore((s) => s.applyMutation);
   const setWorking = useProjectStore((s) => s.setWorking);
@@ -356,6 +358,13 @@ export function ChatPanel({
     }
   }
 
+  // ผู้ช่วย (guided wizard) is just an ENTRY point into a build — once the chat has started, hide it
+  // to declutter; the code actions (อธิบาย/ตรวจบั๊ก) stay whenever the project has files.
+  const chatStarted = messages.length > 0;
+  const showAssistant = !chatStarted;
+  const segCount = (showAssistant ? 1 : 0) + (hasFiles ? 2 : 0);
+  const segCols = segCount >= 3 ? "grid-cols-3" : segCount === 2 ? "grid-cols-2" : "grid-cols-1";
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex-none px-4 pb-3 pt-4">
@@ -378,48 +387,53 @@ export function ChatPanel({
               projectId={projectId}
               currentArm={currentArm}
               isPaid={isPaid}
+              planLabel={planLabel}
               lowCredit={!!energyTank && energy / energyTank > 0.85}
             />
           </div>
         ) : null}
 
-        {/* action segmented control — clicking a button activates it (raised white chip) */}
-        <div className={`grid gap-1 rounded-[10px] bg-slate-100 p-1 dark:bg-slate-800 ${hasFiles ? "grid-cols-3" : "grid-cols-1"}`}>
-          <button
-            onClick={() => {
-              setActiveAction("assistant");
-              setWizardOpen(true);
-            }}
-            className={segClass(activeAction === "assistant")}
-          >
-            <SparklesIcon className="h-3.5 w-3.5 shrink-0" />
-            ผู้ช่วย
-          </button>
-          {hasFiles && (
-            <>
+        {/* action segmented control — ผู้ช่วย (wizard) only BEFORE the chat starts; code actions when there are files */}
+        {segCount > 0 && (
+          <div className={`grid gap-1 rounded-[10px] bg-slate-100 p-1 dark:bg-slate-800 ${segCols}`}>
+            {showAssistant && (
               <button
                 onClick={() => {
-                  setActiveAction("explain");
-                  send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ");
+                  setActiveAction("assistant");
+                  setWizardOpen(true);
                 }}
-                disabled={busy}
-                className={segClass(activeAction === "explain")}
+                className={segClass(activeAction === "assistant")}
               >
-                อธิบายโค้ด
+                <SparklesIcon className="h-3.5 w-3.5 shrink-0" />
+                ผู้ช่วย
               </button>
-              <button
-                onClick={() => {
-                  setActiveAction("fix");
-                  send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย");
-                }}
-                disabled={busy}
-                className={segClass(activeAction === "fix")}
-              >
-                ตรวจบั๊ก
-              </button>
-            </>
-          )}
-        </div>
+            )}
+            {hasFiles && (
+              <>
+                <button
+                  onClick={() => {
+                    setActiveAction("explain");
+                    send("อธิบายว่าโค้ดในโปรเจกต์นี้ทำงานยังไง แบบสรุปสั้น ๆ เป็นข้อ ๆ");
+                  }}
+                  disabled={busy}
+                  className={segClass(activeAction === "explain")}
+                >
+                  อธิบายโค้ด
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveAction("fix");
+                    send("ตรวจโค้ดทั้งหมดหาบั๊กและจุดที่ไม่ตรง best practice ของ Google Apps Script แล้วแก้ให้เรียบร้อย");
+                  }}
+                  disabled={busy}
+                  className={segClass(activeAction === "fix")}
+                >
+                  ตรวจบั๊ก
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div ref={bodyRef} className="flex-1 space-y-3 overflow-auto px-3 pb-2">

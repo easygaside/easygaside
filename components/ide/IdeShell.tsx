@@ -42,6 +42,7 @@ export function IdeShell({
   energyTank,
   currentArm = null,
   isPaid = false,
+  planLabel = "ฟรี",
   deployedUrl,
   projects = [],
   accountMismatch = null,
@@ -56,6 +57,7 @@ export function IdeShell({
   energyTank?: number;
   currentArm?: string | null;
   isPaid?: boolean;
+  planLabel?: string;
   deployedUrl?: string | null;
   projects?: SwitcherProject[];
   accountMismatch?: { login: string; connected: string } | null;
@@ -231,7 +233,7 @@ export function IdeShell({
           style={{ "--preview-w": `${previewW}px` } as CSSProperties}
         >
           <section className={`${PANEL} border-slate-200 dark:border-slate-800 lg:border-r ${hideOnMobile("chat")}`}>
-            <ChatPanel projectId={projectId} initialImages={initialImages} energyUsed={energyUsed} energyTank={energyTank} currentArm={currentArm} isPaid={isPaid} />
+            <ChatPanel projectId={projectId} initialImages={initialImages} energyUsed={energyUsed} energyTank={energyTank} currentArm={currentArm} isPaid={isPaid} planLabel={planLabel} />
           </section>
 
           <section className={`${PANEL} ${hideOnMobile("code")}`}>

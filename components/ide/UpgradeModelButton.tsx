@@ -7,32 +7,26 @@ import { repointProjectModelAction } from "@/app/projects/actions";
 const GLM_ARM = "zai";
 // arms whose stored history is OpenAI wire format → can re-point to GLM without losing the conversation
 const OPENAI_FAMILY = new Set(["deepseek", "deepseek-pro", "chatgpt", "gemini", "zai"]);
-// User-facing tier label (we never expose the underlying model brand to end users — see pricing copy).
-const ARM_LABEL: Record<string, string> = {
-  deepseek: "มาตรฐาน",
-  "deepseek-pro": "มาตรฐาน",
-  chatgpt: "มาตรฐาน",
-  gemini: "มาตรฐาน",
-  zai: "Flagship",
-  claude: "Flagship",
-};
 
 /**
- * Compact model chip (NOT a banner) — looks like a status pill, the ✨ hints there's a better model:
- *  - already GLM            → quiet status chip, no action
- *  - paid + same-family arm → click re-points THIS project to GLM in place
- *  - free                   → click → /pricing
+ * Compact PACKAGE chip (NOT a banner) — shows the user's plan name, never the underlying AI model.
+ * The ✨ hints there's a better tier:
+ *  - already on the Flagship arm (GLM) → quiet status chip, no action
+ *  - paid + same-family arm            → click re-points THIS project to the Flagship arm in place
+ *  - free                              → click → /pricing
  * `lowCredit` (แต้มใกล้หมด) adds a stronger one-line CTA for free users — the high-intent moment.
  */
 export function UpgradeModelButton({
   projectId,
   currentArm,
   isPaid,
+  planLabel,
   lowCredit = false,
 }: {
   projectId: string;
   currentArm: string | null;
   isPaid: boolean;
+  planLabel: string;
   lowCredit?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
@@ -40,13 +34,12 @@ export function UpgradeModelButton({
   if (hidden) return null;
 
   const arm = currentArm ?? (isPaid ? GLM_ARM : "deepseek-pro");
-  const label = ARM_LABEL[arm] ?? arm;
 
-  // already on GLM → quiet status chip
+  // already on the Flagship arm → quiet status chip showing the package name
   if (arm === GLM_ARM) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-        <SparklesIcon className="h-3.5 w-3.5" /> Flagship
+        <SparklesIcon className="h-3.5 w-3.5" /> {planLabel}
       </span>
     );
   }
@@ -84,7 +77,7 @@ export function UpgradeModelButton({
         className="group inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500 transition hover:border-amber-300 hover:text-amber-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-amber-300"
       >
         <BoltIcon className="h-3.5 w-3.5" />
-        {busy ? "กำลังสลับ…" : label}
+        {busy ? "กำลังสลับ…" : planLabel}
         <SparklesIcon className="h-3.5 w-3.5 text-amber-400 transition group-hover:text-amber-500" />
       </button>
       {lowCredit && !isPaid && (

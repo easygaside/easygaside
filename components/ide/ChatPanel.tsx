@@ -10,6 +10,7 @@ import {
   PaperAirplaneIcon,
   PhotoIcon,
   SparklesIcon,
+  Squares2X2Icon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useProjectStore } from "@/store/useProjectStore";
@@ -484,6 +485,16 @@ export function ChatPanel({
                 </button>
               ))}
             </div>
+            {!hasFiles && (
+              <a
+                href="/styleshopping"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2.5 flex items-center justify-center gap-1.5 rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-[11.5px] font-medium text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 dark:border-slate-700/60 dark:text-slate-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+              >
+                <Squares2X2Icon className="h-3.5 w-3.5 shrink-0" /> ยังไม่รู้จะเอาสไตล์ไหน? เปิดดู เลือกสไตล์ ↗
+              </a>
+            )}
           </div>
         )}
         {messages.map((m, i) => (

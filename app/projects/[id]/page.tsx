@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { IdeShell } from "@/components/ide/IdeShell";
+import { SupportChatWidget } from "@/components/support/SupportChatWidget";
 import { getAccessGate } from "@/lib/beta";
 import { listProjectChatImages } from "@/lib/chat-images";
 import { getUserMonthlyEnergyUsed, poolSizeForUser } from "@/lib/energy";
@@ -59,21 +60,25 @@ export default async function ProjectBuilderPage({
       : undefined;
 
   return (
-    <IdeShell
-      projectId={id}
-      projectName={project.name}
-      initialFiles={files.map((f) => ({ path: f.path, content: f.content }))}
-      initialImages={chatImages.map((img) => ({ url: img.url }))}
-      webHint={webHint}
-      googleConnected={conn.connected && conn.status === "active"}
-      energyUsed={energyUsed}
-      energyTank={energyTank}
-      currentArm={project.llm_provider}
-      isPaid={isPaid}
-      planLabel={planLabel}
-      deployedUrl={deployedUrl}
-      projects={switcherProjects}
-      accountMismatch={accountMismatch}
-    />
+    <>
+      <IdeShell
+        projectId={id}
+        projectName={project.name}
+        initialFiles={files.map((f) => ({ path: f.path, content: f.content }))}
+        initialImages={chatImages.map((img) => ({ url: img.url }))}
+        webHint={webHint}
+        googleConnected={conn.connected && conn.status === "active"}
+        energyUsed={energyUsed}
+        energyTank={energyTank}
+        currentArm={project.llm_provider}
+        isPaid={isPaid}
+        planLabel={planLabel}
+        deployedUrl={deployedUrl}
+        projects={switcherProjects}
+        accountMismatch={accountMismatch}
+      />
+      {/* Live chat rides on top of the IDE shell for paid users (fixed bottom-right). */}
+      {isPaid && <SupportChatWidget userId={userId} projectId={id} />}
+    </>
   );
 }

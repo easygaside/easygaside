@@ -38,6 +38,11 @@ export default async function AdminPage() {
   if (!isSuperAdmin(user.email)) redirect("/projects");
 
   const svc = createServiceClient();
+  // Mirror the env superadmin allowlist into egs_admins (source of truth stays the env var).
+  // Needed in-database for the live-chat Realtime policy + admin push fan-out.
+  await svc
+    .from("egs_admins")
+    .upsert({ user_id: user.id, email: user.email ?? "" }, { onConflict: "user_id" });
   const [{ data: list }, { data: settings }, { data: gens }, { data: pcfg }, { data: appcfg }, { data: plancfg }] =
     await Promise.all([
       svc.auth.admin.listUsers({ perPage: 1000 }),
@@ -58,6 +63,7 @@ export default async function AdminPage() {
     { data: appRows },
     { data: payRows },
     { data: upgradeRows },
+    { count: supportUnread },
   ] = await Promise.all([
       svc.from("egs_projects").select("id, name"),
       svc.from("egs_beta_allowlist").select("email, note, created_at").order("created_at", { ascending: true }),
@@ -79,6 +85,12 @@ export default async function AdminPage() {
         .select("id, email, plan, amount_thb, slip_path, created_at")
         .eq("status", "pending")
         .order("created_at", { ascending: true }),
+      // unread live-chat messages from customers → badge on the แชทสด tab
+      svc
+        .from("egs_support_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("sender", "user")
+        .is("read_at", null),
     ]);
   const projectName = new Map((projectRows ?? []).map((p) => [p.id as string, p.name as string]));
 
@@ -378,6 +390,7 @@ export default async function AdminPage() {
       userMetrics={userMetrics}
       finance={finance}
       providerKeys={providerKeys}
+      supportUnread={supportUnread ?? 0}
     />
   );
 }

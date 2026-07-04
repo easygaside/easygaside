@@ -12,7 +12,8 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getAccessGate, getMonthlyToolUsage } from "@/lib/beta";
 import { getUserMonthlyEnergyUsed, poolSizeForUser } from "@/lib/energy";
 import { getAppsScriptReadiness, getConnectionStatus } from "@/lib/google-connection";
-import { PLAN_CONFIG, getUserPlan } from "@/lib/plan";
+import { PLAN_CONFIG, getUserPlan, isPaidPlan } from "@/lib/plan";
+import { SupportChatWidget } from "@/components/support/SupportChatWidget";
 import { getCurrentUser, getDeployedMap, listProjects } from "@/lib/projects";
 
 export const metadata = { title: "โปรเจกต์ของฉัน — EasyGAS" };
@@ -229,6 +230,7 @@ export default async function ProjectsPage() {
           )}
         </div>
       </div>
+      {isPaidPlan(plan) && <SupportChatWidget userId={userId} />}
     </main>
   );
 }

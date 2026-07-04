@@ -7,6 +7,7 @@ import {
   ArrowLeftIcon,
   BanknotesIcon,
   ChartBarIcon,
+  ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
   CreditCardIcon,
   FlagIcon,
@@ -40,6 +41,7 @@ import { UpgradeRequestsViewer, type UpgradeRequest } from "./UpgradeRequestsVie
 import { SubscribersViewer, type Subscriber } from "./SubscribersViewer";
 import { AddSubscriber } from "./AddSubscriber";
 import { ReportsViewer, type FailureReport } from "./ReportsViewer";
+import { SupportInbox } from "./SupportInbox";
 
 export interface AdminUser {
   id: string;
@@ -195,7 +197,7 @@ export interface ProviderModel {
   baseUrl: string;
 }
 
-type Tab = "overview" | "finance" | "providers" | "users" | "plans" | "beta" | "reports";
+type Tab = "overview" | "finance" | "providers" | "users" | "plans" | "beta" | "reports" | "chat";
 
 export function AdminPanel({
   users,
@@ -223,6 +225,7 @@ export function AdminPanel({
   userMetrics,
   finance,
   providerKeys,
+  supportUnread,
 }: {
   users: AdminUser[];
   metrics: ArmMetric[];
@@ -249,6 +252,7 @@ export function AdminPanel({
   userMetrics: UserMetric[];
   finance: FinanceData;
   providerKeys: Record<LlmProvider, boolean>;
+  supportUnread: number;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
@@ -334,6 +338,7 @@ export function AdminPanel({
     { id: "plans", label: "แพ็กเกจ", icon: CreditCardIcon, badge: upgradeRequests.length },
     { id: "beta", label: "Beta", icon: InboxStackIcon, badge: pendingApps },
     { id: "reports", label: "รายงาน", icon: FlagIcon, badge: openReports },
+    { id: "chat", label: "แชทสด", icon: ChatBubbleLeftRightIcon, badge: supportUnread },
   ];
 
   const activeLabel = TABS.find((t) => t.id === tab)?.label ?? "";
@@ -982,6 +987,9 @@ export function AdminPanel({
           <ReportsViewer reports={reports} />
         </div>
       )}
+
+      {/* ───────── แชทสด (ลูกค้าแพ็กเกจเสียเงิน) ───────── */}
+      {tab === "chat" && <SupportInbox />}
 
       {/* ───────── mobile bottom menu (hidden on lg — sidebar takes over) ───────── */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-900/90">

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatBubbleLeftRightIcon, PaperAirplaneIcon, PaperClipIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import { EmojiPicker } from "./EmojiPicker";
+import { ProjectPicker } from "./ProjectPicker";
 
 /**
  * Floating live-chat widget (paid users only — rendered conditionally by the
@@ -28,6 +28,8 @@ interface SupportChatWidgetProps {
   projectId?: string;
   /** Current project's name — shown on the attach chip + on attached bubbles. */
   projectName?: string;
+  /** All of the customer's projects — the picker inserts a name into the message. */
+  projects?: { id: string; name: string }[];
   /** Plan display name (e.g. "Lite") — shown in the header as the perk's origin. */
   planLabel?: string;
 }
@@ -40,7 +42,13 @@ function timeLabel(iso: string): string {
   }
 }
 
-export function SupportChatWidget({ userId, projectId, projectName, planLabel }: SupportChatWidgetProps) {
+export function SupportChatWidget({
+  userId,
+  projectId,
+  projectName,
+  projects = [],
+  planLabel,
+}: SupportChatWidgetProps) {
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -54,24 +62,25 @@ export function SupportChatWidget({ userId, projectId, projectName, planLabel }:
   const openRef = useRef(false);
   openRef.current = open;
 
-  // Grow the composer with its content (capped by max-h) so Shift+Enter lines stay visible.
+  // Grow the composer with its content (between the 1.5-line base and the cap)
+  // so Shift+Enter lines stay visible.
   const autoGrow = useCallback(() => {
     const ta = inputRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, 96)}px`;
+    ta.style.height = `${Math.min(Math.max(ta.scrollHeight, 56), 120)}px`;
   }, []);
 
-  const insertEmoji = useCallback(
-    (emoji: string) => {
+  const insertText = useCallback(
+    (text: string) => {
       const ta = inputRef.current;
       const start = ta?.selectionStart ?? input.length;
       const end = ta?.selectionEnd ?? input.length;
-      setInput(input.slice(0, start) + emoji + input.slice(end));
+      setInput(input.slice(0, start) + text + input.slice(end));
       requestAnimationFrame(() => {
         if (!ta) return;
         ta.focus();
-        const pos = start + emoji.length;
+        const pos = start + text.length;
         ta.setSelectionRange(pos, pos);
         autoGrow();
       });
@@ -245,7 +254,7 @@ export function SupportChatWidget({ userId, projectId, projectName, planLabel }:
               </button>
             )}
             <div className="flex items-end gap-1.5">
-              <EmojiPicker onPick={insertEmoji} />
+              <ProjectPicker projects={projects} onPick={insertText} />
               <textarea
                 ref={inputRef}
                 value={input}
@@ -259,9 +268,9 @@ export function SupportChatWidget({ userId, projectId, projectName, planLabel }:
                     void send();
                   }
                 }}
-                rows={1}
+                rows={2}
                 placeholder="พิมพ์ข้อความ… (Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่)"
-                className="max-h-24 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="max-h-[7.5rem] min-h-14 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               />
               <button
                 type="button"

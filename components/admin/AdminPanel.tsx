@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -257,6 +259,40 @@ export function AdminPanel({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
   const [busy, setBusy] = useState(false);
+  // Live unread badge for the แชทสด tab: seeded server-side, bumped by the
+  // admin-lobby broadcast (fires on every incoming customer message), and
+  // synced down by SupportInbox when threads get read.
+  const [chatUnread, setChatUnread] = useState(supportUnread);
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: RealtimeChannel | null = null;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const res = await fetch("/api/admin/support/threads");
+        if (!res.ok) return;
+        const data = (await res.json()) as { threads: { unread: number }[] };
+        if (!cancelled) setChatUnread(data.threads.reduce((sum, t) => sum + t.unread, 0));
+      } catch {
+        /* badge refresh is best-effort */
+      }
+    };
+    (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session || cancelled) return;
+      await supabase.realtime.setAuth(session.access_token);
+      channel = supabase
+        .channel("support:admin-lobby", { config: { private: true } })
+        .on("broadcast", { event: "new_user_message" }, () => void refresh())
+        .subscribe();
+    })();
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
   const [modelDraft, setModelDraft] = useState<Record<string, string>>(
     Object.fromEntries(models.map((m) => [m.provider, m.model])),
   );
@@ -338,7 +374,7 @@ export function AdminPanel({
     { id: "plans", label: "แพ็กเกจ", icon: CreditCardIcon, badge: upgradeRequests.length },
     { id: "beta", label: "Beta", icon: InboxStackIcon, badge: pendingApps },
     { id: "reports", label: "รายงาน", icon: FlagIcon, badge: openReports },
-    { id: "chat", label: "แชทสด", icon: ChatBubbleLeftRightIcon, badge: supportUnread },
+    { id: "chat", label: "แชทสด", icon: ChatBubbleLeftRightIcon, badge: chatUnread },
   ];
 
   const activeLabel = TABS.find((t) => t.id === tab)?.label ?? "";
@@ -989,7 +1025,7 @@ export function AdminPanel({
       )}
 
       {/* ───────── แชทสด (ลูกค้าแพ็กเกจเสียเงิน) ───────── */}
-      {tab === "chat" && <SupportInbox />}
+      {tab === "chat" && <SupportInbox onUnreadChange={setChatUnread} />}
 
       {/* ───────── mobile bottom menu (hidden on lg — sidebar takes over) ───────── */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-900/90">

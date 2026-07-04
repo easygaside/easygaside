@@ -58,7 +58,12 @@ function timeLabel(iso: string): string {
   }
 }
 
-export function SupportInbox() {
+interface SupportInboxProps {
+  /** Reports the total unread count upward so the sidebar tab badge stays in sync. */
+  onUnreadChange?: (total: number) => void;
+}
+
+export function SupportInbox({ onUnreadChange }: SupportInboxProps) {
   const supabase = useMemo(() => createClient(), []);
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [selected, setSelected] = useState<ThreadRow | null>(null);
@@ -72,6 +77,10 @@ export function SupportInbox() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selected?.userId ?? null;
+
+  useEffect(() => {
+    onUnreadChange?.(threads.reduce((sum, t) => sum + t.unread, 0));
+  }, [threads, onUnreadChange]);
 
   const autoGrow = useCallback(() => {
     const ta = inputRef.current;

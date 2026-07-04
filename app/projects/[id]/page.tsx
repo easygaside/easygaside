@@ -79,7 +79,13 @@ export default async function ProjectBuilderPage({
       />
       {/* Live chat rides on top of the IDE shell for paid users (fixed bottom-right). */}
       {isPaid && (
-        <SupportChatWidget userId={userId} projectId={id} projectName={project.name} planLabel={planLabel} />
+        <SupportChatWidget
+          userId={userId}
+          projectId={id}
+          projectName={project.name}
+          planLabel={planLabel}
+          projects={allProjects.map((p) => ({ id: p.id, name: p.name }))}
+        />
       )}
     </>
   );

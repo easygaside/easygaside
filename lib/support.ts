@@ -79,6 +79,54 @@ export async function markSupportRead(userId: string, reader: "user" | "admin"):
   if (error) throw new Error(`markSupportRead: ${error.message}`);
 }
 
+/** Resolve project names for message chips in the admin inbox (superadmin context). */
+export async function getProjectNameMap(ids: string[]): Promise<Record<string, string>> {
+  if (ids.length === 0) return {};
+  const svc = createServiceClient();
+  const { data, error } = await svc.from("egs_projects").select("id, name").in("id", ids);
+  if (error) throw new Error(`getProjectNameMap: ${error.message}`);
+  return Object.fromEntries(
+    ((data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]),
+  );
+}
+
+export interface SupportProjectDetail {
+  id: string;
+  name: string;
+  createdAt: string;
+  deployedUrl: string | null;
+  files: string[];
+}
+
+/** Details behind the admin's "attached project" chip (superadmin context). */
+export async function getSupportProjectDetail(id: string): Promise<SupportProjectDetail | null> {
+  const svc = createServiceClient();
+  const { data: proj } = await svc
+    .from("egs_projects")
+    .select("id, name, created_at")
+    .eq("id", id)
+    .maybeSingle<{ id: string; name: string; created_at: string }>();
+  if (!proj) return null;
+  const [dep, files] = await Promise.all([
+    svc
+      .from("egs_deployments")
+      .select("exec_url")
+      .eq("project_id", id)
+      .eq("entry_type", "webapp")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ exec_url: string | null }>(),
+    svc.from("egs_files").select("path").eq("project_id", id).order("path"),
+  ]);
+  return {
+    id: proj.id,
+    name: proj.name,
+    createdAt: proj.created_at,
+    deployedUrl: dep.data?.exec_url ?? null,
+    files: ((files.data ?? []) as { path: string }[]).map((f) => f.path),
+  };
+}
+
 /**
  * Admin inbox: one row per customer thread with last message + unread count.
  * Aggregated in JS over the most recent rows — fine at beta scale (a few dozen

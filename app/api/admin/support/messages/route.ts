@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/projects";
 import { sendPushToUser } from "@/lib/push";
 import {
   SUPPORT_MAX_BODY,
+  getProjectNameMap,
   insertSupportMessage,
   listSupportMessages,
   markSupportRead,
@@ -30,7 +31,10 @@ export async function GET(req: Request) {
     // (and the next /threads poll) already reflect it.
     await markSupportRead(userId, "admin");
     const messages = await listSupportMessages(userId);
-    return NextResponse.json({ messages });
+    const projects = await getProjectNameMap([
+      ...new Set(messages.map((m) => m.project_id).filter((id): id is string => !!id)),
+    ]);
+    return NextResponse.json({ messages, projects });
   } catch (e) {
     console.error("[admin/support] list failed:", e);
     return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });

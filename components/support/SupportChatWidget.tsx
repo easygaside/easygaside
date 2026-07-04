@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChatBubbleLeftRightIcon, PaperAirplaneIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { ChatBubbleLeftRightIcon, PaperAirplaneIcon, PaperClipIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { EmojiPicker } from "./EmojiPicker";
 
 /**
  * Floating live-chat widget (paid users only — rendered conditionally by the
@@ -16,14 +17,17 @@ interface ChatMessage {
   id: string;
   sender: "user" | "admin";
   body: string;
+  project_id?: string | null;
   read_at?: string | null;
   created_at: string;
 }
 
 interface SupportChatWidgetProps {
   userId: string;
-  /** Set inside the IDE so the message carries which project it came from. */
+  /** Set inside the IDE so the message can carry which project it came from. */
   projectId?: string;
+  /** Current project's name — shown on the attach chip + on attached bubbles. */
+  projectName?: string;
   /** Plan display name (e.g. "Lite") — shown in the header as the perk's origin. */
   planLabel?: string;
 }
@@ -36,7 +40,7 @@ function timeLabel(iso: string): string {
   }
 }
 
-export function SupportChatWidget({ userId, projectId, planLabel }: SupportChatWidgetProps) {
+export function SupportChatWidget({ userId, projectId, projectName, planLabel }: SupportChatWidgetProps) {
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -44,9 +48,36 @@ export function SupportChatWidget({ userId, projectId, planLabel }: SupportChatW
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [attachProject, setAttachProject] = useState(true);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const openRef = useRef(false);
   openRef.current = open;
+
+  // Grow the composer with its content (capped by max-h) so Shift+Enter lines stay visible.
+  const autoGrow = useCallback(() => {
+    const ta = inputRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 96)}px`;
+  }, []);
+
+  const insertEmoji = useCallback(
+    (emoji: string) => {
+      const ta = inputRef.current;
+      const start = ta?.selectionStart ?? input.length;
+      const end = ta?.selectionEnd ?? input.length;
+      setInput(input.slice(0, start) + emoji + input.slice(end));
+      requestAnimationFrame(() => {
+        if (!ta) return;
+        ta.focus();
+        const pos = start + emoji.length;
+        ta.setSelectionRange(pos, pos);
+        autoGrow();
+      });
+    },
+    [input, autoGrow],
+  );
 
   const markRead = useCallback(() => {
     setUnread(0);
@@ -118,7 +149,7 @@ export function SupportChatWidget({ userId, projectId, planLabel }: SupportChatW
       const res = await fetch("/api/support/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body, projectId: projectId ?? null }),
+        body: JSON.stringify({ body, projectId: attachProject ? projectId ?? null : null }),
       });
       if (!res.ok) throw new Error(`send failed (${res.status})`);
       const data = (await res.json()) as { message: ChatMessage };
@@ -126,12 +157,13 @@ export function SupportChatWidget({ userId, projectId, planLabel }: SupportChatW
         prev.some((p) => p.id === data.message.id) ? prev : [...prev, data.message],
       );
       setInput("");
+      if (inputRef.current) inputRef.current.style.height = "auto";
     } catch (e) {
       console.error("[support] send failed:", e);
     } finally {
       setSending(false);
     }
-  }, [input, sending, projectId]);
+  }, [input, sending, projectId, attachProject]);
 
   return (
     <>
@@ -172,6 +204,16 @@ export function SupportChatWidget({ userId, projectId, planLabel }: SupportChatW
                     }`}
                   >
                     {m.body}
+                    {m.project_id && (
+                      <div
+                        className={`mt-1 flex items-center gap-1 text-[10px] ${
+                          m.sender === "user" ? "text-emerald-100" : "text-slate-400"
+                        }`}
+                      >
+                        <PaperClipIcon className="h-3 w-3 shrink-0" />
+                        {m.project_id === projectId && projectName ? projectName : "แนบโปรเจกต์"}
+                      </div>
+                    )}
                     <div
                       className={`mt-0.5 text-right text-[10px] ${
                         m.sender === "user" ? "text-emerald-100" : "text-slate-400"
@@ -185,29 +227,52 @@ export function SupportChatWidget({ userId, projectId, planLabel }: SupportChatW
             )}
           </div>
 
-          <div className="flex items-end gap-2 border-t border-slate-100 p-2.5 dark:border-slate-800">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void send();
-                }
-              }}
-              rows={1}
-              placeholder="พิมพ์ข้อความ… (Enter เพื่อส่ง)"
-              className="max-h-24 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            />
-            <button
-              type="button"
-              onClick={() => void send()}
-              disabled={sending || !input.trim()}
-              aria-label="ส่งข้อความ"
-              className="rounded-xl bg-emerald-500 p-2.5 text-white transition hover:bg-emerald-400 disabled:opacity-40"
-            >
-              <PaperAirplaneIcon className="h-4 w-4" />
-            </button>
+          <div className="border-t border-slate-100 p-2.5 dark:border-slate-800">
+            {projectId && projectName && (
+              <button
+                type="button"
+                onClick={() => setAttachProject((v) => !v)}
+                aria-pressed={attachProject}
+                title={attachProject ? "กดเพื่อไม่แนบโปรเจกต์" : "กดเพื่อแนบโปรเจกต์ไปกับข้อความ"}
+                className={`mb-2 inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                  attachProject
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "border-slate-200 bg-slate-50 text-slate-400 line-through dark:border-slate-700 dark:bg-slate-800"
+                }`}
+              >
+                <PaperClipIcon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">แนบโปรเจกต์: {projectName}</span>
+              </button>
+            )}
+            <div className="flex items-end gap-1.5">
+              <EmojiPicker onPick={insertEmoji} />
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  autoGrow();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void send();
+                  }
+                }}
+                rows={1}
+                placeholder="พิมพ์ข้อความ… (Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่)"
+                className="max-h-24 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              />
+              <button
+                type="button"
+                onClick={() => void send()}
+                disabled={sending || !input.trim()}
+                aria-label="ส่งข้อความ"
+                className="rounded-xl bg-emerald-500 p-2.5 text-white transition hover:bg-emerald-400 disabled:opacity-40"
+              >
+                <PaperAirplaneIcon className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -230,7 +230,7 @@ export default async function ProjectsPage() {
           )}
         </div>
       </div>
-      {isPaidPlan(plan) && <SupportChatWidget userId={userId} />}
+      {isPaidPlan(plan) && <SupportChatWidget userId={userId} planLabel={PLAN_CONFIG[plan].label} />}
     </main>
   );
 }

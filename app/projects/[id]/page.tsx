@@ -78,7 +78,7 @@ export default async function ProjectBuilderPage({
         accountMismatch={accountMismatch}
       />
       {/* Live chat rides on top of the IDE shell for paid users (fixed bottom-right). */}
-      {isPaid && <SupportChatWidget userId={userId} projectId={id} />}
+      {isPaid && <SupportChatWidget userId={userId} projectId={id} planLabel={planLabel} />}
     </>
   );
 }

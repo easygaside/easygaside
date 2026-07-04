@@ -24,6 +24,8 @@ interface SupportChatWidgetProps {
   userId: string;
   /** Set inside the IDE so the message carries which project it came from. */
   projectId?: string;
+  /** Plan display name (e.g. "Lite") — shown in the header as the perk's origin. */
+  planLabel?: string;
 }
 
 function timeLabel(iso: string): string {
@@ -34,7 +36,7 @@ function timeLabel(iso: string): string {
   }
 }
 
-export function SupportChatWidget({ userId, projectId }: SupportChatWidgetProps) {
+export function SupportChatWidget({ userId, projectId, planLabel }: SupportChatWidgetProps) {
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -138,7 +140,9 @@ export function SupportChatWidget({ userId, projectId }: SupportChatWidgetProps)
           <div className="flex items-center justify-between border-b border-slate-100 bg-emerald-500 px-4 py-3 dark:border-slate-800">
             <div>
               <p className="text-sm font-semibold text-white">แชทกับทีมงาน EasyGAS</p>
-              <p className="text-[11px] text-emerald-50">สิทธิพิเศษแพ็กเกจเสียเงิน — ตอบไวในเวลาทำการ</p>
+              <p className="text-[11px] text-emerald-50">
+                {planLabel ? `สิทธิพิเศษแพ็กเกจ ${planLabel}` : "สิทธิพิเศษแพ็กเกจเสียเงิน"} — ตอบไวในเวลาทำการ
+              </p>
             </div>
             <button
               type="button"

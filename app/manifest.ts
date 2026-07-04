@@ -14,6 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icon/android-icon-144x144.png", sizes: "144x144", type: "image/png" },
       { src: "/icon/android-icon-192x192.png", sizes: "192x192", type: "image/png" },
       { src: "/icon/ms-icon-310x310.png", sizes: "310x310", type: "image/png" },
+      { src: "/icon/pwa-icon-512x512.png", sizes: "512x512", type: "image/png" },
     ],
   };
 }

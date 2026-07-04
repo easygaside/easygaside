@@ -6,6 +6,7 @@ import { sendBetaApprovedEmail } from "@/lib/email";
 import { LLM_PROVIDERS, type LlmProvider } from "@/lib/llm/provider";
 import { PLAN_PERIOD_DAYS } from "@/lib/plan";
 import { getCurrentUser } from "@/lib/projects";
+import { sendPushToUser } from "@/lib/push";
 import { setAppSetting } from "@/lib/settings";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -117,6 +118,15 @@ export async function approveUpgradeAction(requestId: string): Promise<void> {
     .from("egs_upgrade_requests")
     .update({ status: "approved", decided_at: new Date().toISOString() })
     .eq("id", requestId);
+  await sendPushToUser(req.user_id, {
+    title: "🎉 แพ็กเกจของคุณเปิดใช้งานแล้ว",
+    body:
+      req.plan === "byo"
+        ? "BYO เปิดใช้งานแล้ว — ใส่ Anthropic key ของคุณได้ที่หน้าตั้งค่า"
+        : "อัปเกรดสำเร็จ เริ่มใช้โควตาใหม่ได้ทันที",
+    url: req.plan === "byo" ? "/settings" : "/projects",
+    tag: "plan-approved",
+  });
   revalidatePath("/admin");
 }
 

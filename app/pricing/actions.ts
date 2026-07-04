@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { sendPushToAdmins } from "@/lib/push";
 import { notifyTelegram } from "@/lib/telegram";
 import { BYO_PRICE_THB, PLAN_CONFIG, normalizePlan, type Plan } from "@/lib/plan";
 import { createClient } from "@/lib/supabase/server";
@@ -68,6 +69,12 @@ export async function submitUpgradeRequest(
       `ผู้ใช้: ${user.email ?? user.id}\n` +
       `อนุมัติ/ปฏิเสธที่ /admin → แท็บ แพ็กเกจ`,
   );
+  await sendPushToAdmins({
+    title: `🧾 คำขออัปเกรดใหม่ — ${label} ฿${amount}`,
+    body: `จาก ${user.email ?? user.id} — กดเพื่อเปิดหน้าอนุมัติ`,
+    url: "/admin",
+    tag: "admin-upgrade",
+  });
   revalidatePath("/pricing");
   return { ok: true };
 }

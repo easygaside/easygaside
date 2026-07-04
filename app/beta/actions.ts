@@ -1,5 +1,6 @@
 "use server";
 
+import { sendPushToAdmins } from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -61,5 +62,11 @@ export async function submitBetaApplication(
     { onConflict: "email" },
   );
   if (error) return { ok: false, error: "บันทึกไม่สำเร็จ ลองใหม่อีกครั้งในอีกสักครู่" };
+  await sendPushToAdmins({
+    title: "📥 ใบสมัครเบต้าใหม่",
+    body: `${email} — ${input.buildIdea.trim().slice(0, 100)}`,
+    url: "/admin",
+    tag: "admin-beta",
+  });
   return { ok: true };
 }

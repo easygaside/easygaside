@@ -1,5 +1,6 @@
 "use server";
 
+import { sendPushToAdmins } from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
 import { notifyTelegram } from "@/lib/telegram";
 
@@ -70,6 +71,12 @@ export async function submitReportAction(
       .filter(Boolean)
       .join("\n"),
   );
+  await sendPushToAdmins({
+    title: `${KIND_LABEL[kind]} — รายงานปัญหาใหม่`,
+    body: `จาก ${user.email ?? user.id}: ${message.slice(0, 120)}`,
+    url: "/admin",
+    tag: "admin-report",
+  });
 
   return { ok: true };
 }

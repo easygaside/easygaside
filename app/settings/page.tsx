@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeftIcon, ArrowRightOnRectangleIcon, BoltIcon, KeyIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, ArrowRightOnRectangleIcon, BellIcon, BoltIcon, KeyIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { ApiKeyForm } from "@/components/settings/ApiKeyForm";
+import { PushToggle } from "@/components/settings/PushToggle";
 import { signOutAction } from "@/app/auth-actions";
 import { getMonthlyToolUsage, hasOwnApiKey, isByoActive } from "@/lib/beta";
 import { CREDIT_TOKENS, getUserMonthlyEnergyUsed, poolSizeForUser } from "@/lib/energy";
@@ -117,6 +118,14 @@ export default async function SettingsPage() {
             )}
           </div>
         )}
+      </section>
+
+      <section className="mt-6">
+        <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <BellIcon className="h-4 w-4 text-emerald-500" />
+          การแจ้งเตือน
+        </h2>
+        <PushToggle />
       </section>
 
       <section className="mt-6">

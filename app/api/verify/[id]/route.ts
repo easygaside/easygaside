@@ -5,6 +5,7 @@ import { runOpenAiAgentLoop } from "@/lib/openai-agent";
 import { resolveProjectProvider, resolveProvider } from "@/lib/llm/provider";
 import { getAccessGate, getOwnApiKey } from "@/lib/beta";
 import { deployProject } from "@/lib/deploy";
+import { NeedsReauthError, NotConnectedError } from "@/lib/errors";
 import { POOL_EXHAUSTED_MSG, getMonthlyPool, getUserMonthlyEnergyUsed } from "@/lib/energy";
 import { probeExec } from "@/lib/gas-verify";
 import { logGeneration } from "@/lib/metrics";
@@ -77,11 +78,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const startedAt = Date.now();
   const encoder = new TextEncoder();
+  let closed = false; // flipped by cancel() on client disconnect, and in finally
   const stream = new ReadableStream({
     async start(controller) {
-      let closed = false;
       const emit = (ev: AgentEvent) => {
-        if (!closed) controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
+        } catch {
+          closed = true; // client left — let the repair loop finish + log usage
+        }
       };
       let inputTokens = 0;
       let outputTokens = 0;
@@ -163,7 +169,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         emit({ type: "done", tokens: inputTokens + outputTokens });
       } catch (e) {
         console.error("[verify] loop error:", e);
-        const msg = e instanceof Error && /NEEDS_REAUTH|invalid_grant|NOT_CONNECTED/.test(e.message)
+        // Reauth/connection errors carry their code on .code (NeedsReauthError/NotConnectedError),
+        // NOT in the message — the old `.test(e.message)` never matched, so users always got the
+        // generic dead-end. Classify by instanceof/code instead.
+        const code = (e as { code?: string } | null)?.code;
+        const needsReauth =
+          e instanceof NeedsReauthError ||
+          e instanceof NotConnectedError ||
+          code === "NEEDS_REAUTH" ||
+          code === "NOT_CONNECTED";
+        const msg = needsReauth
           ? "การเชื่อมต่อ Google หมดอายุ — เชื่อมต่อใหม่ที่หน้า /connect แล้วลองอีกครั้ง"
           : "ทดสอบ/ซ่อมไม่สำเร็จ ลองใหม่อีกครั้งครับ";
         emit({ type: "text", delta: `\n\n⚠️ ${msg}` });
@@ -171,8 +186,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       } finally {
         await releaseProjectRun(id);
         closed = true;
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          /* already closed by the client's cancel() — ignore */
+        }
       }
+    },
+    cancel() {
+      closed = true;
     },
   });
 

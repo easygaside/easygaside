@@ -45,7 +45,11 @@ function ensureWebAppDeployConfig(apiFiles: GasFile[]): GasFile[] {
     const merged = {
       ...m,
       runtimeVersion: "V8", // Always force V8 — Rhino runtime is deprecated
-      webapp: { access: "ANYONE_ANONYMOUS", ...webapp, executeAs: "USER_DEPLOYING" },
+      // Force BOTH access + executeAs AFTER the spread — the product contract is a PUBLIC web app
+      // that runs as the owner. Previously access was only a DEFAULT, so an AI-written
+      // access:'MYSELF'/'DOMAIN'/'ANYONE' won → the /exec 403s for everyone else and probeExec
+      // misreports it as a one-time "click Allow" auth issue that can never be fixed.
+      webapp: { ...webapp, access: "ANYONE_ANONYMOUS", executeAs: "USER_DEPLOYING" },
     };
     const next = [...apiFiles];
     next[idx] = { ...apiFiles[idx], source: JSON.stringify(merged, null, 2) };

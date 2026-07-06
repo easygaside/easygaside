@@ -144,12 +144,20 @@ export async function POST(
   const startedAt = Date.now();
 
   const encoder = new TextEncoder();
+  let closed = false; // flipped by cancel() on client disconnect, and in finally
   const stream = new ReadableStream({
     async start(controller) {
-      let closed = false;
       const emit = (ev: AgentEvent) => {
         if (closed) return;
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(ev)}\n\n`));
+        } catch {
+          // client went away mid-stream — stop enqueuing but let the loop RUN TO
+          // COMPLETION so egs_files/history persist and tokens are metered. (Before:
+          // enqueue threw → the turn aborted before appendMessages/logGeneration, losing
+          // the whole turn's history and billing 0 tokens — a cost leak + error-rate inflator.)
+          closed = true;
+        }
       };
       try {
         const r =
@@ -193,8 +201,17 @@ export async function POST(
       } finally {
         await releaseProjectRun(id); // always free the per-project lock
         closed = true;
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          /* already closed by the client's cancel() — ignore */
+        }
       }
+    },
+    cancel() {
+      // client disconnected: no-op emit() from here on; the running loop still finishes,
+      // persists history, and logs real usage before releasing the lock.
+      closed = true;
     },
   });
 

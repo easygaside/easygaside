@@ -230,7 +230,13 @@ async function runOpenAiTurn(
     const issues = [...plint.errors, ...plint.warnings].map((i) => i.message);
     if (issues.length > 0) {
       const last = messages[messages.length - 1] as { content: string };
-      last.content = `${last.content}\n\n[ตรวจทั้งโปรเจกต์]\n${issues.map((m) => "- " + m).join("\n")}`;
+      // OpenAI tool messages have no is_error flag, so mark blocking errors inline so weak
+      // tool-users (deepseek/GLM) don't end the turn on a hidden project-wide error (P1-9).
+      const header =
+        plint.errors.length > 0
+          ? "[❌ ตรวจทั้งโปรเจกต์ — ต้องแก้ก่อนจบงาน]"
+          : "[ตรวจทั้งโปรเจกต์]";
+      last.content = `${last.content}\n\n${header}\n${issues.map((m) => "- " + m).join("\n")}`;
     }
 
     if (finish !== "tool_calls") {
@@ -299,7 +305,7 @@ async function runOpenAiCriticGate(
     const repairMsg =
       "ตรวจคุณภาพ (rulebook critic) พบปัญหาต่อไปนี้ แก้ไฟล์ที่เกี่ยวข้องให้เรียบร้อยด้วย edit_file/write_file:\n" +
       actionable.map((i) => `- ${i.file}: ${i.problem} — แนวทาง: ${i.fix}`).join("\n");
-    const repair = await runOpenAiTurn(client, cfg, { ...args, userMessage: repairMsg, internal: true });
+    const repair = await runOpenAiTurn(client, cfg, { ...args, images: [], userMessage: repairMsg, internal: true });
     emit({
       type: "text",
       delta: repair.capped
@@ -339,7 +345,8 @@ export async function runOpenAiAgentLoop(
   let capped = main.capped;
   for (let round = 1; isCodegen && capped && mutated && round <= AUTO_CONTINUE_MAX; round++) {
     args.emit({ type: "status", text: `เนื้อหายาว — กำลังเขียนต่อให้อัตโนมัติ (${round}/${AUTO_CONTINUE_MAX})…` });
-    const cont = await runOpenAiTurn(client, cfg, { ...args, userMessage: "ทำต่อ" });
+    // images:[] — already fed on the first round; re-sending re-bills vision tokens each round.
+    const cont = await runOpenAiTurn(client, cfg, { ...args, images: [], userMessage: "ทำต่อ" });
     inputTokens += cont.inputTokens;
     outputTokens += cont.outputTokens;
     cacheReadTokens += cont.cacheReadTokens;

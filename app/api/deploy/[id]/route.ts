@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { acquireProjectRun, releaseProjectRun } from "@/lib/agent-lock";
 import { mapGoogleError } from "@/lib/api-helpers";
 import { getTarget } from "@/lib/deployment-targets";
 import { getConnectionStatus, markAppsScriptReady } from "@/lib/google-connection";
@@ -31,6 +32,16 @@ export async function POST(
   const project = await getProject(id); // RLS-scoped
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
+  // P0-4: share the per-project run lock with agent/verify. Without it, a double-click (or a
+  // deploy overlapping an in-flight generation) could create duplicate scripts / two webapp
+  // deployment rows and push a half-written file set. The partial unique index on
+  // egs_deployments(project_id) WHERE entry_type='webapp' is the structural backstop.
+  if (!(await acquireProjectRun(id)))
+    return NextResponse.json(
+      { error: "already_running", message: "โปรเจกต์นี้กำลังประมวลผลอยู่ — รอให้เสร็จก่อนแล้วลองใหม่นะครับ" },
+      { status: 409 },
+    );
+
   try {
     const target = getTarget(project.target ?? "gas");
     const result = await target.deploy(user.id, project);
@@ -41,5 +52,7 @@ export async function POST(
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     return mapGoogleError(e, (await getConnectionStatus(user.id)).email);
+  } finally {
+    await releaseProjectRun(id); // always free the per-project lock
   }
 }

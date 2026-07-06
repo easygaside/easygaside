@@ -306,7 +306,9 @@ export async function runAgentLoop(args: RunAgentArgs): Promise<AgentRunResult> 
   let capped = main.capped;
   for (let round = 1; isCodegen && capped && mutated && round <= AUTO_CONTINUE_MAX; round++) {
     args.emit({ type: "status", text: `เนื้อหายาว — กำลังเขียนต่อให้อัตโนมัติ (${round}/${AUTO_CONTINUE_MAX})…` });
-    const cont = await runTurn(client, { ...args, userMessage: "ทำต่อ" });
+    // images:[] — the reference images were already fed on the first round; re-sending them here
+    // re-bills the vision tokens every auto-continue and writes a false "(แนบรูป N รูป)" note.
+    const cont = await runTurn(client, { ...args, images: [], userMessage: "ทำต่อ" });
     inputTokens += cont.inputTokens;
     outputTokens += cont.outputTokens;
     cacheReadTokens += cont.cacheReadTokens;
@@ -476,6 +478,10 @@ async function runTurn(
       if (issues.length > 0) {
         const lastTr = toolResults[toolResults.length - 1];
         lastTr.content = `${lastTr.content}\n\n[ตรวจทั้งโปรเจกต์]\n${issues.map((m) => "- " + m).join("\n")}`;
+        // Project-wide ERRORS (missing include file, getActiveSpreadsheet in a web app) are
+        // blocking — mark the tool_result as an error so the model FIXES them instead of ending
+        // the turn on a "success" that hides them (QUALITY-MOAT §3). Warnings stay non-blocking.
+        if (plint.errors.length > 0) lastTr.is_error = true;
       }
     }
     messages.push({ role: "user", content: toolResults });
@@ -573,6 +579,7 @@ async function runCriticGate(
       actionable.map((i) => `- ${i.file}: ${i.problem} — แนวทาง: ${i.fix}`).join("\n");
     const repair = await runTurn(client, {
       ...args,
+      images: [], // repair is a derived turn — don't re-send/re-bill the original images
       userMessage: repairMsg,
       turn: "codegen",
       maxIterations: REPAIR_MAX_ITERATIONS,

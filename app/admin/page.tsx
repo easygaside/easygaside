@@ -294,12 +294,24 @@ export default async function AdminPage() {
     .slice(0, 15);
 
   const totalCriticIssues = rows.reduce((a, r) => a + r.critic_issues, 0);
+
+  // deployed-projects funnel metric: distinct projects with a live webapp deployment (an /exec URL).
+  // The partial unique index means at most one webapp row per project, so this is the true count of
+  // tools that made it all the way to the user's Google account.
+  const { data: deployRows } = await svc
+    .from("egs_deployments")
+    .select("project_id")
+    .eq("entry_type", "webapp")
+    .not("exec_url", "is", null);
+  const deployedProjects = new Set((deployRows ?? []).map((d) => d.project_id as string)).size;
+
   const summary = {
     totalTokens: totalIn + totalOut,
     totalIn,
     totalOut,
     gens: rows.length,
     projectCount,
+    deployedProjects,
     avgPerProject: projectCount ? Math.round((totalIn + totalOut) / projectCount) : 0,
     totalCriticIssues,
     avgCriticPerGen: rows.length ? +(totalCriticIssues / rows.length).toFixed(2) : 0,

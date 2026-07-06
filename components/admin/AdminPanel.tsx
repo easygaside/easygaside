@@ -79,6 +79,7 @@ export interface TokenSummary {
   totalOut: number;
   gens: number;
   projectCount: number;
+  deployedProjects: number;
   avgPerProject: number;
   totalCriticIssues: number;
   avgCriticPerGen: number;
@@ -444,6 +445,7 @@ export function AdminPanel({
               { label: "input รวม", value: fmt(summary.totalIn) },
               { label: "output รวม", value: fmt(summary.totalOut) },
               { label: "โปรเจกต์ที่ใช้งาน", value: fmt(summary.projectCount) },
+              { label: "โปรเจกต์ที่ deploy แล้ว", value: fmt(summary.deployedProjects) },
             ].map((c) => (
               <div
                 key={c.label}

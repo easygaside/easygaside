@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { acquireProjectRun, releaseProjectRun } from "@/lib/agent-lock";
-import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
+import { runAgentLoop, type AgentEvent, type RunAgentArgs } from "@/lib/anthropic-agent";
 import { runOpenAiAgentLoop } from "@/lib/openai-agent";
-import { resolveProjectProvider, resolveProvider } from "@/lib/llm/provider";
+import { resolveProjectProvider, resolveProvider, resolveRepairProvider } from "@/lib/llm/provider";
 import { getAccessGate, getOwnApiKey } from "@/lib/beta";
 import { deployProject } from "@/lib/deploy";
 import { NeedsReauthError, NotConnectedError } from "@/lib/errors";
@@ -61,20 +61,32 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       { status: 409 },
     );
 
-  // Route the repair to the project's OWN arm (same as /api/agent) — a DeepSeek project repairs on
-  // DeepSeek, a Claude project on Claude. The live /exec run is the oracle either way; this keeps
-  // verify cost on the arm the user is actually testing instead of silently billing Claude.
-  const provider = await resolveProjectProvider(id, user.id);
-  const cfg = await resolveProvider(provider);
-  const byok = provider === "claude" ? (await getOwnApiKey(user.id)) ?? undefined : undefined;
-  const repairKey = byok ?? cfg.apiKey;
-  if (!repairKey) {
+  // The project's OWN arm (Anthropic vs OpenAI wire format is locked per project) — the guaranteed
+  // fallback + the key baseline. BYOK (Claude) uses the user's own key.
+  const projectProvider = await resolveProjectProvider(id, user.id);
+  const ownCfg = await resolveProvider(projectProvider);
+  const byok = projectProvider === "claude" ? (await getOwnApiKey(user.id)) ?? undefined : undefined;
+  const ownKey = byok ?? ownCfg.apiKey;
+  if (!ownKey) {
     await releaseProjectRun(id);
     return NextResponse.json(
-      { error: "provider_not_configured", message: `ยังไม่ได้ตั้งค่า API key ของ ${cfg.label} ในระบบ` },
+      { error: "provider_not_configured", message: `ยังไม่ได้ตั้งค่า API key ของ ${ownCfg.label} ในระบบ` },
       { status: 400 },
     );
   }
+
+  // Escalate the Gate-2 REPAIR to a stronger arm — GLM (z.ai) by default (admin: 'repair_provider') —
+  // for OpenAI-family projects; Claude projects stay on Claude (format lock). runRepair falls back to
+  // the project's own arm at run time if GLM errors (e.g. z.ai ToS block), so repair never dead-ends.
+  const repairProvider = await resolveRepairProvider(projectProvider);
+  const crossModel = repairProvider !== projectProvider;
+  const repairCfgBase = crossModel ? await resolveProvider(repairProvider) : ownCfg;
+  // glm-5.x / deepseek-v4-pro are thinking models: they 400 on tool_choice and stream reasoning_content.
+  const repairCfg = {
+    ...repairCfgBase,
+    reasoning: repairCfgBase.reasoning || /glm-5|v4-pro|reasoner/i.test(repairCfgBase.model),
+  };
+  const repairKey = (repairProvider === "claude" ? byok : undefined) ?? repairCfgBase.apiKey ?? ownKey;
 
   const startedAt = Date.now();
   const encoder = new TextEncoder();
@@ -89,6 +101,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           closed = true; // client left — let the repair loop finish + log usage
         }
       };
+
+      // One repair turn on the escalated arm (GLM); on ANY GLM failure fall back to the project's own
+      // arm so a bad / ToS-blocked GLM call never dead-ends the repair loop.
+      const runRepair = (base: RunAgentArgs) => {
+        if (crossModel) {
+          return runOpenAiAgentLoop(
+            { ...base, stripHistoryReasoning: true },
+            { ...repairCfg, apiKey: repairKey },
+          ).catch((e) => {
+            console.error("[verify] escalated (GLM) repair failed — falling back to project arm:", e);
+            emit({ type: "status", text: "สลับไปซ่อมด้วยอาร์มเดิม…" });
+            return projectProvider === "claude"
+              ? runAgentLoop({ ...base, apiKey: ownKey })
+              : runOpenAiAgentLoop(base, { ...ownCfg, apiKey: ownKey });
+          });
+        }
+        return projectProvider === "claude"
+          ? runAgentLoop({ ...base, apiKey: ownKey })
+          : runOpenAiAgentLoop(base, { ...ownCfg, apiKey: ownKey });
+      };
+
       let inputTokens = 0;
       let outputTokens = 0;
       let cacheReadTokens = 0;
@@ -141,10 +174,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             skipCritic: true,
             emit,
           };
-          const r =
-            provider === "claude"
-              ? await runAgentLoop({ ...repairArgs, apiKey: repairKey })
-              : await runOpenAiAgentLoop(repairArgs, { ...cfg, apiKey: repairKey });
+          const r = await runRepair(repairArgs);
           inputTokens += r.inputTokens;
           outputTokens += r.outputTokens;
           cacheReadTokens += r.cacheReadTokens ?? 0;
@@ -156,8 +186,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         await logGeneration({
           projectId: id,
           userId: user.id,
-          provider,
-          model: cfg.model,
+          provider: repairProvider, // the arm that actually ran the fix (GLM when escalated)
+          model: repairCfg.model,
           inputTokens,
           outputTokens,
           cacheReadTokens,

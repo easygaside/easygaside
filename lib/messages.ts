@@ -155,7 +155,10 @@ export async function appendMessages(
  * FULL provider message object (incl. tool_calls / tool_call_id), so we store + return it verbatim.
  * Ordered by seq (stable). No compaction yet (acceptable for the A/B's mostly-short sessions).
  */
-export async function getRawHistory(projectId: string): Promise<unknown[]> {
+export async function getRawHistory(
+  projectId: string,
+  opts: { stripReasoning?: boolean } = {},
+): Promise<unknown[]> {
   const svc = createServiceClient();
   const { data, error } = await svc
     .from("egs_messages")
@@ -163,7 +166,18 @@ export async function getRawHistory(projectId: string): Promise<unknown[]> {
     .eq("project_id", projectId)
     .order("seq", { ascending: true });
   if (error) throw new Error(`getRawHistory: ${error.message}`);
-  return trimIncompleteOpenAiTail((data ?? []).map((m) => m.content));
+  const rows = trimIncompleteOpenAiTail((data ?? []).map((m) => m.content));
+  if (!opts.stripReasoning) return rows;
+  // Escalated repair on a DIFFERENT arm (e.g. deepseek-pro project → GLM): the stored history carries
+  // deepseek's OWN reasoning_content on assistant messages, which another model must not receive.
+  return rows.map((m) => {
+    if (m && typeof m === "object" && "reasoning_content" in (m as Record<string, unknown>)) {
+      const rest = { ...(m as Record<string, unknown>) };
+      delete rest.reasoning_content;
+      return rest;
+    }
+    return m;
+  });
 }
 
 export async function appendRawMessages(

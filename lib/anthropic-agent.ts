@@ -276,6 +276,9 @@ export interface RunAgentArgs {
   apiKey?: string;
   /** Skip the Gate-1 rulebook critic (e.g. Gate-2 verify repairs — execution is the stronger oracle). */
   skipCritic?: boolean;
+  /** Strip reasoning_content from OpenAI-format history — for a repair escalated to a DIFFERENT arm
+   *  (e.g. a deepseek-pro project repaired on GLM) whose model must not receive the origin model's CoT. */
+  stripHistoryReasoning?: boolean;
   emit: Emit;
 }
 

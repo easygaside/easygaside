@@ -1,4 +1,5 @@
 import { usesOwnKey } from "@/lib/beta";
+import { getAppSetting } from "@/lib/settings";
 import {
   DEFAULT_PROVIDER,
   LLM_PROVIDERS,
@@ -103,4 +104,21 @@ export async function resolveProjectProvider(
   const arm = await getUserProvider(userId);
   await svc.from("egs_projects").update({ llm_provider: arm }).eq("id", projectId);
   return arm;
+}
+
+/**
+ * The arm that RUNS a Gate-2 repair. Escalates OpenAI-family projects to GLM (z.ai) — a stronger
+ * repairer than the weak free arm — while keeping Claude projects on Claude (their stored history is
+ * Anthropic-format and can't be fed to an OpenAI-family model). Admin-set via egs_app_settings
+ * 'repair_provider' (default 'zai'); falls back to the project's own arm when the target has no key.
+ * The verify route additionally falls back at RUN time if the escalated arm errors, so the repair
+ * path can never fully break (e.g. a z.ai ToS block on the coding endpoint).
+ */
+export async function resolveRepairProvider(projectProvider: LlmProvider): Promise<LlmProvider> {
+  if (projectProvider === "claude") return "claude"; // format lock — can't cross to the OpenAI family
+  const stored = (await getAppSetting("repair_provider")) as LlmProvider | null;
+  const target: LlmProvider = stored && LLM_PROVIDERS.includes(stored) ? stored : "zai";
+  if (target === projectProvider || target === "claude") return projectProvider; // no-op / format-incompat
+  const cfg = await resolveProvider(target);
+  return cfg.apiKey ? target : projectProvider; // only escalate when the target arm is actually configured
 }

@@ -43,6 +43,22 @@ const OPENAI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = EGS_TOOLS.map
   function: { name: t.name, description: t.description, parameters: t.input_schema as Record<string, unknown> },
 }));
 
+/**
+ * Drop reasoning_content from a message before persisting a CROSS-ARM repair (e.g. GLM fixing a
+ * deepseek project): the project's home arm would otherwise re-read a foreign model's chain-of-thought
+ * on its next turn. The field is only needed within the repairer's own tool cycle (kept in memory),
+ * never downstream.
+ */
+function stripReasoningField(m: Msg): Msg {
+  const obj = m as unknown as Record<string, unknown>;
+  if (obj && typeof obj === "object" && "reasoning_content" in obj) {
+    const rest = { ...obj };
+    delete rest.reasoning_content;
+    return rest as unknown as Msg;
+  }
+  return m;
+}
+
 interface TurnResult {
   mutated: boolean;
   capped: boolean;
@@ -55,7 +71,15 @@ interface TurnResult {
 async function runOpenAiTurn(
   client: OpenAI,
   cfg: ProviderConfig,
-  { projectId, project, userMessage, images = [], internal = false, emit }: RunAgentArgs,
+  {
+    projectId,
+    project,
+    userMessage,
+    images = [],
+    internal = false,
+    stripHistoryReasoning = false,
+    emit,
+  }: RunAgentArgs,
 ): Promise<TurnResult> {
   // The rulebook goes in the FIRST system message and is byte-identical across turns. OpenAI,
   // DeepSeek and Gemini all auto-cache a stable prompt prefix, so this is what makes caching work
@@ -64,7 +88,7 @@ async function runOpenAiTurn(
   const system = buildCodegenSystemPrompt({ kind: project.kind });
   // Drop blank assistant turns (a prior empty completion with no text and no tool_calls) — some
   // providers choke when replaying them and just return empty again, snowballing the silence.
-  const history = ((await getRawHistory(projectId)) as Msg[]).filter(
+  const history = ((await getRawHistory(projectId, { stripReasoning: stripHistoryReasoning })) as Msg[]).filter(
     (m) =>
       !(
         m.role === "assistant" &&
@@ -131,7 +155,11 @@ async function runOpenAiTurn(
     try {
       await appendRawMessages(
         projectId,
-        added.map((m) => ({ role: m.role, content: m })),
+        added.map((m) => ({
+          role: m.role,
+          // cross-arm repair (GLM into a deepseek project) → don't persist the repairer's CoT.
+          content: stripHistoryReasoning ? stripReasoningField(m) : m,
+        })),
       );
     } catch (pe) {
       console.error("[openai-agent] persist failed:", pe);

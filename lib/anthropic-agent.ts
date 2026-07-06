@@ -288,6 +288,20 @@ export interface AgentRunResult {
   criticIssues: number;
 }
 
+/** Token usage of a single turn — also stashed on a thrown error so a route can log partial COGS. */
+export interface TurnUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+}
+
+/** Read partial usage stashed on an error thrown mid-turn (so an aborted run still meters tokens). */
+export function errorUsage(e: unknown): TurnUsage | undefined {
+  const u = (e as { __egsUsage?: TurnUsage } | null)?.__egsUsage;
+  return u && typeof u.inputTokens === "number" ? u : undefined;
+}
+
 export async function runAgentLoop(args: RunAgentArgs): Promise<AgentRunResult> {
   const client = new Anthropic(args.apiKey ? { apiKey: args.apiKey } : undefined); // BYOK or platform key
   const main = await runTurn(client, args);
@@ -404,6 +418,66 @@ async function runTurn(
   let outputTokens = 0;
   let cacheReadTokens = 0;
   let cacheCreationTokens = 0;
+
+  let flushed = false;
+  // Persist this turn EXACTLY ONCE — from the normal exit AND from a mid-loop throw (provider
+  // 500/timeout) — so files written this turn always keep matching history (P0-3). A hard
+  // maxDuration kill can still skip it; getHistory() sanitizes any orphan blocks as a backstop.
+  const flushTurn = async (isError: boolean): Promise<void> => {
+    if (flushed) return;
+    flushed = true;
+
+    // A throw between pushing an assistant tool_use turn and pushing its tool_results leaves a
+    // trailing assistant with an UNRESOLVED tool_use — persisting it 400s the next request. Drop it.
+    const lastMsg = messages[messages.length - 1];
+    if (
+      lastMsg?.role === "assistant" &&
+      Array.isArray(lastMsg.content) &&
+      lastMsg.content.some((b) => (b as { type?: string }).type === "tool_use")
+    ) {
+      messages.pop();
+    }
+
+    // If the tail is a resolved-but-trailing tool_result (iteration cap, or a throw right after a
+    // tool round), close the turn on an assistant message so the next turn doesn't start with two
+    // user messages / an unresolved tool_use.
+    const tail = messages[messages.length - 1];
+    const dangling =
+      tail?.role === "user" &&
+      Array.isArray(tail.content) &&
+      tail.content.some((b) => (b as { type?: string }).type === "tool_result");
+    if (dangling) {
+      capped = true;
+      messages.pop(); // tool_result (user)
+      messages.pop(); // assistant tool_use turn
+      const note = internal
+        ? "(แก้บางส่วนในรอบตรวจคุณภาพ)"
+        : isError
+          ? "(หยุดกลางคัน — ระบบขัดข้อง ลองสั่งต่อได้ครับ)"
+          : "หยุดไว้ก่อน — ถึงขีดจำกัดรอบการแก้ในเทิร์นนี้ พิมพ์บอกต่อได้เลยครับ";
+      if (!internal && !isError) emit({ type: "text", delta: "\n" + note });
+      messages.push({ role: "assistant", content: note });
+    }
+
+    // persist the new turn(s) for resume (egs_files is the source of truth for code). Store the
+    // user's ORIGINAL message as TEXT only — never the RAG-injected prefix nor the image blocks.
+    const persisted = messages.slice(history.length);
+    if (persisted[0]?.role === "user" && (retrieved.text || images.length)) {
+      const note = images.length ? `\n\n(แนบรูปอ้างอิง ${images.length} รูป)` : "";
+      persisted[0] = { role: "user", content: userMessage + note };
+    }
+    // Only persist a turn that ENDS on an assistant message — a lone user turn (provider threw on
+    // the first call) would create consecutive user messages next turn, and nothing was produced.
+    if (persisted.length === 0 || persisted[persisted.length - 1]?.role !== "assistant") return;
+    try {
+      await appendMessages(projectId, persisted, turn);
+    } catch (pe) {
+      console.error("[agent] persist failed:", pe);
+      if (!isError) throw pe; // surface a real persist failure on the normal path
+    }
+  };
+
+  try {
   for (let iter = 0; iter < maxIterations; iter++) {
     const stream = client.messages.stream({
       model: pickModel(turn),
@@ -487,37 +561,19 @@ async function runTurn(
     messages.push({ role: "user", content: toolResults });
   }
 
-  // If we exited capped on a pending tool_use, the tail is a dangling tool_result (role:user)
-  // preceded by an assistant tool_use with no resolution. Persisting that breaks the next request
-  // (consecutive user msgs / unresolved tool_use). Roll back to a clean assistant turn.
-  const tail = messages[messages.length - 1];
-  const dangling =
-    tail?.role === "user" &&
-    Array.isArray(tail.content) &&
-    tail.content.some((b) => (b as { type?: string }).type === "tool_result");
-  if (dangling) {
-    capped = true;
-    messages.pop(); // tool_result (user)
-    messages.pop(); // assistant tool_use turn
-    // user-facing note only for the user's OWN turn; the critic's internal repair handles this via
-    // its own close-out so the note doesn't leak into chat (and contradict "✓ แก้แล้ว").
-    const note = internal
-      ? "(แก้บางส่วนในรอบตรวจคุณภาพ)"
-      : "หยุดไว้ก่อน — ถึงขีดจำกัดรอบการแก้ในเทิร์นนี้ พิมพ์บอกต่อได้เลยครับ";
-    if (!internal) emit({ type: "text", delta: "\n" + note });
-    messages.push({ role: "assistant", content: note });
+  await flushTurn(false);
+  } catch (e) {
+    // A mid-loop throw (provider 5xx/timeout) still flushes what was produced so history matches
+    // the files already written this turn, then stashes partial usage so the route can meter it.
+    await flushTurn(true).catch((fe) => console.error("[agent] flush-on-error failed:", fe));
+    (e as { __egsUsage?: TurnUsage }).__egsUsage = {
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheCreationTokens,
+    };
+    throw e;
   }
-
-  // persist the new turn(s) for resume (egs_files is the source of truth for code).
-  // Store the user's ORIGINAL message as TEXT only — never the RAG-injected prefix nor the
-  // image blocks. This keeps history lean and avoids re-feeding stale context / re-billing image
-  // tokens on every later turn (the bucket keeps the images as the project's reference history).
-  const persisted = messages.slice(history.length);
-  if (persisted[0]?.role === "user" && (retrieved.text || images.length)) {
-    const note = images.length ? `\n\n(แนบรูปอ้างอิง ${images.length} รูป)` : "";
-    persisted[0] = { role: "user", content: userMessage + note };
-  }
-  await appendMessages(projectId, persisted, turn);
   return { mutated, capped, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens };
 }
 

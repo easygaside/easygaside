@@ -36,6 +36,82 @@ function compactContent(content: unknown): unknown {
   });
 }
 
+/**
+ * Drop orphan tool_use / tool_result blocks so a HALF-persisted turn (a mid-loop throw, or a hard
+ * maxDuration kill that skipped the flush — P0-3) can't 400 the next request ("unresolved tool_use"
+ * / "tool_result without tool_use"). A well-formed history passes through unchanged.
+ */
+function sanitizeAnthropicHistory(
+  msgs: Anthropic.MessageParam[],
+): Anthropic.MessageParam[] {
+  const out: Anthropic.MessageParam[] = [];
+  for (let i = 0; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (!Array.isArray(m.content)) {
+      out.push(m);
+      continue;
+    }
+    if (m.role === "assistant") {
+      // keep a tool_use only if the NEXT message answers it with a matching tool_result
+      const next = msgs[i + 1];
+      const nextBlocks = next && Array.isArray(next.content) ? next.content : [];
+      const resultIds = new Set(
+        nextBlocks
+          .filter((b) => (b as { type?: string }).type === "tool_result")
+          .map((b) => (b as { tool_use_id?: string }).tool_use_id),
+      );
+      const kept = m.content.filter((b) =>
+        (b as { type?: string }).type === "tool_use"
+          ? resultIds.has((b as { id?: string }).id)
+          : true,
+      );
+      if (kept.length > 0) out.push({ ...m, content: kept });
+    } else {
+      // keep a tool_result only if the PREVIOUS kept message is an assistant with the matching tool_use
+      const prev = out[out.length - 1];
+      const prevBlocks =
+        prev && prev.role === "assistant" && Array.isArray(prev.content) ? prev.content : [];
+      const useIds = new Set(
+        prevBlocks
+          .filter((b) => (b as { type?: string }).type === "tool_use")
+          .map((b) => (b as { id?: string }).id),
+      );
+      const kept = m.content.filter((b) =>
+        (b as { type?: string }).type === "tool_result"
+          ? useIds.has((b as { tool_use_id?: string }).tool_use_id)
+          : true,
+      );
+      if (kept.length > 0) out.push({ ...m, content: kept });
+    }
+  }
+  return out;
+}
+
+/**
+ * Remove a trailing INCOMPLETE tool round from OpenAI-format history: an assistant whose tool_calls
+ * aren't all answered by following `tool` messages (a mid-loop throw / hard kill between emitting the
+ * tool_calls and writing every tool result) would 400 the next request. Complete/plain histories pass
+ * through unchanged. (P0-3 backstop; also reused by the OpenAI loop's flush.)
+ */
+export function trimIncompleteOpenAiTail(msgs: unknown[]): unknown[] {
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i] as { role?: string; tool_calls?: { id?: string }[] } | null;
+    if (!m) return msgs;
+    if (m.role === "tool") continue; // a trailing tool → keep scanning back to its assistant
+    if (m.role !== "assistant") return msgs; // clean tail (user / plain assistant text handled below)
+    if (!Array.isArray(m.tool_calls) || m.tool_calls.length === 0) return msgs; // plain assistant tail
+    const answered = new Set(
+      msgs
+        .slice(i + 1)
+        .map((x) => x as { role?: string; tool_call_id?: string })
+        .filter((x) => x.role === "tool")
+        .map((x) => x.tool_call_id),
+    );
+    return m.tool_calls.every((tc) => answered.has(tc.id)) ? msgs : msgs.slice(0, i);
+  }
+  return msgs;
+}
+
 export async function getHistory(
   projectId: string,
 ): Promise<Anthropic.MessageParam[]> {
@@ -49,10 +125,12 @@ export async function getHistory(
     .eq("project_id", projectId)
     .order("seq", { ascending: true });
   if (error) throw new Error(`getHistory: ${error.message}`);
-  return (data ?? []).map((m) => ({
-    role: m.role as MessageRole,
-    content: compactContent(m.content) as Anthropic.MessageParam["content"],
-  }));
+  return sanitizeAnthropicHistory(
+    (data ?? []).map((m) => ({
+      role: m.role as MessageRole,
+      content: compactContent(m.content) as Anthropic.MessageParam["content"],
+    })),
+  );
 }
 
 export async function appendMessages(
@@ -85,7 +163,7 @@ export async function getRawHistory(projectId: string): Promise<unknown[]> {
     .eq("project_id", projectId)
     .order("seq", { ascending: true });
   if (error) throw new Error(`getRawHistory: ${error.message}`);
-  return (data ?? []).map((m) => m.content);
+  return trimIncompleteOpenAiTail((data ?? []).map((m) => m.content));
 }
 
 export async function appendRawMessages(

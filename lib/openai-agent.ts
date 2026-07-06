@@ -2,13 +2,14 @@ import OpenAI from "openai";
 import { buildCodegenSystemPrompt, validateGasFiles } from "@/lib/gas-codegen";
 import { reviewProject } from "@/lib/critic";
 import { getFiles } from "@/lib/files";
-import { appendRawMessages, getRawHistory } from "@/lib/messages";
+import { appendRawMessages, getRawHistory, trimIncompleteOpenAiTail } from "@/lib/messages";
 import {
   EGS_TOOLS,
   executeEgsTool,
   type AgentRunResult,
   type Emit,
   type RunAgentArgs,
+  type TurnUsage,
 } from "@/lib/anthropic-agent";
 import type { ProviderConfig } from "@/lib/llm/provider";
 
@@ -96,6 +97,49 @@ async function runOpenAiTurn(
   let outputTokens = 0;
   let cacheReadTokens = 0; // OpenAI-format providers (DeepSeek/z.ai/…) auto-cache; capture the split
 
+  let flushed = false;
+  // Persist this turn EXACTLY ONCE — from the normal exit AND from a mid-loop throw — so files
+  // written this turn keep matching history (P0-3). getRawHistory() trims any orphan tool round as
+  // a backstop for a hard maxDuration kill that skips this.
+  const flushTurn = async (isError: boolean): Promise<void> => {
+    if (flushed) return;
+    flushed = true;
+
+    // Guard: a provider (notably Gemini's OpenAI-compat) can return an EMPTY completion. Never leave
+    // the chat dead-silent — but skip this on an error path (the route surfaces the real error).
+    if (!isError && !emittedText && !mutated) {
+      const fallback =
+        "ขออภัย รอบนี้ AI ตอบกลับมาว่าง ๆ (อาจมีจังหวะสะดุด) — ลองพิมพ์สั่งอีกครั้ง ถ้าเพิ่งสรุปสเปคไว้ พิมพ์ “สร้างเลย” เพื่อให้เริ่มเขียนโค้ดได้เลยครับ";
+      emit({ type: "text", delta: fallback });
+      const lastMsg = messages[messages.length - 1] as { role: string; content: unknown };
+      if (lastMsg?.role === "assistant" && (lastMsg.content == null || lastMsg.content === "")) {
+        lastMsg.content = fallback;
+      }
+    }
+
+    // persist this turn's messages (everything after system+history); store the user turn TEXT-only.
+    // trimIncompleteOpenAiTail drops a trailing assistant whose tool_calls weren't all answered (a
+    // throw between emitting tool_calls and writing every tool result) — persisting it 400s next turn.
+    const added = trimIncompleteOpenAiTail(messages.slice(base.length)) as Msg[];
+    if (added[0]?.role === "user") {
+      const note = images.length ? `\n\n(แนบรูปอ้างอิง ${images.length} รูป)` : "";
+      added[0] = { role: "user", content: userMessage + note };
+    }
+    // skip a turn with no assistant reply (provider threw on the first call) — a lone user turn would
+    // create consecutive user messages next turn.
+    if (added.length === 0 || !added.some((m) => m.role === "assistant")) return;
+    try {
+      await appendRawMessages(
+        projectId,
+        added.map((m) => ({ role: m.role, content: m })),
+      );
+    } catch (pe) {
+      console.error("[openai-agent] persist failed:", pe);
+      if (!isError) throw pe;
+    }
+  };
+
+  try {
   for (let iter = 0; iter < (internal ? REPAIR_MAX_ITERATIONS : MAX_ITERATIONS); iter++) {
     const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
       model: cfg.model,
@@ -246,29 +290,19 @@ async function runOpenAiTurn(
     if (iter === (internal ? REPAIR_MAX_ITERATIONS : MAX_ITERATIONS) - 1) capped = true;
   }
 
-  // Guard: a provider (notably Gemini's OpenAI-compat) can return an EMPTY completion — no text, no
-  // tool calls, no file changes. Never leave the chat dead-silent: surface a recoverable nudge and
-  // overwrite the empty assistant turn so the stored history doesn't carry a blank message forward.
-  if (!emittedText && !mutated) {
-    const fallback =
-      "ขออภัย รอบนี้ AI ตอบกลับมาว่าง ๆ (อาจมีจังหวะสะดุด) — ลองพิมพ์สั่งอีกครั้ง ถ้าเพิ่งสรุปสเปคไว้ พิมพ์ “สร้างเลย” เพื่อให้เริ่มเขียนโค้ดได้เลยครับ";
-    emit({ type: "text", delta: fallback });
-    const lastMsg = messages[messages.length - 1] as { role: string; content: unknown };
-    if (lastMsg?.role === "assistant" && (lastMsg.content == null || lastMsg.content === "")) {
-      lastMsg.content = fallback;
-    }
+  await flushTurn(false);
+  } catch (e) {
+    // A mid-loop throw still flushes what was produced so history matches the files already written,
+    // then stashes partial usage so the route can meter it instead of logging 0.
+    await flushTurn(true).catch((fe) => console.error("[openai-agent] flush-on-error failed:", fe));
+    (e as { __egsUsage?: TurnUsage }).__egsUsage = {
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheCreationTokens: 0,
+    };
+    throw e;
   }
-
-  // persist this turn's messages (everything after system+history); store the user turn TEXT-only.
-  const added = messages.slice(base.length);
-  if (added[0]?.role === "user") {
-    const note = images.length ? `\n\n(แนบรูปอ้างอิง ${images.length} รูป)` : "";
-    added[0] = { role: "user", content: userMessage + note };
-  }
-  await appendRawMessages(
-    projectId,
-    added.map((m) => ({ role: m.role, content: m })),
-  );
 
   return { mutated, capped, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens: 0 };
 }

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { acquireProjectRun, releaseProjectRun } from "@/lib/agent-lock";
-import { runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
+import { errorUsage, runAgentLoop, type AgentEvent } from "@/lib/anthropic-agent";
 import { getAccessGate, getOwnApiKey } from "@/lib/beta";
 import { POOL_EXHAUSTED_MSG, getMonthlyPool, getUserMonthlyEnergyUsed } from "@/lib/energy";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
@@ -185,13 +185,18 @@ export async function POST(
         emit({ type: "done", tokens: r.inputTokens + r.outputTokens });
       } catch (e) {
         console.error("[agent] loop error:", e);
+        // Meter whatever the aborted turn actually spent (stashed on the error) instead of 0 — a
+        // mid-loop failure still burned real provider tokens (P0-3).
+        const u = errorUsage(e);
         await logGeneration({
           projectId: id,
           userId: user.id,
           provider,
           model,
-          inputTokens: 0,
-          outputTokens: 0,
+          inputTokens: u?.inputTokens ?? 0,
+          outputTokens: u?.outputTokens ?? 0,
+          cacheReadTokens: u?.cacheReadTokens ?? 0,
+          cacheCreationTokens: u?.cacheCreationTokens ?? 0,
           criticIssues: 0,
           durationMs: Date.now() - startedAt,
           outcome: "error",

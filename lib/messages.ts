@@ -4,7 +4,7 @@ import type { MessageRole, TurnType } from "@/types/db";
 
 /**
  * egs_messages history (server-only). Stores Anthropic content blocks verbatim (jsonb) so the
- * agent loop can resume after disconnect / maxDuration.
+ * agent loop can resume after a disconnect or a container restart.
  */
 
 // Context compaction: full file contents live in egs_files (source of truth), so we strip the bulky
@@ -37,8 +37,8 @@ function compactContent(content: unknown): unknown {
 }
 
 /**
- * Drop orphan tool_use / tool_result blocks so a HALF-persisted turn (a mid-loop throw, or a hard
- * maxDuration kill that skipped the flush — P0-3) can't 400 the next request ("unresolved tool_use"
+ * Drop orphan tool_use / tool_result blocks so a HALF-persisted turn (a mid-loop throw, or a
+ * container restart that skipped the flush — P0-3) can't 400 the next request ("unresolved tool_use"
  * / "tool_result without tool_use"). A well-formed history passes through unchanged.
  */
 function sanitizeAnthropicHistory(

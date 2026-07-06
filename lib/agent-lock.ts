@@ -7,7 +7,7 @@ import { createServiceClient } from "@/lib/supabase/service";
  * crashed/timed-out run is stolen after STALE_MS.
  */
 
-const STALE_MS = 6 * 60 * 1000; // > maxDuration(300s)
+const STALE_MS = 6 * 60 * 1000; // reclaim window if a container restart drops a run mid-flight (Railway = no per-request timeout)
 
 export async function acquireProjectRun(projectId: string): Promise<boolean> {
   const svc = createServiceClient();

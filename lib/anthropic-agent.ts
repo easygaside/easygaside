@@ -421,8 +421,8 @@ async function runTurn(
 
   let flushed = false;
   // Persist this turn EXACTLY ONCE — from the normal exit AND from a mid-loop throw (provider
-  // 500/timeout) — so files written this turn always keep matching history (P0-3). A hard
-  // maxDuration kill can still skip it; getHistory() sanitizes any orphan blocks as a backstop.
+  // 500/timeout) — so files written this turn always keep matching history (P0-3). A container
+  // restart mid-run can still skip it; getHistory() sanitizes any orphan blocks as a backstop.
   const flushTurn = async (isError: boolean): Promise<void> => {
     if (flushed) return;
     flushed = true;

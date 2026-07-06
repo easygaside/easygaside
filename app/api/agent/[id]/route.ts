@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { snapshotProject } from "@/lib/versions";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // needs Vercel Pro for >60s; fine for local dev
+export const maxDuration = 300; // Vercel-only knob — INERT on Railway (long-lived container, no per-request timeout; see DEPLOY.md). Kept for portability.
 
 /**
  * Turn a thrown agent/provider error into a short, user-facing reason so the chat shows WHY a turn

@@ -100,7 +100,7 @@ async function runOpenAiTurn(
   let flushed = false;
   // Persist this turn EXACTLY ONCE — from the normal exit AND from a mid-loop throw — so files
   // written this turn keep matching history (P0-3). getRawHistory() trims any orphan tool round as
-  // a backstop for a hard maxDuration kill that skips this.
+  // a backstop for a container restart that skips this.
   const flushTurn = async (isError: boolean): Promise<void> => {
     if (flushed) return;
     flushed = true;

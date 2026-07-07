@@ -60,15 +60,14 @@ export function providerConfig(p: LlmProvider): ProviderConfig {
         vision: true,
       };
     case "deepseek":
-      // deepseek-chat (V3) is the GA id today and supports tool-calls + json mode (what our codegen +
-      // critic need). NOTE: deepseek-chat/deepseek-reasoner are slated to deprecate 2026-07-24 —
-      // confirm DeepSeek's actual GA replacement id (their docs name deepseek-v4-flash, UNVERIFIED on
-      // the live API) and update this + the DB before then. 8K output ceiling.
+      // deepseek-v4-flash is the current GA id (deepseek-chat/deepseek-reasoner retired 2026-07-24;
+      // during the grace period they transparently routed here). Supports tool-calls + json mode. The
+      // LIVE model is the DB value (egs_provider_config.deepseek) — this is only the absent-row fallback.
       return {
         provider: "deepseek",
         family: "openai",
         label: "DeepSeek",
-        model: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
+        model: process.env.DEEPSEEK_MODEL ?? "deepseek-v4-flash",
         baseURL: "https://api.deepseek.com",
         apiKey: process.env.DEEPSEEK_API_KEY,
         maxOutputTokens: 8000,

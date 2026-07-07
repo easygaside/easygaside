@@ -44,12 +44,15 @@ export interface ProbeResult {
   error?: string; // human-readable error when ok=false
   /** true = the owner just needs to authorize/publish the app once — NOT a code bug, don't repair. */
   authRequired?: boolean;
+  /** true = infra failure (timeout / network / 4xx like a deleted deployment) — NOT a code bug, so
+   *  verify must NOT feed it to the repair loop (cold GAS apps regularly exceed the probe timeout). */
+  infraError?: boolean;
 }
 
 /** Fetch the live /exec and decide pass/fail. Never throws — network issues return ok:false. */
 export async function probeExec(execUrl: string): Promise<ProbeResult> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 12_000);
+  const timer = setTimeout(() => ctrl.abort(), 15_000); // cold GAS apps regularly exceed 12s on first hit
   try {
     // ask the app to self-report its error (rulebook self-diagnostics) → exact message + line
     const url = execUrl + (execUrl.includes("?") ? "&" : "?") + `${DIAG_PARAM}=${DIAG_TOKEN}`;
@@ -81,7 +84,14 @@ export async function probeExec(execUrl: string): Promise<ProbeResult> {
       return { ok: false, error: (err + logs).slice(0, 560) || "แอปรายงานข้อผิดพลาดตอนรัน" };
     }
 
-    if (res.status >= 500) return { ok: false, error: `เซิร์ฟเวอร์ตอบกลับ HTTP ${res.status} ตอนเปิดแอป` };
+    // P1-7: any 4xx/5xx that isn't the auth wall (handled above) is an INFRA problem, not a code bug —
+    // don't feed it to the repair loop. 404 = the deployment/URL is gone (was silently "ผ่าน" before).
+    if (res.status >= 400)
+      return {
+        ok: false,
+        infraError: true,
+        error: `เปิดแอปไม่สำเร็จ (HTTP ${res.status}) — อาจถูกลบ deployment / URL ผิด / ยังไม่พร้อม`,
+      };
     for (const { re, label } of FAIL_SIGNATURES) {
       const m = text.match(re);
       if (m) {
@@ -89,11 +99,22 @@ export async function probeExec(execUrl: string): Promise<ProbeResult> {
         return { ok: false, error: label ? `${label}${detail && detail !== m[0] ? ` — ${detail}` : ""}` : detail || m[0] };
       }
     }
-    // Looks like the app rendered without a GAS-level error.
+    // P1-7 positive-signal check: a real render is non-trivial HTML. A blank/near-empty 200 means doGet
+    // returned nothing meaningful — don't call that "ผ่าน".
+    const body = text.trim();
+    if (body.length < 40 && !/<\w/.test(body))
+      return { ok: false, error: "แอปเปิดแล้วได้หน้าว่าง — doGet อาจไม่ได้คืนหน้าเว็บ" };
+    // Rendered without a detectable GAS-level error (doGet PATH ONLY — buttons/data are not tested).
     return { ok: true };
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError";
-    return { ok: false, error: aborted ? "เปิดแอปไม่ตอบใน 12 วินาที (อาจค้าง/ช้า)" : "เปิดแอปไม่ได้ (เชื่อมต่อล้มเหลว)" };
+    // P1-8: timeout / network = infra, NOT a code bug (cold GAS apps regularly exceed the timeout on
+    // first hit) — flag it so verify retries instead of "repairing" perfectly healthy code.
+    return {
+      ok: false,
+      infraError: true,
+      error: aborted ? "เปิดแอปไม่ตอบใน 15 วินาที (อาจค้าง/ช้า/เพิ่งเย็นเครื่อง)" : "เปิดแอปไม่ได้ (เชื่อมต่อล้มเหลว)",
+    };
   } finally {
     clearTimeout(timer);
   }

@@ -140,6 +140,10 @@ export async function deployProject(
   const prevScopes = existing?.oauth_scopes ?? [];
   const scopesAdded =
     existing && prevScopes.length > 0 ? newScopes.filter((s) => !prevScopes.includes(s)) : [];
+  // P2-6: if the manifest omits oauthScopes (GAS then INFERS them from code), don't overwrite the
+  // stored baseline with [] — that would permanently blind scope-growth detection. Keep the last
+  // known non-empty baseline instead of resetting it.
+  const storedScopes = newScopes.length > 0 ? newScopes : prevScopes;
 
   // 1. ensure the script exists (reuse forever)
   let scriptId = project.script_id;
@@ -163,7 +167,7 @@ export async function deployProject(
     webAppUrl = r.webAppUrl;
     await svc
       .from("egs_deployments")
-      .update({ exec_url: webAppUrl, version_number: versionNumber, content_hash: deployHash, oauth_scopes: newScopes, updated_at: new Date().toISOString() })
+      .update({ exec_url: webAppUrl, version_number: versionNumber, content_hash: deployHash, oauth_scopes: storedScopes, updated_at: new Date().toISOString() })
       .eq("id", existing.id);
   } else {
     const r = await createDeployment(accessToken, scriptId, versionNumber, project.name);
@@ -175,7 +179,7 @@ export async function deployProject(
       exec_url: webAppUrl,
       version_number: versionNumber,
       content_hash: deployHash,
-      oauth_scopes: newScopes,
+      oauth_scopes: storedScopes,
     });
   }
 

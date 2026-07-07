@@ -11,6 +11,7 @@ import { probeExec } from "@/lib/gas-verify";
 import { logGeneration } from "@/lib/metrics";
 import { AGENT_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { getDeployedUrl, getProject } from "@/lib/projects";
+import { snapshotProject } from "@/lib/versions";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -142,8 +143,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           emit({ type: "status", text: "กำลังเปิดแอปเพื่อทดสอบการรันจริง…" });
           const probe = await probeExec(url);
           if (probe.ok) {
-            emit({ type: "verdict", ok: true, text: "ทดสอบรันจริงผ่าน — แอปเปิดและทำงานได้ที่ลิงก์ของคุณ" });
+            emit({
+              type: "verdict",
+              ok: true,
+              text: "หน้าแอปเปิดได้ ✓ (ทดสอบเฉพาะการเปิดหน้า — ปุ่ม/การบันทึกข้อมูลยังไม่ได้ทดสอบ) ลองกดใช้งานจริงดูอีกที",
+            });
             verified = true;
+            break;
+          }
+          // P1-8: infra failure (timeout / network / deleted deployment) is NOT a code bug — never
+          // repair it (that would rewrite healthy code). Ask the user to retry instead.
+          if (probe.infraError) {
+            emit({ type: "text", delta: `\n\n⏳ ${probe.error}` });
+            emit({
+              type: "text",
+              delta: '\n\nไม่ใช่ปัญหาโค้ด — แอปอาจเพิ่งเย็นเครื่องหรือช้า รอสักครู่แล้วกด "ทดสอบรันจริง" อีกครั้งครับ',
+            });
             break;
           }
           if (probe.authRequired) {
@@ -181,21 +196,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           cacheCreationTokens += r.cacheCreationTokens ?? 0;
           const dep = await deployProject(user.id, project); // same deployment → same /exec URL
           url = dep.execUrl ?? url;
+          // P2-4: version the code that actually went live so an auto-repair is undoable (ย้อนเวอร์ชัน).
+          if (!dep.unchanged) await snapshotProject(id, "deploy", { label: "auto-repair" });
         }
 
-        await logGeneration({
-          projectId: id,
-          userId: user.id,
-          provider: repairProvider, // the arm that actually ran the fix (GLM when escalated)
-          model: repairCfg.model,
-          inputTokens,
-          outputTokens,
-          cacheReadTokens,
-          cacheCreationTokens,
-          criticIssues: 0,
-          durationMs: Date.now() - startedAt,
-          outcome: verified ? "ok" : "error",
-        }).catch(() => {});
+        // P2-2: only log a generation when a repair actually ran (tokens > 0). A probe-only pass /
+        // authRequired / infra path burned no model tokens — a 0-token row would pollute the arm's
+        // ok-rate + error-rate that the A/B decision reads.
+        if (inputTokens + outputTokens > 0) {
+          await logGeneration({
+            projectId: id,
+            userId: user.id,
+            provider: repairProvider, // the arm that actually ran the fix (GLM when escalated)
+            model: repairCfg.model,
+            inputTokens,
+            outputTokens,
+            cacheReadTokens,
+            cacheCreationTokens,
+            criticIssues: 0,
+            durationMs: Date.now() - startedAt,
+            outcome: verified ? "ok" : "error",
+          }).catch(() => {});
+        }
         emit({ type: "done", tokens: inputTokens + outputTokens });
       } catch (e) {
         console.error("[verify] loop error:", e);

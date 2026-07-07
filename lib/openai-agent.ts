@@ -250,12 +250,14 @@ async function runOpenAiTurn(
     }));
 
     if (calls.length === 0) {
-      // Weak tool-users (Gemini's OpenAI-compat) sometimes "describe" the build as chat text on the
-      // first step instead of calling write_file. If a non-repair turn opens with text/empty and no
-      // tool call, force ONE retry with tool_choice:"required" so files actually get written.
-      if (iter === 0 && !forcedToolRetry && !internal) {
+      // Force ONE retry to coax a tool call ONLY when the model returned NOTHING (no text, no tools)
+      // on the first step of a fresh build — a weak tool-user (Gemini) sometimes stalls. P1-11: do NOT
+      // retry when there IS text (a legit Q&A answer) and NOT on reasoning arms — there tool_choice is
+      // never sent, so the retry is a byte-identical DUPLICATE of a ~110s reasoning call (the biggest
+      // single contributor to deepseek-pro's 112s average).
+      if (iter === 0 && !forcedToolRetry && !internal && !cfg.reasoning && !text.trim()) {
         forcedToolRetry = true;
-        continue; // re-run this step; any text already streamed stands as a preamble
+        continue; // re-run this step
       }
       messages.push(withReasoning({ role: "assistant", content: text }, reasoning, cfg.reasoning));
       break;

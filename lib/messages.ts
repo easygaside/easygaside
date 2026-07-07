@@ -155,6 +155,49 @@ export async function appendMessages(
  * FULL provider message object (incl. tool_calls / tool_call_id), so we store + return it verbatim.
  * Ordered by seq (stable). No compaction yet (acceptable for the A/B's mostly-short sessions).
  */
+/**
+ * Compaction for the OpenAI-format loop (P1-12) — parity with compactContent on the Anthropic side.
+ * The full file body sits in every write_file's tool_calls `arguments`, and every read_project dump
+ * in a tool message; without this the deepseek/GLM arm re-sends ALL of it on every turn (quadratic
+ * context growth → latency + eventual context-overflow 400s). The model re-fetches current code via
+ * read_project. reasoning_content is intentionally KEPT (deepseek thinking models 400 without it).
+ */
+function compactRawMessage(m: unknown): unknown {
+  if (!m || typeof m !== "object") return m;
+  const msg = m as Record<string, unknown>;
+  if (Array.isArray(msg.tool_calls)) {
+    const tool_calls = (msg.tool_calls as Record<string, unknown>[]).map((tc) => {
+      const fn = tc?.function as Record<string, unknown> | undefined;
+      if (!fn || typeof fn.arguments !== "string") return tc;
+      let args: Record<string, unknown>;
+      try {
+        args = JSON.parse(fn.arguments) as Record<string, unknown>;
+      } catch {
+        return tc;
+      }
+      let changed = false;
+      if (typeof args.content === "string" && args.content.length > 0) {
+        args.content = `<โค้ดถูกตัดจากประวัติ (${args.content.length} ตัวอักษร) — เรียก read_project เพื่อดูโค้ดล่าสุด>`;
+        changed = true;
+      }
+      if (typeof args.new_str === "string" && args.new_str.length > MAX_TOOL_RESULT_CHARS) {
+        args.new_str = `<ตัด ${args.new_str.length} ตัวอักษร>`;
+        changed = true;
+      }
+      if (typeof args.old_str === "string" && args.old_str.length > MAX_TOOL_RESULT_CHARS) {
+        args.old_str = `<ตัด ${args.old_str.length} ตัวอักษร>`;
+        changed = true;
+      }
+      return changed ? { ...tc, function: { ...fn, arguments: JSON.stringify(args) } } : tc;
+    });
+    return { ...msg, tool_calls };
+  }
+  if (msg.role === "tool" && typeof msg.content === "string" && msg.content.length > MAX_TOOL_RESULT_CHARS) {
+    return { ...msg, content: `${(msg.content as string).slice(0, MAX_TOOL_RESULT_CHARS)} …<ตัดส่วนที่เหลือ>` };
+  }
+  return m;
+}
+
 export async function getRawHistory(
   projectId: string,
   opts: { stripReasoning?: boolean } = {},
@@ -166,7 +209,7 @@ export async function getRawHistory(
     .eq("project_id", projectId)
     .order("seq", { ascending: true });
   if (error) throw new Error(`getRawHistory: ${error.message}`);
-  const rows = trimIncompleteOpenAiTail((data ?? []).map((m) => m.content));
+  const rows = trimIncompleteOpenAiTail((data ?? []).map((m) => m.content)).map(compactRawMessage);
   if (!opts.stripReasoning) return rows;
   // Escalated repair on a DIFFERENT arm (e.g. deepseek-pro project → GLM): the stored history carries
   // deepseek's OWN reasoning_content on assistant messages, which another model must not receive.

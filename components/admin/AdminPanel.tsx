@@ -61,6 +61,10 @@ export interface ArmMetric {
   avgCritic: number;
   avgSec: number;
   okRate: number;
+  /** gens the critic actually judged (clean|issues) — the denominator for a trustworthy clean-rate. */
+  reviewed: number;
+  /** % of REVIEWED gens the critic passed clean — excludes skipped/degraded/unreviewed (P1-1/1-3). */
+  cleanRate: number;
   up: number;
   down: number;
 }
@@ -479,7 +483,12 @@ export function AdminPanel({
               <Bars title="เวลาเฉลี่ย/gen (วินาที)" items={metrics.map((m) => ({ label: m.provider, value: m.avgSec, color: ARM_COLOR[m.provider] }))} unit="s" />
               <Bars title="👍 ถูกใจ" items={metrics.map((m) => ({ label: m.provider, value: m.up, color: ARM_COLOR[m.provider] }))} />
               <Bars title="🔍 critic issues เฉลี่ย/gen" items={metrics.map((m) => ({ label: m.provider, value: m.avgCritic, color: ARM_COLOR[m.provider] }))} />
+              <Bars title="✓ clean-rate (เฉพาะที่ critic ตรวจจริง)" items={metrics.map((m) => ({ label: m.provider, value: m.cleanRate, color: ARM_COLOR[m.provider] }))} unit="%" />
             </div>
+            <p className="mt-2 text-xs text-slate-400">
+              clean-rate นับเฉพาะ gen ที่ critic ตัดสินจริง (clean/issues) — ไม่รวม skipped/degraded/ยังไม่ตรวจ
+              จึงไม่ถูก critic ที่ crash/อ่านไม่ได้ปั่นให้ดูดีเกินจริง (ข้อมูลสะสมหลัง deploy commit ชุดนี้)
+            </p>
           </div>
 
           <LineChart data={daily} />

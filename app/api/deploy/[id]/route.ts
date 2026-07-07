@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { acquireProjectRun, releaseProjectRun } from "@/lib/agent-lock";
 import { mapGoogleError } from "@/lib/api-helpers";
 import { getTarget } from "@/lib/deployment-targets";
+import { probeExec } from "@/lib/gas-verify";
 import { getConnectionStatus, markAppsScriptReady } from "@/lib/google-connection";
 import { getProject } from "@/lib/projects";
 import { snapshotProject } from "@/lib/versions";
@@ -49,7 +50,18 @@ export async function POST(
     await markAppsScriptReady(user.id);
     // nothing changed → no new code went live, so don't pile up an identical version snapshot
     if (!result.unchanged) await snapshotProject(id, "deploy"); // version the exact code that went live
-    return NextResponse.json({ ok: true, ...result });
+    // P1-6: auto-probe the live /exec so the user gets an immediate "opened OK / has a problem" verdict
+    // without pressing ทดสอบรันจริง. Repair stays MANUAL (the client offers a button) — no surprise
+    // auto-rewrite of their deployed code. Best-effort + non-blocking.
+    let probe: Awaited<ReturnType<typeof probeExec>> | undefined;
+    if (result.execUrl) {
+      try {
+        probe = await probeExec(result.execUrl);
+      } catch {
+        /* probe is a bonus — never fail the deploy over it */
+      }
+    }
+    return NextResponse.json({ ok: true, ...result, probe });
   } catch (e) {
     return mapGoogleError(e, (await getConnectionStatus(user.id)).email);
   } finally {

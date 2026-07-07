@@ -15,7 +15,14 @@ import { Tooltip } from "@/components/ui/Tooltip";
 type Result =
   | { kind: "idle" }
   | { kind: "busy" }
-  | { kind: "ok"; execUrl?: string; needsTriggerSetup: boolean; scriptEditorUrl: string; scopesAdded: string[] }
+  | {
+      kind: "ok";
+      execUrl?: string;
+      needsTriggerSetup: boolean;
+      scriptEditorUrl: string;
+      scopesAdded: string[];
+      probe?: { ok: boolean; error?: string; authRequired?: boolean; infraError?: boolean };
+    }
   | { kind: "enable_api"; enableUrl: string; message: string }
   | { kind: "error"; message: string };
 
@@ -56,6 +63,7 @@ export function DeployButton({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const actionRequest = useProjectStore((s) => s.actionRequest);
   const clearActionRequest = useProjectStore((s) => s.clearActionRequest);
+  const runAgent = useProjectStore((s) => s.runAgent);
 
   // command palette → "Deploy เข้า Google" (palette only dispatches this when Google is connected)
   useEffect(() => {
@@ -78,6 +86,7 @@ export function DeployButton({
           needsTriggerSetup: !!data.needsTriggerSetup,
           scriptEditorUrl: data.scriptEditorUrl,
           scopesAdded: Array.isArray(data.scopesAdded) ? data.scopesAdded : [],
+          probe: data.probe,
         });
         if (data.execUrl) onDeployed?.(data.execUrl); // surface the URL in the persistent bar
       } else if (data.error === "USER_SETTINGS_DISABLED") {
@@ -177,6 +186,30 @@ export function DeployButton({
                     {res.execUrl}
                   </a>
                 )}
+                {res.probe &&
+                  !res.probe.authRequired &&
+                  (res.probe.ok ? (
+                    <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2 text-[11px] text-emerald-700 dark:text-emerald-300">
+                      ✓ ทดสอบเปิดหน้าแอปอัตโนมัติแล้ว — เปิดได้ (ทดสอบเฉพาะการเปิดหน้า ปุ่ม/การบันทึกยังไม่ได้ทดสอบ)
+                    </div>
+                  ) : res.probe.infraError ? (
+                    <div className="rounded-lg bg-slate-50 dark:bg-slate-800 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
+                      ⏳ เปิดหน้ายังไม่ได้/ช้า (อาจเพิ่งเย็นเครื่อง) — ลองเปิดลิงก์เอง หรือกด &ldquo;ทดสอบรันจริง&rdquo; อีกที
+                    </div>
+                  ) : (
+                    <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
+                      ⚠️ เปิดแล้วเจอปัญหาตอนรัน: {res.probe.error}
+                      <button
+                        onClick={() => {
+                          setRes({ kind: "idle" });
+                          runAgent("verify");
+                        }}
+                        className="mt-1.5 block w-full rounded-lg bg-amber-500 py-1.5 text-xs font-semibold text-white hover:bg-amber-400"
+                      >
+                        ให้ AI ทดสอบรันจริง + ซ่อมให้
+                      </button>
+                    </div>
+                  ))}
                 <p className="rounded-lg bg-slate-50 dark:bg-slate-800 px-3 py-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                   ครั้งแรกที่เปิด Google จะขอให้คุณ (เจ้าของ) อนุญาตสิทธิ์ของสคริปต์ เช่น Sheets/Gmail —
                   กด <b>Review permissions → Advanced → Allow</b> ครั้งเดียว แล้วใช้ได้เลย ·

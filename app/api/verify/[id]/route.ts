@@ -204,7 +204,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         // authRequired / infra path burned no model tokens — a 0-token row would pollute the arm's
         // ok-rate + error-rate that the A/B decision reads.
         if (inputTokens + outputTokens > 0) {
-          await logGeneration({
+          const genId = await logGeneration({
             projectId: id,
             userId: user.id,
             provider: repairProvider, // the arm that actually ran the fix (GLM when escalated)
@@ -216,7 +216,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             criticIssues: 0,
             durationMs: Date.now() - startedAt,
             outcome: verified ? "ok" : "error",
-          }).catch(() => {});
+          }).catch(() => null);
+          // P2-1: make Gate-2 runs ratable — the most information-dense 👍/👎 moment ("did the deployed
+          // app actually work for you?"). Was never emitted, so verify runs couldn't be rated at all.
+          if (genId) emit({ type: "generation", id: genId });
         }
         emit({ type: "done", tokens: inputTokens + outputTokens });
       } catch (e) {

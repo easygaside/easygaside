@@ -26,6 +26,7 @@ interface GenRow {
   cache_read_tokens: number;
   cache_creation_tokens: number;
   critic_issues: number;
+  critic_status: string | null;
   duration_ms: number | null;
   outcome: string | null;
   rating: number | null;
@@ -50,7 +51,7 @@ export default async function AdminPage() {
       svc
         .from("egs_generations")
         .select(
-          "provider, model, project_id, user_id, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, critic_issues, duration_ms, outcome, rating, created_at",
+          "provider, model, project_id, user_id, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, critic_issues, critic_status, duration_ms, outcome, rating, created_at",
         ),
       svc.from("egs_provider_config").select("provider, model, energy_tank, base_url"),
       svc.from("egs_app_settings").select("key, value"),
@@ -202,6 +203,10 @@ export default async function AdminPage() {
     const g = rows.filter((r) => r.provider === p);
     const n = g.length || 1;
     const sum = (f: (r: GenRow) => number) => g.reduce((a, r) => a + f(r), 0);
+    // Trustworthy clean-rate: only count gens the critic ACTUALLY judged (clean|issues) — exclude
+    // skipped/degraded/null so a crashed/unparseable critic no longer inflates "clean" (P1-1/1-3).
+    const clean = g.filter((r) => r.critic_status === "clean").length;
+    const reviewed = clean + g.filter((r) => r.critic_status === "issues").length;
     return {
       provider: p,
       assigned: users.filter((u) => u.arm === p).length,
@@ -213,6 +218,8 @@ export default async function AdminPage() {
       avgCritic: +(sum((r) => r.critic_issues) / n).toFixed(2),
       avgSec: +(sum((r) => r.duration_ms ?? 0) / n / 1000).toFixed(1),
       okRate: g.length ? Math.round((g.filter((r) => r.outcome === "ok").length / g.length) * 100) : 0,
+      reviewed,
+      cleanRate: reviewed ? Math.round((clean / reviewed) * 100) : 0,
       up: g.filter((r) => r.rating === 1).length,
       down: g.filter((r) => r.rating === -1).length,
     };

@@ -282,7 +282,7 @@ export function parseCodegenOutput(rawOutput: string): GasFile[] {
 const FORBIDDEN: { rule: string; re: RegExp; message: (f: string) => string }[] = [
   { rule: "no-require", re: /\brequire\s*\(/, message: (f) => `${f}: ใช้ require() ไม่ได้ใน GAS` },
   { rule: "no-import", re: /\bimport\s*(?:type\s+)?[\s\S]{0,200}?\bfrom\s+['"]|\bimport\s*\(/, message: (f) => `${f}: ใช้ ES module import ไม่ได้ใน GAS` },
-  { rule: "no-export", re: /\bexport\s+(default|function|class|const|let|var)/, message: (f) => `${f}: ใช้ ES module export ไม่ได้ใน GAS` },
+  { rule: "no-export", re: /\bexport\s+(default|async|function|class|const|let|var|\{|\*)/, message: (f) => `${f}: ใช้ ES module export ไม่ได้ใน GAS` },
   { rule: "no-fetch", re: /\bfetch\s*\(/, message: (f) => `${f}: ใช้ fetch() ไม่ได้ — ใช้ UrlFetchApp.fetch()` },
   { rule: "no-process-env", re: /\bprocess\.env\b/, message: (f) => `${f}: ใช้ process.env ไม่ได้ — ใช้ PropertiesService` },
   // Camera/mic can't work in a deployed GAS web app: it's served inside Google's iframe whose
@@ -394,6 +394,53 @@ export function validateGasFiles(
       message: `${captureFile.name}: <input capture> เปิดกล้องใน GAS ไม่ได้ (iframe ปิดสิทธิ์กล้อง) — เอา capture ออก ใช้แค่เลือกรูป QR ที่ถ่ายไว้แล้ว หรือให้พิมพ์รหัสเอง; สแกนด้วยกล้องสดต้องโฮสต์นอก GAS (เฟสหน้า)`,
       severity: "warning",
     });
+  }
+
+  // P1-4: server-side timers don't exist in GAS (ReferenceError at runtime). .gs ONLY — setTimeout is
+  // valid in client HTML (browser), so don't flag it there.
+  const TIMER_RE = /\bset(Timeout|Interval)\s*\(/;
+  for (const f of gsFiles) {
+    if (TIMER_RE.test(f.content)) {
+      errors.push({
+        file: f.name,
+        rule: "no-timers",
+        message: `${f.name}: setTimeout/setInterval ใช้ใน GAS (ฝั่ง server) ไม่ได้ — ReferenceError ตอนรัน; ใช้ Utilities.sleep() หรือ time-driven trigger แทน`,
+        severity: "error",
+      });
+    }
+  }
+
+  // P1-4: parse appsscript.json (a malformed manifest, or one that needs Cloud-Console/library setup a
+  // non-coder can't do, only surfaces as an opaque Apps Script 400 at deploy — catch it at Gate 0).
+  const manifest = files.find((f) => f.name.toLowerCase() === "appsscript.json");
+  if (manifest) {
+    try {
+      const m = JSON.parse(manifest.content) as { dependencies?: Record<string, unknown> };
+      const deps = m.dependencies ?? {};
+      if (Array.isArray(deps.enabledAdvancedServices) && deps.enabledAdvancedServices.length > 0) {
+        errors.push({
+          file: manifest.name,
+          rule: "no-advanced-services",
+          message: `${manifest.name}: มี dependencies.enabledAdvancedServices — ต้องเปิด API ใน Cloud Console เอง (ผู้ใช้ non-coder ทำไม่ได้ → auto-deploy พัง) เอาออกแล้วใช้ built-in service (DriveApp/SpreadsheetApp/…)`,
+          severity: "error",
+        });
+      }
+      if (Array.isArray(deps.libraries) && deps.libraries.length > 0) {
+        errors.push({
+          file: manifest.name,
+          rule: "no-libraries",
+          message: `${manifest.name}: มี dependencies.libraries — ต้อง add library ด้วยมือ (ผู้ใช้ non-coder ทำไม่ได้) เอาออก`,
+          severity: "error",
+        });
+      }
+    } catch {
+      errors.push({
+        file: manifest.name,
+        rule: "manifest-json",
+        message: `${manifest.name}: JSON ไม่ถูกต้อง (parse ไม่ได้) — deploy จะ error; แก้ให้เป็น JSON ที่ถูกต้อง`,
+        severity: "error",
+      });
+    }
   }
 
   return { errors, warnings };

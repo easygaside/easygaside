@@ -47,7 +47,8 @@ async function resolveCritic(): Promise<CriticConfig> {
     (await getAppSetting("critic_model"))?.trim() || CRITIC_MODEL_FALLBACK || defaultCriticModel(provider);
   return { provider, model };
 }
-const CRITIC_MAX_TOKENS = 1500;
+const CRITIC_MAX_TOKENS = 4000; // headroom for issue-rich replies (was 1500 → truncated → silent "✓ ผ่าน")
+const CRITIC_RETRY_MAX_TOKENS = 10000; // one retry with big headroom when the first verdict was unparseable
 const MAX_ISSUES = 12; // bound the repair prompt
 
 export type CriticSeverity = "high" | "medium" | "low";
@@ -64,6 +65,9 @@ export interface CriticIssue {
 export interface CriticResult {
   ok: boolean;
   issues: CriticIssue[];
+  /** true = the verdict could NOT be trusted (reply unparseable/truncated even after retry) — this is
+   *  NOT a clean pass. Callers must show "ตรวจไม่สำเร็จ", never "✓ ผ่าน", and log critic_status=degraded. */
+  degraded: boolean;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -80,6 +84,7 @@ interface CriticUsage {
 const EMPTY: CriticResult = {
   ok: true,
   issues: [],
+  degraded: false,
   inputTokens: 0,
   outputTokens: 0,
   cacheReadTokens: 0,
@@ -122,12 +127,12 @@ function normalizeSeverity(s: unknown): CriticSeverity {
   return s === "high" || s === "low" ? s : "medium";
 }
 
-function parseIssues(text: string): CriticIssue[] {
+function parseIssues(text: string): CriticIssue[] | null {
   try {
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return [];
+    if (!match) return null; // no JSON object at all → not a verdict (truncated / refused / prose)
     const obj = JSON.parse(match[0]) as { issues?: unknown };
-    if (!Array.isArray(obj.issues)) return [];
+    if (!Array.isArray(obj.issues)) return null; // malformed shape → not a verdict
     return obj.issues
       .filter((i): i is Record<string, unknown> => !!i && typeof i === "object")
       .map((i) => {
@@ -143,12 +148,14 @@ function parseIssues(text: string): CriticIssue[] {
       .filter((i) => i.problem.length > 0)
       .slice(0, MAX_ISSUES);
   } catch {
-    return [];
+    return null; // JSON.parse threw (usually truncation) → not a verdict
   }
 }
 
-function toResult(issues: CriticIssue[], usage: CriticUsage): CriticResult {
-  return { ok: issues.length === 0, issues, ...usage };
+function toResult(issues: CriticIssue[] | null, usage: CriticUsage): CriticResult {
+  // issues === null → the reply wasn't a parseable verdict → DEGRADED (not a clean pass).
+  if (issues === null) return { ok: false, degraded: true, issues: [], ...usage };
+  return { ok: issues.length === 0, degraded: false, issues, ...usage };
 }
 
 /**
@@ -199,11 +206,11 @@ function buildReviewPrompt(files: { path: string; content: string }[], project: 
 }
 
 /** Critic backend: Anthropic (Haiku) — caches the constant rubric (identical on every call). */
-async function reviewWithAnthropic(userPrompt: string, model: string): Promise<CriticResult> {
+async function reviewWithAnthropic(userPrompt: string, model: string, maxTokens: number): Promise<CriticResult> {
   const client = new Anthropic();
   const msg = await client.messages.create({
     model,
-    max_tokens: CRITIC_MAX_TOKENS,
+    max_tokens: maxTokens,
     system: [{ type: "text", text: CRITIC_SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: userPrompt }],
   });
@@ -231,12 +238,13 @@ async function reviewWithOpenAi(
   model: string,
   apiKey: string | undefined,
   baseURL: string | undefined,
+  maxTokens: number,
 ): Promise<CriticResult> {
   const client = new OpenAI({ apiKey, baseURL });
   const reasoning = /v4-pro|reasoner|glm-5/i.test(model);
   const res = await client.chat.completions.create({
     model,
-    max_tokens: reasoning ? 8000 : CRITIC_MAX_TOKENS,
+    max_tokens: reasoning ? Math.max(8000, maxTokens) : maxTokens,
     messages: [
       { role: "system", content: CRITIC_SYSTEM },
       { role: "user", content: userPrompt },
@@ -259,8 +267,8 @@ async function reviewWithOpenAi(
 }
 
 /** DeepSeek backend (default critic) — OpenAI wire format via the DeepSeek endpoint + key. */
-function reviewWithDeepSeek(userPrompt: string, model: string): Promise<CriticResult> {
-  return reviewWithOpenAi(userPrompt, model, process.env.DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL);
+function reviewWithDeepSeek(userPrompt: string, model: string, maxTokens: number): Promise<CriticResult> {
+  return reviewWithOpenAi(userPrompt, model, process.env.DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, maxTokens);
 }
 
 export interface CriticInfo {
@@ -288,15 +296,33 @@ export async function reviewProject(project: EgsProject, projectId: string): Pro
   const files = await getFiles(projectId);
   if (files.length === 0) return EMPTY;
   const userPrompt = buildReviewPrompt(files, project);
-  // Paid plans build on GLM (zai) — review on GLM too, so the critic doesn't depend on a SEPARATE
-  // DeepSeek balance (which can run dry: a successful GLM build then showed "ระบบขัดข้อง" when the
-  // DeepSeek critic call failed). Falls back to the admin-configured critic if the z.ai key is absent.
-  if (project.llm_provider === "zai") {
-    const cfg = await resolveProvider("zai");
-    if (cfg.apiKey) return reviewWithOpenAi(userPrompt, cfg.model, cfg.apiKey, cfg.baseURL);
+  // one critic pass at a given token budget (backend chosen by arm / admin).
+  const run = async (maxTokens: number): Promise<CriticResult> => {
+    // Paid plans build on GLM (zai) — review on GLM too, so the critic doesn't depend on a SEPARATE
+    // DeepSeek balance (which can run dry: a successful GLM build then showed "ระบบขัดข้อง" when the
+    // DeepSeek critic call failed). Falls back to the admin-configured critic if the z.ai key is absent.
+    if (project.llm_provider === "zai") {
+      const cfg = await resolveProvider("zai");
+      if (cfg.apiKey) return reviewWithOpenAi(userPrompt, cfg.model, cfg.apiKey, cfg.baseURL, maxTokens);
+    }
+    const { provider, model } = await resolveCritic();
+    return provider === "claude"
+      ? reviewWithAnthropic(userPrompt, model, maxTokens)
+      : reviewWithDeepSeek(userPrompt, model, maxTokens);
+  };
+
+  let r = await run(CRITIC_MAX_TOKENS);
+  // P1-1: an unparseable/truncated verdict is DEGRADED — retry ONCE with big headroom before giving
+  // up (else the WORST code, whose issue list is longest, is the MOST likely to silently "pass").
+  if (r.degraded) {
+    const r2 = await run(CRITIC_RETRY_MAX_TOKENS);
+    r = {
+      ...r2,
+      inputTokens: r.inputTokens + r2.inputTokens,
+      outputTokens: r.outputTokens + r2.outputTokens,
+      cacheReadTokens: r.cacheReadTokens + r2.cacheReadTokens,
+      cacheCreationTokens: r.cacheCreationTokens + r2.cacheCreationTokens,
+    };
   }
-  const { provider, model } = await resolveCritic();
-  return provider === "claude"
-    ? reviewWithAnthropic(userPrompt, model)
-    : reviewWithDeepSeek(userPrompt, model);
+  return r;
 }

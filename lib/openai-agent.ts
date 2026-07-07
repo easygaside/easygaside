@@ -341,50 +341,94 @@ async function runOpenAiCriticGate(
   args: RunAgentArgs,
 ): Promise<{
   issues: number;
+  criticStatus: string;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
 }> {
   const { projectId, project, emit } = args;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheCreationTokens = 0;
+  const acc = (t: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
+  }) => {
+    inputTokens += t.inputTokens;
+    outputTokens += t.outputTokens;
+    cacheReadTokens += t.cacheReadTokens ?? 0;
+    cacheCreationTokens += t.cacheCreationTokens ?? 0;
+  };
+  const totals = (issues: number, criticStatus: string) => ({
+    issues,
+    criticStatus,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
+  });
   try {
     // Working state in the status bar (not chat) — same as the Claude arm.
     emit({ type: "status", text: "กำลังตรวจสอบความถูกต้องของโค้ด…" });
     // consistent yardstick: the SAME shared rulebook critic for every arm (lib/critic CRITIC_PROVIDER)
     const review = await reviewProject(project, projectId);
+    acc(review); // count the review's tokens (was dropped to 0 on this arm — P2-10)
+    // P1-1: an unparseable/truncated verdict is NOT a clean pass — say so, never emit ✓.
+    if (review.degraded) {
+      emit({
+        type: "text",
+        delta: "\n\n⚠️ ตรวจคุณภาพอัตโนมัติไม่สมบูรณ์รอบนี้ (อ่านผลตรวจไม่ได้) — กดปุ่ม “ตรวจซ้ำ” ได้ ไม่กระทบโค้ด",
+      });
+      return totals(0, "degraded");
+    }
     if (review.issues.length === 0) {
       emit({ type: "text", delta: "\n\n✓ ตรวจคุณภาพ (rulebook critic) — ผ่าน" });
-      return { issues: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
+      return totals(0, "clean");
     }
     const lines = review.issues.map((i) => `- [${i.severity}] ${i.file}: ${i.problem} → ${i.fix}`);
     emit({ type: "text", delta: `\n\n🔍 ตรวจคุณภาพพบ ${review.issues.length} จุด:\n${lines.join("\n")}` });
 
     const actionable = review.issues.filter((i) => i.severity !== "low");
-    if (actionable.length === 0)
-      return { issues: review.issues.length, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
+    if (actionable.length === 0) return totals(review.issues.length, "issues");
 
     emit({ type: "status", text: "กำลังแก้ตามผลตรวจคุณภาพ…" });
     const repairMsg =
       "ตรวจคุณภาพ (rulebook critic) พบปัญหาต่อไปนี้ แก้ไฟล์ที่เกี่ยวข้องให้เรียบร้อยด้วย edit_file/write_file:\n" +
       actionable.map((i) => `- ${i.file}: ${i.problem} — แนวทาง: ${i.fix}`).join("\n");
     const repair = await runOpenAiTurn(client, cfg, { ...args, images: [], userMessage: repairMsg, internal: true });
+    acc(repair);
+
+    // P1-2: re-run the critic ONCE to report what actually got fixed — don't just assert "✓ แก้แล้ว".
+    let remaining = actionable.length;
+    try {
+      const after = await reviewProject(project, projectId);
+      acc(after);
+      if (!after.degraded) remaining = after.issues.filter((i) => i.severity !== "low").length;
+    } catch (e) {
+      console.error("[openai-agent] post-repair re-review failed (non-fatal):", e);
+    }
+    const fixed = Math.max(0, actionable.length - remaining);
+    if (remaining === 0) {
+      emit({ type: "text", delta: "\n\n✓ แก้ตามผลตรวจคุณภาพแล้ว (ครบทุกจุด)" });
+    } else {
+      emit({
+        type: "text",
+        delta: `\n\n✓ แก้แล้ว ${fixed}/${actionable.length} จุด — เหลืออีก ${remaining} จุด พิมพ์ “แก้ต่อ” ได้ครับ`,
+      });
+    }
+    return totals(review.issues.length, "issues");
+  } catch (e) {
+    // P1-3: a SKIPPED review is NOT a clean pass — neutral warning, no ✓, no "กด Deploy ได้เลย".
+    console.error("[openai-agent] critic gate failed (non-fatal):", e);
     emit({
       type: "text",
-      delta: repair.capped
-        ? '\n\n✓ แก้ตามผลตรวจคุณภาพบางส่วนแล้ว — ถ้ายังมีจุดค้าง พิมพ์ "แก้ต่อ" ได้ครับ'
-        : "\n\n✓ แก้ตามผลตรวจคุณภาพแล้ว",
+      delta: "\n\n⚠️ ข้ามการตรวจคุณภาพอัตโนมัติรอบนี้ (ระบบตรวจไม่พร้อม) — กดปุ่ม “ตรวจซ้ำ” ได้ ไม่กระทบโค้ด",
     });
-    return {
-      issues: review.issues.length,
-      inputTokens: repair.inputTokens,
-      outputTokens: repair.outputTokens,
-      cacheReadTokens: repair.cacheReadTokens,
-      cacheCreationTokens: repair.cacheCreationTokens,
-    };
-  } catch (e) {
-    console.error("[openai-agent] critic gate failed (non-fatal):", e);
-    emit({ type: "text", delta: "\n\n✓ โค้ดพร้อมใช้งานแล้ว — ข้ามการตรวจคุณภาพอัตโนมัติรอบนี้ (ไม่กระทบโค้ด) กด Deploy ได้เลยครับ" });
-    return { issues: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
+    return totals(0, "skipped");
   }
 }
 
@@ -399,6 +443,7 @@ export async function runOpenAiAgentLoop(
   let cacheReadTokens = main.cacheReadTokens;
   let cacheCreationTokens = main.cacheCreationTokens;
   let criticIssues = 0;
+  let criticStatus: string | null = null;
   const isCodegen = (args.turn ?? "codegen") === "codegen";
 
   // Auto-continue a build that capped mid-way (parity with the Claude loop): fire "ทำต่อ" ourselves a
@@ -422,10 +467,11 @@ export async function runOpenAiAgentLoop(
   if (isCodegen && mutated && !capped && !args.skipCritic) {
     const c = await runOpenAiCriticGate(client, cfg, args);
     criticIssues = c.issues;
+    criticStatus = c.criticStatus;
     inputTokens += c.inputTokens;
     outputTokens += c.outputTokens;
     cacheReadTokens += c.cacheReadTokens;
     cacheCreationTokens += c.cacheCreationTokens;
   }
-  return { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, criticIssues };
+  return { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, criticIssues, criticStatus };
 }

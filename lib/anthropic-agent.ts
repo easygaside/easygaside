@@ -289,6 +289,8 @@ export interface AgentRunResult {
   cacheReadTokens?: number;
   cacheCreationTokens?: number;
   criticIssues: number;
+  /** How the rulebook critic ran: null (didn't run) | clean | issues | skipped | degraded (P1-1/1-3). */
+  criticStatus?: string | null;
 }
 
 /** Token usage of a single turn — also stashed on a thrown error so a route can log partial COGS. */
@@ -313,6 +315,7 @@ export async function runAgentLoop(args: RunAgentArgs): Promise<AgentRunResult> 
   let cacheReadTokens = main.cacheReadTokens;
   let cacheCreationTokens = main.cacheCreationTokens;
   let criticIssues = 0;
+  let criticStatus: string | null = null;
   const isCodegen = (args.turn ?? "codegen") === "codegen";
 
   // Auto-continue: a big build can hit the per-turn token/iteration cap mid-way (a file left half- or
@@ -340,13 +343,14 @@ export async function runAgentLoop(args: RunAgentArgs): Promise<AgentRunResult> 
   if (isCodegen && mutated && !capped && !args.skipCritic) {
     const c = await runCriticGate(client, args);
     criticIssues = c.issues;
+    criticStatus = c.criticStatus;
     inputTokens += c.inputTokens;
     outputTokens += c.outputTokens;
     cacheReadTokens += c.cacheReadTokens;
     cacheCreationTokens += c.cacheCreationTokens;
   }
   // NOTE: the route emits `generation` (with the logged id) then `done`.
-  return { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, criticIssues };
+  return { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, criticIssues, criticStatus };
 }
 
 /**
@@ -591,6 +595,7 @@ async function runCriticGate(
   args: RunAgentArgs,
 ): Promise<{
   issues: number;
+  criticStatus: string;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -612,16 +617,31 @@ async function runCriticGate(
     cacheReadTokens += t.cacheReadTokens ?? 0;
     cacheCreationTokens += t.cacheCreationTokens ?? 0;
   };
-  const totals = (issues: number) => ({ issues, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens });
+  const totals = (issues: number, criticStatus: string) => ({
+    issues,
+    criticStatus,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
+  });
   try {
     // Show the working state in the status bar (like "เขียนไฟล์…" during codegen), not as a chat
     // bubble — keeps transient progress out of the conversation. Persistent results stay in chat.
     emit({ type: "status", text: "กำลังตรวจสอบความถูกต้องของโค้ด…" });
     const review = await reviewProject(project, projectId);
-    acc(review); // the review costs tokens even when it passes — always count it (was dropped to 0 before)
+    acc(review); // the review costs tokens even when it passes — always count it
+    // P1-1: an unparseable/truncated verdict is NOT a clean pass — say so, never emit ✓.
+    if (review.degraded) {
+      emit({
+        type: "text",
+        delta: "\n\n⚠️ ตรวจคุณภาพอัตโนมัติไม่สมบูรณ์รอบนี้ (อ่านผลตรวจไม่ได้) — กดปุ่ม “ตรวจซ้ำ” ได้ ไม่กระทบโค้ด",
+      });
+      return totals(0, "degraded");
+    }
     if (review.issues.length === 0) {
       emit({ type: "text", delta: "\n\n✓ ตรวจคุณภาพ (rulebook critic) — ผ่าน" });
-      return totals(0);
+      return totals(0, "clean");
     }
 
     const lines = review.issues.map(
@@ -630,7 +650,7 @@ async function runCriticGate(
     emit({ type: "text", delta: `\n\n🔍 ตรวจคุณภาพพบ ${review.issues.length} จุด:\n${lines.join("\n")}` });
 
     const actionable = review.issues.filter((i) => i.severity !== "low");
-    if (actionable.length === 0) return totals(review.issues.length);
+    if (actionable.length === 0) return totals(review.issues.length, "issues");
 
     emit({ type: "status", text: "กำลังแก้ตามผลตรวจคุณภาพ…" });
     const repairMsg =
@@ -645,17 +665,33 @@ async function runCriticGate(
       internal: true,
     });
     acc(repair);
+
+    // P1-2: re-run the critic ONCE to report what actually got fixed — don't just assert "✓ แก้แล้ว".
+    let remaining = actionable.length;
+    try {
+      const after = await reviewProject(project, projectId);
+      acc(after);
+      if (!after.degraded) remaining = after.issues.filter((i) => i.severity !== "low").length;
+    } catch (e) {
+      console.error("[agent] post-repair re-review failed (non-fatal):", e);
+    }
+    const fixed = Math.max(0, actionable.length - remaining);
+    if (remaining === 0) {
+      emit({ type: "text", delta: "\n\n✓ แก้ตามผลตรวจคุณภาพแล้ว (ครบทุกจุด)" });
+    } else {
+      emit({
+        type: "text",
+        delta: `\n\n✓ แก้แล้ว ${fixed}/${actionable.length} จุด — เหลืออีก ${remaining} จุด พิมพ์ “แก้ต่อ” ได้ครับ`,
+      });
+    }
+    return totals(review.issues.length, "issues");
+  } catch (e) {
+    // P1-3: a SKIPPED review is NOT a clean pass — neutral warning, no ✓, no "กด Deploy ได้เลย".
+    console.error("[agent] critic gate failed (non-fatal):", e);
     emit({
       type: "text",
-      delta: repair.capped
-        ? '\n\n✓ แก้ตามผลตรวจคุณภาพบางส่วนแล้ว — ถ้ายังมีจุดค้าง พิมพ์ "แก้ต่อ" ได้ครับ'
-        : "\n\n✓ แก้ตามผลตรวจคุณภาพแล้ว",
+      delta: "\n\n⚠️ ข้ามการตรวจคุณภาพอัตโนมัติรอบนี้ (ระบบตรวจไม่พร้อม) — กดปุ่ม “ตรวจซ้ำ” ได้ ไม่กระทบโค้ด",
     });
-    return totals(review.issues.length);
-  } catch (e) {
-    // never leave the "กำลังแก้ให้อัตโนมัติ…" line hanging — close it out visibly.
-    console.error("[agent] critic gate failed (non-fatal):", e);
-    emit({ type: "text", delta: "\n\n✓ โค้ดพร้อมใช้งานแล้ว — ข้ามการตรวจคุณภาพอัตโนมัติรอบนี้ (ไม่กระทบโค้ด) กด Deploy ได้เลยครับ" });
-    return totals(0);
+    return totals(0, "skipped");
   }
 }

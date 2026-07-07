@@ -16,6 +16,9 @@ export interface GenerationMetric {
   cacheReadTokens?: number;
   cacheCreationTokens?: number;
   criticIssues: number;
+  /** How the rulebook critic ran: null|clean|issues|skipped|degraded — excludes non-verdicts from
+   *  the trustworthy clean-rate (v2 audit P1-1/1-3). */
+  criticStatus?: string | null;
   durationMs: number;
   outcome: "ok" | "error";
 }
@@ -35,6 +38,7 @@ export async function logGeneration(m: GenerationMetric): Promise<string | null>
         cache_read_tokens: m.cacheReadTokens ?? 0,
         cache_creation_tokens: m.cacheCreationTokens ?? 0,
         critic_issues: m.criticIssues,
+        critic_status: m.criticStatus ?? null,
         duration_ms: m.durationMs,
         outcome: m.outcome,
       })

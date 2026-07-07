@@ -178,6 +178,7 @@ export async function POST(
           cacheReadTokens: r.cacheReadTokens,
           cacheCreationTokens: r.cacheCreationTokens,
           criticIssues: r.criticIssues,
+          criticStatus: r.criticStatus,
           durationMs: Date.now() - startedAt,
           outcome: "ok",
         });

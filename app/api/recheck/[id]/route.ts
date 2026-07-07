@@ -66,7 +66,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const startedAt = Date.now();
     try {
       const r = await reviewProject(project, id);
-      gate1 = r.issues;
+      // P1-1: an unparseable/truncated verdict is NOT "clean" — surface it as "couldn't check".
+      if (r.degraded) criticError = true;
+      else gate1 = r.issues;
       tokens = r.inputTokens + r.outputTokens;
       // meter it: count toward the per-project energy budget (same as a generation)
       await logGeneration({
@@ -79,6 +81,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         cacheReadTokens: r.cacheReadTokens,
         cacheCreationTokens: r.cacheCreationTokens,
         criticIssues: gate1.length,
+        criticStatus: r.degraded ? "degraded" : gate1.length ? "issues" : "clean",
         durationMs: Date.now() - startedAt,
         outcome: "ok",
       }).catch(() => {});

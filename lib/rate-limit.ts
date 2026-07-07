@@ -14,6 +14,7 @@ export interface RateRule {
 
 export const AGENT_RATE: RateRule = { bucket: "agent", max: 20, windowMs: 60_000 };
 export const DEPLOY_RATE: RateRule = { bucket: "deploy", max: 10, windowMs: 60_000 };
+export const PREVIEW_RATE: RateRule = { bucket: "preview", max: 10, windowMs: 60_000 };
 
 /** Returns true if the request is allowed (and counts it); false if the window is exhausted. */
 export async function checkRateLimit(userId: string, rule: RateRule): Promise<boolean> {

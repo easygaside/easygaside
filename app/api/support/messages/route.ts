@@ -6,6 +6,7 @@ import {
   insertSupportMessage,
   listSupportMessages,
 } from "@/lib/support";
+import { getProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 import { notifyTelegram } from "@/lib/telegram";
 
@@ -53,12 +54,16 @@ export async function POST(req: Request) {
   if (!body) return NextResponse.json({ error: "EMPTY" }, { status: 400 });
 
   try {
+    // P2-10: only attach a project the sender actually OWNS (getProject is RLS-scoped → null if not);
+    // else a paid user could plant another tenant's project reference into the admin inbox.
+    const rawPid = typeof input.projectId === "string" ? input.projectId : null;
+    const projectId = rawPid && (await getProject(rawPid)) ? rawPid : null;
     const message = await insertSupportMessage({
       userId: user.id,
       sender: "user",
       body,
       email: user.email ?? null,
-      projectId: typeof input.projectId === "string" ? input.projectId : null,
+      projectId,
     });
     // Best-effort admin alerts (Telegram + push); the message is already stored.
     await notifyTelegram(

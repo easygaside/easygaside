@@ -18,20 +18,18 @@ export async function acquireProjectRun(projectId: string): Promise<boolean> {
     console.error("[agent-lock] acquire error (fail-open):", ins.error.message);
     return true;
   }
-  // a run already holds the lock — only steal it if it looks crashed (older than the timeout)
-  const { data } = await svc
+  // a run already holds the lock — only steal it if it looks crashed (older than the timeout). Do the
+  // check-and-steal ATOMICALLY as a conditional UPDATE: if two requests race past STALE_MS, only the
+  // one whose UPDATE matches the still-stale row wins; the other matches nothing → false. (Was a racy
+  // read-then-update that let BOTH in.)
+  const cutoff = new Date(Date.now() - STALE_MS).toISOString();
+  const { data: stolen } = await svc
     .from("egs_agent_runs")
-    .select("started_at")
+    .update({ started_at: new Date().toISOString() })
     .eq("project_id", projectId)
-    .maybeSingle<{ started_at: string }>();
-  if (data && Date.now() - new Date(data.started_at).getTime() > STALE_MS) {
-    await svc
-      .from("egs_agent_runs")
-      .update({ started_at: new Date().toISOString() })
-      .eq("project_id", projectId);
-    return true;
-  }
-  return false;
+    .lt("started_at", cutoff)
+    .select("project_id");
+  return !!(stolen && stolen.length > 0);
 }
 
 export async function releaseProjectRun(projectId: string): Promise<void> {

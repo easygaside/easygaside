@@ -3,6 +3,7 @@ import { mapGoogleError } from "@/lib/api-helpers";
 import { getTarget } from "@/lib/deployment-targets";
 import { getConnectionStatus } from "@/lib/google-connection";
 import { getProject } from "@/lib/projects";
+import { PREVIEW_RATE, checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -22,6 +23,14 @@ export async function POST(
 
   const project = await getProject(id);
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+  // P2-7: preview mints a Google token + pushes files — rate-limit it like deploy so a stuck client
+  // can't burn the user's Apps Script API quota (which would then break their real deploys).
+  if (!(await checkRateLimit(user.id, PREVIEW_RATE)))
+    return NextResponse.json(
+      { error: "rate_limited", message: "พรีวิวถี่เกินไป — รอสักครู่แล้วลองใหม่" },
+      { status: 429 },
+    );
 
   try {
     const target = getTarget(project.target ?? "gas");

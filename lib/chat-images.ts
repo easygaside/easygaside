@@ -12,6 +12,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 export const CHAT_IMAGES_BUCKET = "egs-chat-images";
 export const MAX_CHAT_IMAGES = 4;
+const MAX_IMAGE_B64 = 7_000_000; // ~5 MB decoded per image
+const MAX_TOTAL_B64 = 16_000_000; // ~12 MB decoded total per turn
 
 /** Allowed by the Anthropic image API (and the bucket's allowed_mime_types). */
 const ALLOWED_MEDIA = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -32,6 +34,7 @@ export interface AttachedImage {
 export function parseAttachedImages(raw: unknown): AttachedImage[] {
   if (!Array.isArray(raw)) return [];
   const out: AttachedImage[] = [];
+  let total = 0;
   for (const item of raw.slice(0, MAX_CHAT_IMAGES)) {
     if (!item || typeof item !== "object") continue;
     const mediaType = String((item as Record<string, unknown>).mediaType ?? "");
@@ -40,6 +43,11 @@ export function parseAttachedImages(raw: unknown): AttachedImage[] {
     const comma = data.indexOf(",");
     if (data.startsWith("data:") && comma !== -1) data = data.slice(comma + 1);
     if (!ALLOWED_MEDIA.has(mediaType) || data.length === 0) continue;
+    // P2-10: bound the payload — skip an oversized image and stop once the turn's total cap is hit
+    // (prevents OOM decoding huge base64 + uncapped vision cost on the platform key).
+    if (data.length > MAX_IMAGE_B64) continue;
+    if (total + data.length > MAX_TOTAL_B64) break;
+    total += data.length;
     out.push({ dataBase64: data, mediaType });
   }
   return out;

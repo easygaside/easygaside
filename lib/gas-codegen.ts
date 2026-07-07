@@ -197,16 +197,27 @@ const WEBAPP_ADDENDUM = `
   - Run setup on first use (top of doGet or each data function) so the spreadsheet + tabs + header columns are created automatically on the first request.
   - Expose the spreadsheet URL to the owner (a link in an admin view or returned from a function) so they can find their data.
 - Use LockService around appendRow for concurrent writes.
-- Self-diagnostics (lets EasyGAS auto-test & repair the deployed app): wrap doGet(e) in try/catch. On error, if e && e.parameter && e.parameter.__egsdiag === 'egsverify', return the raw error as TEXT so EasyGAS can read the exact message + line; otherwise show a friendly fallback page. Normal users never pass that param, so they only ever see the fallback.
+- Self-diagnostics (lets EasyGAS auto-test & repair the deployed app): wrap doGet(e) in try/catch. When e.parameter.__egsdiag === 'egsverify', CAPTURE Logger.log output and, on error, return the stack PLUS the captured logs as TEXT so EasyGAS sees what happened before the crash; otherwise show a friendly fallback page. Normal users never pass that param, so they only ever see the fallback. Copy this shape EXACTLY (the log-capture is wrapped in its own try so a non-writable Logger can never break the page):
       function doGet(e) {
+        var __egsDiag = e && e.parameter && e.parameter.__egsdiag === 'egsverify';
+        var __egsLogs = [];
+        if (__egsDiag) {
+          try {                                            // capture Logger.log ONLY in diag mode
+            var __ol = Logger.log;
+            Logger.log = function (m) { try { __egsLogs.push(String(m)); } catch (_) {} return __ol.apply(Logger, arguments); };
+          } catch (_) {}
+        }
         try {
           // ...build + return your HtmlOutput as usual...
         } catch (err) {
-          if (e && e.parameter && e.parameter.__egsdiag === 'egsverify')
-            return ContentService.createTextOutput('EGS_ERROR: ' + (err && err.stack ? err.stack : err)).setMimeType(ContentService.MimeType.TEXT);
+          if (__egsDiag)
+            return ContentService.createTextOutput(
+              'EGS_ERROR: ' + (err && err.stack ? err.stack : err) + '\nEGS_LOGS: ' + JSON.stringify(__egsLogs)
+            ).setMimeType(ContentService.MimeType.TEXT);
           return HtmlService.createHtmlOutput('<p style="font-family:sans-serif;padding:16px">ขออภัย เกิดข้อผิดพลาด ลองใหม่อีกครั้ง</p>');
         }
-      }`;
+      }
+  Add Logger.log('...') at key steps (after reading/writing the Sheet, before returning a value) so a failed diag run shows the trace — EasyGAS feeds these logs straight into the auto-repair.`;
 
 export interface CodegenOptions {
   kind?: ProjectKind;

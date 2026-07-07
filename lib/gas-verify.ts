@@ -11,7 +11,10 @@
 // "EGS_ERROR: <stack>" when this param is present, so the probe gets the exact message + line.
 const DIAG_PARAM = "__egsdiag";
 const DIAG_TOKEN = "egsverify";
-const SELF_REPORT = /EGS_ERROR:\s*([\s\S]{0,600})/;
+// doGet's diag path returns "EGS_ERROR: <stack>\nEGS_LOGS: <json array>" (gas-codegen self-diag):
+// the exact error PLUS the captured Logger.log trace that led up to it.
+const SELF_ERROR = /EGS_ERROR:\s*([\s\S]*?)(?:\nEGS_LOGS:|$)/;
+const SELF_LOGS = /EGS_LOGS:\s*(\[[\s\S]*\])/;
 
 // Strong signatures that mean a GAS-level failure (avoid generic "error" to limit false positives).
 const FAIL_SIGNATURES: { re: RegExp; label: string }[] = [
@@ -60,9 +63,23 @@ export async function probeExec(execUrl: string): Promise<ProbeResult> {
     if (LOGIN_WALL.test(finalUrl) || LOGIN_WALL.test(text))
       return { ok: false, authRequired: true, error: "แอปยังเปิดให้รันสาธารณะไม่ได้ (อาจยังไม่ได้ deploy / สิทธิ์เข้าถึงไม่ใช่ ANYONE_ANONYMOUS)" };
 
-    // self-reported error from doGet's catch (the precise one) wins
-    const sr = text.match(SELF_REPORT);
-    if (sr) return { ok: false, error: sr[1].replace(/\s+/g, " ").trim().slice(0, 400) };
+    // self-reported error from doGet's catch (the precise one) wins; the captured Logger.log trace
+    // (EGS_LOGS) rides along so the auto-repair sees WHAT the app did before it crashed.
+    if (/EGS_ERROR:/.test(text)) {
+      const err = (text.match(SELF_ERROR)?.[1] ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
+      let logs = "";
+      const lm = text.match(SELF_LOGS);
+      if (lm) {
+        try {
+          const arr = JSON.parse(lm[1]) as unknown[];
+          if (Array.isArray(arr) && arr.length)
+            logs = " | log: " + arr.slice(-6).map(String).join(" · ").slice(0, 220);
+        } catch {
+          /* logs not valid json — ignore */
+        }
+      }
+      return { ok: false, error: (err + logs).slice(0, 560) || "แอปรายงานข้อผิดพลาดตอนรัน" };
+    }
 
     if (res.status >= 500) return { ok: false, error: `เซิร์ฟเวอร์ตอบกลับ HTTP ${res.status} ตอนเปิดแอป` };
     for (const { re, label } of FAIL_SIGNATURES) {

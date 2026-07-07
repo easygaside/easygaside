@@ -151,6 +151,35 @@ function toResult(issues: CriticIssue[], usage: CriticUsage): CriticResult {
   return { ok: issues.length === 0, issues, ...usage };
 }
 
+/**
+ * Format the confirmed spec (egs_projects.spec) into a CONFORMANCE rubric (P1-5): the critic must
+ * check the code actually implements what the user was promised — a whole class of "tidy but
+ * incomplete" builds that pass every other gate. Empty/absent spec → "" (review code-quality only).
+ */
+function buildSpecBlock(spec: Record<string, unknown> | null): string {
+  if (!spec) return "";
+  const list = (v: unknown): string[] => (Array.isArray(v) ? v.map(String).filter(Boolean) : []);
+  const features = list(spec.features);
+  const dataModel = list(spec.dataModel);
+  const outputs = list(spec.outputs);
+  const lines: string[] = [];
+  if (spec.summary) lines.push(`สรุประบบ: ${String(spec.summary)}`);
+  if (features.length) lines.push(`ฟีเจอร์ที่ต้องมี: ${features.join("; ")}`);
+  if (dataModel.length) lines.push(`ข้อมูล/คอลัมน์ที่ต้องเก็บ: ${dataModel.join("; ")}`);
+  if (outputs.length) lines.push(`ผลลัพธ์/การกระทำที่ต้องทำได้: ${outputs.join("; ")}`);
+  if (spec.storage) lines.push(`ที่เก็บข้อมูล: ${String(spec.storage)}`);
+  if (lines.length === 0) return "";
+  return (
+    `=== SPEC ที่ผู้ใช้ยืนยันไว้ — ต้องตรวจว่าโค้ด "ทำครบ" ===\n${lines.join("\n")}\n\n` +
+    `CONFORMANCE CHECK: for EACH feature / data field / output listed above, verify the code ACTUALLY ` +
+    `implements it, and flag any PROMISED item with no corresponding implementation as an issue (severity ` +
+    `"high"). Examples: spec says "ส่งอีเมลยืนยัน" but there is no MailApp/GmailApp.sendEmail call; a data ` +
+    `field (เบอร์โทร/วันที่/ชื่อ) with no matching Sheet header/column write; an output/action with no handler ` +
+    `function. Put "file"/"line" at the entry point where it SHOULD be wired. Do NOT flag extra functionality ` +
+    `the spec didn't mention, and do NOT invent missing items you can't confirm from the code.\n\n`
+  );
+}
+
 /** Number every line so the model can cite a 1-based `line` we map to an editor marker. */
 function buildReviewPrompt(files: { path: string; content: string }[], project: EgsProject): string {
   const body = files
@@ -166,7 +195,7 @@ function buildReviewPrompt(files: { path: string; content: string }[], project: 
     project.kind === "bound"
       ? "container-bound script (bound to a Google Sheet, uses onOpen menu)"
       : "standalone web app (doGet entry point)";
-  return `Project kind: ${kind}\n\n${body}`;
+  return `Project kind: ${kind}\n\n${buildSpecBlock(project.spec)}${body}`;
 }
 
 /** Critic backend: Anthropic (Haiku) — caches the constant rubric (identical on every call). */
